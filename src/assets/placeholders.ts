@@ -53,6 +53,18 @@ function paintEthan(g: G): void {
   for (let i = 0; i < ETHAN_FRAME.count; i++) {
     const ox = i * ETHAN_FRAME.width;
     const cx = ox + 100;
+    const a = angles[i] ?? 0;
+    const sx = cx + 50;
+    const sy = 180;
+    const hx = sx + Math.cos(a) * 55;
+    const hy = sy + Math.sin(a) * 55;
+    // Cream outline first (logo-style ink outlines, and it keeps his black
+    // shirt visible on dark backgrounds), then the shirt on top.
+    g.fillStyle(COLORS.cream);
+    g.fillRoundedRect(cx - 66, 154, 132, 122, 34);
+    g.fillRoundedRect(cx - 86, 164, 42, 92, 18);
+    g.lineStyle(40, COLORS.cream);
+    g.lineBetween(sx, sy, hx, hy);
     // Body, left arm, apron
     g.fillStyle(COLORS.shirt);
     g.fillRoundedRect(cx - 60, 160, 120, 110, 30);
@@ -60,11 +72,6 @@ function paintEthan(g: G): void {
     g.fillStyle(COLORS.cream);
     g.fillRoundedRect(cx - 35, 185, 70, 80, 12);
     // Waving arm
-    const a = angles[i] ?? 0;
-    const sx = cx + 50;
-    const sy = 180;
-    const hx = sx + Math.cos(a) * 55;
-    const hy = sy + Math.sin(a) * 55;
     g.lineStyle(28, COLORS.shirt);
     g.lineBetween(sx, sy, hx, hy);
     g.fillStyle(COLORS.skin);

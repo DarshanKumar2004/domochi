@@ -38,3 +38,20 @@ Kumar chose **option B** (fill the screen, no bars) and asked for **landscape on
 - **Popup dimmers and tap areas are a fixed 4000×4000 px,** bigger than any possible game, so they never need resizing.
 - **Tweens no longer animate x/y** (they would fight the layout). The Lobby's 'Tap me!' pulses in scale, and the Fry donut wobbles in angle.
 - **Playwright runs 3 projects:** Pixel 7 portrait, Pixel 7 landscape, and desktop at 1440×900 (mouse, no touch). A rotation test flips the phone mid-game and checks that state is kept and everything is still tappable. `tapGame` also fails if a target is off screen. The full-flow test timeout is 90 s because projects run in parallel.
+
+## Real domochi branding (2026-10-30)
+
+Kumar asked for the real branding and flavours from https://www.domochitreats.com.
+
+- **Source:** the site is a Square Online store. Its pages render in the browser, so the menu came from Square's public store API: `https://cdn5.editmysite.com/app/store/api/v28/editor/users/154290604/sites/187969059733018017/products`. Re-run that to refresh `menu.json` when the shop changes flavours.
+- **`menu.json` now has the real menu:** strawberry, cookies & cream, chocolate hazelnut, fruity cereal, cookie butter and beignet, all $4. Boxes: the trio (3, $11), the flight (6, $20) and the domochi box (12, $30). Names, descriptions and prices are copied exactly.
+- **Game-design guesses layered on top** (not from the shop, easy to change in the JSON):
+  - "sweet glaze" for fruity cereal, because the site only says "sweet glaze".
+  - **Beignet is a "dust" style**: powdered sugar shaken on at the Glaze station, a third style beside dip and drizzle. Its mechanic is decided in Phase 4.
+  - Every real flavour is a full dip, so "drizzle" is unused for now but still supported.
+  - **Unlock order:** day 1 strawberry plus cookies & cream (so the Toppings station is used from day 1), then chocolate hazelnut, fruity cereal, cookie butter and beignet on days 2 to 5. This is a balance placeholder, to be tuned in Phase 6.
+- **`validateMenu()`** (`src/systems/menu.ts`) checks ids, references, colours and unlock days, and a unit test runs it on the real `menu.json`. A typo in a future menu edit fails the tests instead of breaking the game.
+- **`brand.json`** holds the name, tagline, founder, city, website and Instagram. Address and hours were left out because they change, and stale hours in a game would be bad marketing.
+- **Palette:** ink `#1f1a17` and cream `#fffaf0` from the site, with strawberry-glaze pink `#f4a6c0` as the accent. Ethan wears black with a cream outline, echoing the logo's ink outlines and keeping him visible on dark backgrounds.
+- **Text:** the loading screen shows "domochi" plus the tagline, the truck sign is lowercase, and Ethan's tutorial lines use the shop's own "what's a mochi donut?" copy.
+- **Not done yet, waiting on Kumar:** the official logo PNG is not in the repo (see open questions in chat). The setting is still a truck, but the real business is a walk-up window at the shop plus pop-ups.

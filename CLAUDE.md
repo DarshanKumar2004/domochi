@@ -162,5 +162,9 @@ tests/              # vitest + playwright
 
 ## Branding
 
-- The business name is **Domochi Donuts**, and the owner character is **Ethan**.
-- Use the owner's real logo, menu, and colors once provided. Until then, use neutral placeholder colors and mark them `TODO-BRAND` in code.
+- **Use the real domochi branding, from https://www.domochitreats.com** (a Square Online store). The brand facts are in `src/data/brand.json` and the real menu is in `src/data/menu.json`.
+- The name is written **"domochi"**, all lowercase. The tagline is "taste sweetness, spark greatness". The owner character is **Ethan** (founder Ethan Ly). The shop is Lafayette's first mochi donut shop, and its Instagram is @domochi.treats.
+- **Brand voice:** warm, casual, mostly lowercase in menu copy ("chewy, pull-apart mochi ring", "made fresh daily").
+- **Look:** the logo is a black-and-white, comic-style pon de ring (halftone dots, bold ink outlines, sprinkle strokes) above a thin lowercase wordmark. The site is minimal ink black and cream. Colour comes from the food. Game palette: `src/ui/theme.ts`.
+- **Menu:** use the shop's real flavour names, descriptions and prices exactly. Game-only fields (glaze style, colours, unlock day) are clearly ours. To refresh the menu, re-fetch it from the store (see DECISIONS.md).
+- Anything still unconfirmed is marked `TODO-BRAND` in code.

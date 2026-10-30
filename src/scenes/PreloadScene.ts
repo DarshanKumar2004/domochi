@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ASSET_FILES, queueAssetFile } from '../assets/files';
+import brand from '../data/brand.json';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
 import { save } from '../systems/services';
 import type { Viewport } from '../ui/layout';
@@ -38,10 +39,10 @@ export class PreloadScene extends Phaser.Scene {
     this.ready = false;
 
     this.title = this.add
-      .text(0, 0, 'Domochi Donuts', { fontFamily: FONT_FAMILY, fontSize: '110px', fontStyle: 'bold', color: CSS.cream })
+      .text(0, 0, brand.name, { fontFamily: FONT_FAMILY, fontSize: '140px', fontStyle: 'bold', color: CSS.cream })
       .setOrigin(0.5);
     this.subtitle = this.add
-      .text(0, 0, 'Fresh mochi donuts · Lafayette, LA', { fontFamily: FONT_FAMILY, fontSize: '44px', color: CSS.muted })
+      .text(0, 0, brand.tagline, { fontFamily: FONT_FAMILY, fontSize: '44px', color: CSS.muted })
       .setOrigin(0.5);
     this.truck = new Truck(this, 0, 0);
     this.barBg = this.add.rectangle(0, 0, BAR_WIDTH + 16, BAR_HEIGHT + 16, COLORS.tabBar);

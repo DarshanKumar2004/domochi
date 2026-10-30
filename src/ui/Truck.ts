@@ -18,13 +18,13 @@ export class Truck extends Phaser.GameObjects.Container {
     ).setOrigin(0.5, 1);
     ethan.play(AnimKeys.EthanWave);
 
-    // TODO-BRAND: replace with the real logo once provided.
+    // TODO-BRAND: swap for the official logo artwork once Kumar confirms we may use it.
     const sign = scene.make
       .text(
         {
           x: left + TRUCK_SPEC.signCenter.x,
           y: top + TRUCK_SPEC.signCenter.y,
-          text: 'DOMOCHI',
+          text: 'domochi',
           style: { fontFamily: FONT_FAMILY, fontSize: '56px', fontStyle: 'bold', color: CSS.cream },
         },
         false,
