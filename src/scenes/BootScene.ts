@@ -17,7 +17,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    ensurePlaceholderTextures(this, [TextureKeys.Truck, TextureKeys.Ethan]);
+    ensurePlaceholderTextures(this, [TextureKeys.Logo, TextureKeys.Truck, TextureKeys.Ethan]);
     createAnimations(this);
     this.scene.start(SceneKeys.Preload);
   }

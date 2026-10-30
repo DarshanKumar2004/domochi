@@ -167,4 +167,10 @@ tests/              # vitest + playwright
 - **Brand voice:** warm, casual, mostly lowercase in menu copy ("chewy, pull-apart mochi ring", "made fresh daily").
 - **Look:** the logo is a black-and-white, comic-style pon de ring (halftone dots, bold ink outlines, sprinkle strokes) above a thin lowercase wordmark. The site is minimal ink black and cream. Colour comes from the food. Game palette: `src/ui/theme.ts`.
 - **Menu:** use the shop's real flavour names, descriptions and prices exactly. Game-only fields (glaze style, colours, unlock day) are clearly ours. To refresh the menu, re-fetch it from the store (see DECISIONS.md).
+- **Setting:** domochi's main base is a **white food trailer** (photos from Kumar, 2026-10-30). It has a serving window with a menu board, a black OPEN sign, the big logo with the @handle and website on the side, tandem wheels with white rims, and a sidewalk A-frame poster ("DOMOCHI MOCHI DONUTS" with donut photos). It's parked on a concrete lot.
+- **Logo:** the official logo is cleared for use (Kumar, 2026-10-30) and lives at `public/assets/logo.png`. It's ink on a transparent background with a hollow wordmark, so always place it on a light background.
 - Anything still unconfirmed is marked `TODO-BRAND` in code.
+
+## Future ideas (not scheduled yet)
+
+- **Morning deliveries:** domochi also delivers to local coffee shops and through delivery apps. A morning rush could mix walk-up customers with batch orders for partner coffee shops (Kumar suggested Campus Grounds at UL Lafayette) and delivery-app pickups. Before using any real partner's name, get their OK. Use a generic "delivery app" rather than a real brand name.

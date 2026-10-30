@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { TextureKey } from './keys';
+import { TextureKeys, type TextureKey } from './keys';
 
 /** A real art file in public/assets/. Any key not listed here uses a code-drawn placeholder. */
 export interface AssetFile {
@@ -14,9 +14,11 @@ export interface AssetFile {
 }
 
 // To replace a placeholder: drop the PNG in public/assets/, add a line here,
-// and update assets/MANIFEST.md. Example:
-// { key: TextureKeys.Truck, path: 'assets/truck.png', boot: true },
-export const ASSET_FILES: AssetFile[] = [];
+// and update assets/MANIFEST.md.
+export const ASSET_FILES: AssetFile[] = [
+  // Official domochi logo (permission confirmed by Kumar, 2026-10-30). Needed on the loading screen.
+  { key: TextureKeys.Logo, path: 'assets/logo.png', boot: true },
+];
 
 export function queueAssetFile(scene: Phaser.Scene, file: AssetFile): void {
   if (file.frameWidth !== undefined) {

@@ -2,7 +2,9 @@
 // Each key must also be documented in assets/MANIFEST.md (a unit test checks this).
 
 export const TextureKeys = {
+  Logo: 'logo',
   Truck: 'truck',
+  SignAFrame: 'sign-aframe',
   Ethan: 'ethan',
   Customer: 'customer',
   DonutPlain: 'donut-plain',
@@ -28,12 +30,19 @@ export const ETHAN_FRAME = { width: 220, height: 260, count: 4 } as const;
 
 /**
  * Anchor points inside the truck image, in its own pixel coordinates.
- * Update these if the real truck art puts the window or sign elsewhere.
+ * The truck is domochi's white trailer (see photos from Kumar, 2026-10-30):
+ * serving window on the left, black OPEN sign, big logo on the right side.
+ * Update these if the real truck art puts things elsewhere.
  */
 export const TRUCK_SPEC = {
   width: 900,
   height: 620,
   /** Ethan's feet are placed here, so he appears to stand behind the counter. */
-  windowBottomCenter: { x: 450, y: 440 },
-  signCenter: { x: 450, y: 45 },
+  windowBottomCenter: { x: 250, y: 390 },
+  /** Ethan is drawn at this scale so he fits the window. */
+  ethanScale: 0.85,
+  openSignCenter: { x: 515, y: 200 },
+  logoCenter: { x: 720, y: 250 },
+  logoSize: 260,
+  handleCenter: { x: 720, y: 430 },
 } as const;

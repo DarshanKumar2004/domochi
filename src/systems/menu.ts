@@ -22,7 +22,10 @@ export interface Flavor {
   name: string;
   price: number;
   description: string;
+  /** Base coat: id of a 'dip' or 'dust' glaze. */
   glaze: string;
+  /** Optional stripes over the base coat: id of a 'drizzle' glaze. */
+  drizzle?: string;
   toppings: string[];
   /** First in-game day this flavor can be ordered. */
   unlockDay: number;
@@ -54,7 +57,7 @@ function duplicates(ids: string[]): string[] {
 /** Returns human-readable problems with a menu; empty means valid. */
 export function validateMenu(menu: Menu): string[] {
   const errors: string[] = [];
-  const glazeIds = new Set(menu.glazes.map((g) => g.id));
+  const glazeById = new Map(menu.glazes.map((g) => [g.id, g]));
   const toppingIds = new Set(menu.toppings.map((t) => t.id));
 
   for (const [kind, ids] of [
@@ -75,7 +78,16 @@ export function validateMenu(menu: Menu): string[] {
     for (const c of t.colors) if (!HEX.test(c)) errors.push(`topping "${t.id}" color "${c}" is not #rrggbb`);
   }
   for (const f of menu.flavors) {
-    if (!glazeIds.has(f.glaze)) errors.push(`flavor "${f.id}" uses unknown glaze "${f.glaze}"`);
+    const base = glazeById.get(f.glaze);
+    if (!base) errors.push(`flavor "${f.id}" uses unknown glaze "${f.glaze}"`);
+    else if (base.style === 'drizzle') {
+      errors.push(`flavor "${f.id}" base glaze "${f.glaze}" must be a dip or dust, not a drizzle`);
+    }
+    if (f.drizzle !== undefined) {
+      const d = glazeById.get(f.drizzle);
+      if (!d) errors.push(`flavor "${f.id}" uses unknown drizzle "${f.drizzle}"`);
+      else if (d.style !== 'drizzle') errors.push(`flavor "${f.id}" drizzle "${f.drizzle}" is not a drizzle glaze`);
+    }
     for (const t of f.toppings) if (!toppingIds.has(t)) errors.push(`flavor "${f.id}" uses unknown topping "${t}"`);
     if (!Number.isInteger(f.unlockDay) || f.unlockDay < 1) errors.push(`flavor "${f.id}" unlockDay must be an integer >= 1`);
     if (!(f.price > 0)) errors.push(`flavor "${f.id}" price must be > 0`);

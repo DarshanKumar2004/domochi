@@ -67,3 +67,14 @@ Kumar asked for the real branding and flavours from https://www.domochitreats.co
   - It always calls `scale.refresh()`.
   - `#game` is now `position: fixed` with overflow clipped, so a briefly oversized canvas can't widen the page and trigger mobile zoom-to-fit.
 - **Tests (`tests/e2e/layout.spec.ts`):** the canvas fills the screen on load, after rapid back-and-forth rotations, and after being forced oversized. The rotation flow in `smoke.spec.ts` also asserts the canvas fills the screen. I checked that the oversized test **fails on the old code** with the canvas stuck at 3× the screen.
+
+## Trailer, logo and drizzles (2026-10-30)
+
+Kumar shared photos of the real trailer and A-frame sign, confirmed the setting is the trailer, confirmed we may use the official logo, and confirmed the lowercase name "domochi".
+
+- **Logo** is in `public/assets/logo.png`, a 512 px downscale (125 KB, down from 619 KB) for phone load times. It loads in Boot because the loading screen needs it. A code-drawn fallback ring is used if the file ever fails to load.
+- **The loading screen is now cream,** like the trailer. The logo is ink on transparent with a *hollow* wordmark, which would disappear on our dark background. The logo replaces the text title, and the layout puts the logo on the left and the trailer on the right in landscape, stacked in portrait.
+- **The placeholder truck now matches the photos:** a white trailer with bold ink outlines, as in the logo's comic style. It has the window on the left with Ethan and a menu board, the OPEN sign, the logo and @handle on the right, and tandem white-rim wheels. The old roof sign is gone because the real trailer doesn't have one.
+- **New A-frame sign** in the Lobby next to the trailer. The ground is light concrete, like the photos, and the truck's wheels now sit on the ground line.
+- **Drizzles, from the A-frame photo:** strawberry and cookie butter have white icing stripes over the base glaze, and cookie butter has a cookie on top. The menu model is now *base glaze* (dip or dust) plus an *optional drizzle* plus toppings, and the validator enforces those styles. So the Glaze station (Phase 4) will be dip or dust, then drizzle when the ticket asks for it.
+- **The deliveries idea** (coffee-shop batch orders, delivery apps) is recorded in CLAUDE.md under Future ideas, with a note to get partner permission before using real names.

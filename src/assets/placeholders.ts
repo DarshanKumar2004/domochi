@@ -18,32 +18,101 @@ interface PlaceholderSpec {
 
 const DARK = 0x2b1a10;
 
+/**
+ * domochi's white trailer, after Kumar's photos: serving window on the left
+ * with a menu board, stainless shelf, black OPEN sign, light bar, tandem
+ * wheels with white rims. Bold ink outlines echo the logo's comic style.
+ * The logo, OPEN text and @handle are added on top by ui/Truck.ts.
+ */
 function paintTruck(g: G): void {
-  // Roof sign (TODO-BRAND: real logo)
-  g.fillStyle(COLORS.pink);
-  g.fillRoundedRect(250, 0, 400, 90, 24);
+  const ink = COLORS.ink;
   // Body
-  g.fillStyle(COLORS.cream);
-  g.fillRoundedRect(20, 80, 860, 450, 48);
-  g.fillStyle(COLORS.pinkDark);
-  g.fillRoundedRect(20, 470, 860, 60, { tl: 0, tr: 0, bl: 48, br: 48 });
-  // Service window
-  g.fillStyle(0x3a2a1e);
-  g.fillRoundedRect(150, 180, 600, 260, 16);
-  // Striped awning
-  for (let i = 0; i < 10; i++) {
-    g.fillStyle(i % 2 === 0 ? COLORS.pink : COLORS.cream);
-    g.fillRect(130 + i * 64, 120, 64, 60);
-  }
-  // Counter
-  g.fillStyle(COLORS.brown);
-  g.fillRect(130, 440, 640, 26);
-  // Wheels
-  for (const x of [210, 690]) {
+  g.fillStyle(0xf7f6f2);
+  g.fillRoundedRect(20, 40, 860, 470, 28);
+  g.fillStyle(0xdedcd6);
+  g.fillRect(28, 48, 844, 22);
+  g.lineStyle(8, ink);
+  g.strokeRoundedRect(20, 40, 860, 470, 28);
+  // Light bar
+  g.fillStyle(0xffffff);
+  g.fillRect(600, 86, 240, 14);
+  g.lineStyle(3, 0xbdbdbd);
+  g.strokeRect(600, 86, 240, 14);
+  // Serving window: frame, glass, menu board
+  g.fillStyle(0xb9bec4);
+  g.fillRect(60, 110, 380, 290);
+  g.fillStyle(0x2f3438);
+  g.fillRect(72, 122, 356, 268);
+  g.fillStyle(0xffffff);
+  g.fillRect(82, 132, 66, 150);
+  g.lineStyle(4, ink);
+  for (let y = 160; y < 270; y += 22) g.lineBetween(90, y, 140, y);
+  g.lineStyle(6, ink);
+  g.strokeRect(60, 110, 380, 290);
+  // Stainless shelf and panel under the window
+  g.fillStyle(0xd9dcdf);
+  g.fillRect(60, 420, 380, 60);
+  g.fillStyle(0xc8ccd0);
+  g.fillRect(48, 392, 404, 22);
+  g.lineStyle(4, ink);
+  g.strokeRect(48, 392, 404, 22);
+  // OPEN sign (text added by ui/Truck.ts)
+  g.fillStyle(ink);
+  g.fillEllipse(TRUCK_SPEC.openSignCenter.x, TRUCK_SPEC.openSignCenter.y, 150, 66);
+  g.lineStyle(3, 0x777777);
+  g.lineBetween(TRUCK_SPEC.openSignCenter.x - 30, 140, TRUCK_SPEC.openSignCenter.x, 120);
+  g.lineBetween(TRUCK_SPEC.openSignCenter.x + 30, 140, TRUCK_SPEC.openSignCenter.x, 120);
+  // Tandem wheels with white rims
+  for (const x of [170, 320]) {
     g.fillStyle(0x222222);
-    g.fillCircle(x, 540, 72);
-    g.fillStyle(0x9aa3ab);
-    g.fillCircle(x, 540, 30);
+    g.fillCircle(x, 540, 64);
+    g.fillStyle(0xf2f2f2);
+    g.fillCircle(x, 540, 34);
+    g.fillStyle(0x999999);
+    g.fillCircle(x, 540, 8);
+  }
+}
+
+/** Sidewalk A-frame sign: a poster of real domochi flavors (after Kumar's photo). */
+function paintAFrame(g: G): void {
+  const ink = COLORS.ink;
+  // Legs and frame
+  g.fillStyle(ink);
+  g.fillRect(14, 20, 14, 290);
+  g.fillRect(192, 20, 14, 290);
+  g.fillRoundedRect(10, 10, 200, 260, 10);
+  g.fillStyle(0xf7f6f2);
+  g.fillRect(22, 22, 176, 236);
+  // Donut photos: beignet, cookie butter, strawberry, cookies & cream, fruity cereal
+  const donuts: [number, number, number][] = [
+    [62, 70, 0xffffff],
+    [148, 70, 0xc68a4e],
+    [62, 140, 0xf4a6c0],
+    [148, 140, 0xf1ece4],
+    [105, 205, 0xff6b8a],
+  ];
+  for (const [x, y, color] of donuts) {
+    g.fillStyle(color);
+    g.fillCircle(x, y, 30);
+    g.lineStyle(3, 0xcfc8bd);
+    g.strokeCircle(x, y, 30);
+    g.fillStyle(0xf7f6f2);
+    g.fillCircle(x, y, 11);
+  }
+  // "DOMOCHI MOCHI DONUTS" lettering, as bars
+  g.fillStyle(ink);
+  g.fillRect(40, 238, 140, 10);
+}
+
+/** Fallback if public/assets/logo.png fails to load: the ring of 8 balls, ink on white. */
+function paintLogoFallback(g: G): void {
+  const ring = 170;
+  const r = ringBallRadius(ring, 8, 1.2);
+  for (const p of ringBallCenters(256, 230, ring)) {
+    g.fillStyle(0xffffff);
+    g.fillCircle(p.x, p.y, r);
+    g.lineStyle(10, COLORS.ink);
+    g.strokeCircle(p.x, p.y, r);
   }
 }
 
@@ -228,7 +297,9 @@ function paintIconBox(g: G): void {
 }
 
 const SPECS: Record<TextureKey, PlaceholderSpec> = {
+  [TextureKeys.Logo]: { width: 512, height: 512, paint: paintLogoFallback },
   [TextureKeys.Truck]: { width: TRUCK_SPEC.width, height: TRUCK_SPEC.height, paint: paintTruck },
+  [TextureKeys.SignAFrame]: { width: 220, height: 320, paint: paintAFrame },
   [TextureKeys.Ethan]: {
     width: ETHAN_FRAME.width * ETHAN_FRAME.count,
     height: ETHAN_FRAME.height,

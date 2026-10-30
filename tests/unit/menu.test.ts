@@ -39,4 +39,19 @@ describe('validateMenu', () => {
     expect(errors).toContain('price');
     expect(errors).toContain('no flavor is unlocked on day 1');
   });
+
+  it('checks base glaze vs drizzle styles', () => {
+    const base = menu.flavors[0]!;
+    const errors = validateMenu({
+      ...menu,
+      flavors: [
+        { ...base, id: 'a', glaze: 'white-icing', drizzle: undefined },
+        { ...base, id: 'b', glaze: 'strawberry', drizzle: 'strawberry' },
+        { ...base, id: 'c', glaze: 'strawberry', drizzle: 'nope' },
+      ],
+    }).join('\n');
+    expect(errors).toContain('"a" base glaze "white-icing" must be a dip or dust');
+    expect(errors).toContain('"b" drizzle "strawberry" is not a drizzle glaze');
+    expect(errors).toContain('"c" uses unknown drizzle "nope"');
+  });
 });

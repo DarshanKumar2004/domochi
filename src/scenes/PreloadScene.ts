@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ASSET_FILES, queueAssetFile } from '../assets/files';
 import brand from '../data/brand.json';
+import { TextureKeys } from '../assets/keys';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
 import { save } from '../systems/services';
 import type { Viewport } from '../ui/layout';
@@ -19,7 +20,7 @@ const BAR_WIDTH = 700;
 const BAR_HEIGHT = 44;
 
 export class PreloadScene extends Phaser.Scene {
-  private title!: Phaser.GameObjects.Text;
+  private logo!: Phaser.GameObjects.Image;
   private subtitle!: Phaser.GameObjects.Text;
   private truck!: Truck;
   private barBg!: Phaser.GameObjects.Rectangle;
@@ -38,17 +39,18 @@ export class PreloadScene extends Phaser.Scene {
     this.elapsed = 0;
     this.ready = false;
 
-    this.title = this.add
-      .text(0, 0, brand.name, { fontFamily: FONT_FAMILY, fontSize: '140px', fontStyle: 'bold', color: CSS.cream })
-      .setOrigin(0.5);
+    // Cream, like the real trailer: the official logo is ink-on-white and its
+    // hollow wordmark would vanish on a dark background.
+    this.cameras.main.setBackgroundColor(COLORS.cream);
+    this.logo = this.add.image(0, 0, TextureKeys.Logo);
     this.subtitle = this.add
-      .text(0, 0, brand.tagline, { fontFamily: FONT_FAMILY, fontSize: '44px', color: CSS.muted })
+      .text(0, 0, brand.tagline, { fontFamily: FONT_FAMILY, fontSize: '48px', color: CSS.ink })
       .setOrigin(0.5);
     this.truck = new Truck(this, 0, 0);
-    this.barBg = this.add.rectangle(0, 0, BAR_WIDTH + 16, BAR_HEIGHT + 16, COLORS.tabBar);
+    this.barBg = this.add.rectangle(0, 0, BAR_WIDTH + 16, BAR_HEIGHT + 16, 0xe6e1d6);
     this.barFill = this.add.rectangle(0, 0, BAR_WIDTH, BAR_HEIGHT, COLORS.pink).setOrigin(0, 0.5).setScale(0, 1);
     this.prompt = this.add
-      .text(0, 0, 'Tap to start', { fontFamily: FONT_FAMILY, fontSize: '72px', fontStyle: 'bold', color: CSS.pink })
+      .text(0, 0, 'Tap to start', { fontFamily: FONT_FAMILY, fontSize: '72px', fontStyle: 'bold', color: CSS.ink })
       .setOrigin(0.5)
       .setName('prompt-start')
       .setVisible(false);
@@ -64,16 +66,25 @@ export class PreloadScene extends Phaser.Scene {
 
   private layout(v: Viewport): void {
     const s = v.safe;
-    const cx = v.width / 2;
-    // [title, subtitle, truck, bar, prompt] y positions and truck scale, per orientation.
-    const L = v.orientation === 'landscape';
-    const y = L ? [130, 225, 545, 870, 975] : [300, 410, 880, 1340, 1520];
-    this.title.setPosition(cx, s.y + y[0]!);
-    this.subtitle.setPosition(cx, s.y + y[1]!);
-    this.truck.setPosition(cx, s.y + y[2]!).setScale(L ? 0.75 : 1);
-    this.barBg.setPosition(cx, s.y + y[3]!);
-    this.barFill.setPosition(cx - BAR_WIDTH / 2, s.y + y[3]!);
-    this.prompt.setPosition(cx, s.y + y[4]!);
+    if (v.orientation === 'landscape') {
+      // Logo and tagline on the left, trailer, bar and prompt on the right.
+      const lx = s.x + 470;
+      const rx = s.x + 1360;
+      this.logo.setPosition(lx, s.y + 450).setDisplaySize(620, 620);
+      this.subtitle.setPosition(lx, s.y + 820);
+      this.truck.setPosition(rx, s.y + 430).setScale(0.85);
+      this.barBg.setPosition(rx, s.y + 830);
+      this.barFill.setPosition(rx - BAR_WIDTH / 2, s.y + 830);
+      this.prompt.setPosition(rx, s.y + 940);
+    } else {
+      const cx = v.width / 2;
+      this.logo.setPosition(cx, s.y + 400).setDisplaySize(560, 560);
+      this.subtitle.setPosition(cx, s.y + 730);
+      this.truck.setPosition(cx, s.y + 1150).setScale(1);
+      this.barBg.setPosition(cx, s.y + 1560);
+      this.barFill.setPosition(cx - BAR_WIDTH / 2, s.y + 1560);
+      this.prompt.setPosition(cx, s.y + 1700);
+    }
   }
 
   create(): void {

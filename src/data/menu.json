@@ -1,17 +1,78 @@
 {
-  "_source": "Real domochi menu from domochitreats.com (Square Online store), fetched 2026-10-30. Names and prices are exact. Game fields (glaze style, colors, unlockDay) are game design, not from the shop.",
+  "_source": "Real domochi menu from domochitreats.com (Square Online store), fetched 2026-10-30. Names and prices are exact. Game fields (glaze style, colors, unlockDay) are game design, not from the shop. Drizzles and the cookie on cookie butter are from the A-frame sign photo Kumar shared (2026-10-30).",
   "currency": "USD",
   "glazes": [
-    { "id": "strawberry", "name": "strawberry glaze", "style": "dip", "color": "#f4a6c0" },
-    { "id": "chocolate-hazelnut", "name": "chocolate hazelnut glaze", "style": "dip", "color": "#6b3f2a" },
-    { "id": "cookie-butter", "name": "cookie butter glaze", "style": "dip", "color": "#c68a4e" },
-    { "id": "cookies-and-cream", "name": "cookies & cream glaze", "style": "dip", "color": "#f1ece4" },
-    { "id": "sweet", "name": "sweet glaze", "style": "dip", "color": "#fff6e5" },
-    { "id": "powdered-sugar", "name": "powdered sugar", "style": "dust", "color": "#ffffff" }
+    {
+      "id": "strawberry",
+      "name": "strawberry glaze",
+      "style": "dip",
+      "color": "#f4a6c0"
+    },
+    {
+      "id": "chocolate-hazelnut",
+      "name": "chocolate hazelnut glaze",
+      "style": "dip",
+      "color": "#6b3f2a"
+    },
+    {
+      "id": "cookie-butter",
+      "name": "cookie butter glaze",
+      "style": "dip",
+      "color": "#c68a4e"
+    },
+    {
+      "id": "cookies-and-cream",
+      "name": "cookies & cream glaze",
+      "style": "dip",
+      "color": "#f1ece4"
+    },
+    {
+      "id": "sweet",
+      "name": "sweet glaze",
+      "style": "dip",
+      "color": "#fff6e5"
+    },
+    {
+      "id": "powdered-sugar",
+      "name": "powdered sugar",
+      "style": "dust",
+      "color": "#ffffff"
+    },
+    {
+      "id": "white-icing",
+      "name": "white icing",
+      "style": "drizzle",
+      "color": "#ffffff"
+    }
   ],
   "toppings": [
-    { "id": "crushed-cookies", "name": "crushed chocolate cookies", "colors": ["#2b2420", "#4a3f39"] },
-    { "id": "fruity-cereal", "name": "fruity cereal", "colors": ["#ff6b8a", "#ffb347", "#ffe066", "#7fd1ae", "#9b8cff"] }
+    {
+      "id": "cookie-butter-cookie",
+      "name": "cookie butter cookie",
+      "colors": [
+        "#b5763a",
+        "#8f5a2b"
+      ]
+    },
+    {
+      "id": "crushed-cookies",
+      "name": "crushed chocolate cookies",
+      "colors": [
+        "#2b2420",
+        "#4a3f39"
+      ]
+    },
+    {
+      "id": "fruity-cereal",
+      "name": "fruity cereal",
+      "colors": [
+        "#ff6b8a",
+        "#ffb347",
+        "#ffe066",
+        "#7fd1ae",
+        "#9b8cff"
+      ]
+    }
   ],
   "flavors": [
     {
@@ -20,6 +81,7 @@
       "price": 4,
       "description": "bright, fruity strawberry glaze on our light and chewy, pull-apart mochi ring. sweet, simple and pretty in pink.",
       "glaze": "strawberry",
+      "drizzle": "white-icing",
       "toppings": [],
       "unlockDay": 1
     },
@@ -29,7 +91,9 @@
       "price": 4,
       "description": "sweet cookies-and-cream glaze topped with crushed chocolate cookies on our chewy, pull-apart mochi ring. a classic combo, done the domochi way.",
       "glaze": "cookies-and-cream",
-      "toppings": ["crushed-cookies"],
+      "toppings": [
+        "crushed-cookies"
+      ],
       "unlockDay": 1
     },
     {
@@ -47,7 +111,9 @@
       "price": 4,
       "description": "saturday-morning nostalgia in donut form. sweet glaze and colorful fruity cereal crunch on our chewy, pull-apart mochi ring.",
       "glaze": "sweet",
-      "toppings": ["fruity-cereal"],
+      "toppings": [
+        "fruity-cereal"
+      ],
       "unlockDay": 3
     },
     {
@@ -56,7 +122,10 @@
       "price": 4,
       "description": "sweet, warmly spiced cookie butter glaze on our chewy, pull-apart mochi ring. cozy, caramel-y and seriously addictive.",
       "glaze": "cookie-butter",
-      "toppings": [],
+      "drizzle": "white-icing",
+      "toppings": [
+        "cookie-butter-cookie"
+      ],
       "unlockDay": 4
     },
     {
@@ -70,8 +139,26 @@
     }
   ],
   "boxes": [
-    { "id": "trio", "name": "the trio", "size": 3, "price": 11, "description": "can't pick just one? choose any 3 mochi donuts." },
-    { "id": "flight", "name": "the flight", "size": 6, "price": 20, "description": "half a dozen mochi donuts, and you pick every flavor." },
-    { "id": "domochi-box", "name": "the domochi box", "size": 12, "price": 30, "description": "a full dozen mochi donuts, and you pick every flavor." }
+    {
+      "id": "trio",
+      "name": "the trio",
+      "size": 3,
+      "price": 11,
+      "description": "can't pick just one? choose any 3 mochi donuts."
+    },
+    {
+      "id": "flight",
+      "name": "the flight",
+      "size": 6,
+      "price": 20,
+      "description": "half a dozen mochi donuts, and you pick every flavor."
+    },
+    {
+      "id": "domochi-box",
+      "name": "the domochi box",
+      "size": 12,
+      "price": 30,
+      "description": "a full dozen mochi donuts, and you pick every flavor."
+    }
   ]
 }

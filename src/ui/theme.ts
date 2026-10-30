@@ -13,7 +13,7 @@ export const COLORS = {
   brown: 0x5a3e2b,
   ink: 0x1f1a17,
   sky: 0xbfe3f2,
-  asphalt: 0x6b6f73,
+  concrete: 0xc4c0b8, // the lot in the trailer photos
   tabBar: 0x2b2522,
   card: 0xfffaf0,
   skin: 0xf1c27d,

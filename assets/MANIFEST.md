@@ -15,7 +15,9 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 
 | Key | Path (planned) | Size (px) | Frames | Status | Purpose |
 |---|---|---|---|---|---|
-| `truck` | `public/assets/truck.png` | 900×620 | 1 | Placeholder (code) | Domochi food truck on the loading screen and in the Lobby. The window's bottom centre (450, 440) and sign centre (450, 45) are set in `TRUCK_SPEC`. |
+| `logo` | `public/assets/logo.png` | 512×512 | 1 | **Final** | Official domochi logo: ink-on-white comic ring plus a hollow wordmark, on a transparent background, so it needs a light background. Shown on the loading screen and on the trailer. Downscaled from the 1024 px original on domochitreats.com. Permission confirmed by Kumar on 2026-10-30. |
+| `truck` | `public/assets/truck.png` | 900×620 | 1 | Placeholder (code) | domochi's white trailer (based on Kumar's photos): window on the left, OPEN sign, logo on the right side. Anchors are set in `TRUCK_SPEC`: window bottom centre (250, 390), OPEN sign (515, 200), logo centre (720, 250) at 260 px, @handle (720, 430). The logo, OPEN text and handle are overlaid by `ui/Truck.ts`, so real truck art should leave those areas blank. |
+| `sign-aframe` | `public/assets/sign-aframe.png` | 220×320 | 1 | Placeholder (code) | Sidewalk A-frame poster ("DOMOCHI MOCHI DONUTS" plus donut photos) next to the trailer. Origin at the bottom centre. |
 | `ethan` | `public/assets/ethan.png` | 880×260 sheet | 4 × (220×260) | Placeholder (code) | Ethan (owner), torso up, waving. Feet anchor at the bottom centre of each frame. |
 | `customer` | `public/assets/customer.png` | 180×340 | 1 | Placeholder (code) | Generic customer, origin at the bottom centre. |
 | `donut-plain` | `public/assets/donut-plain.png` | 320×320 | 1 | Placeholder (code) | Plain pon de ring (8 balls), before glaze. |
