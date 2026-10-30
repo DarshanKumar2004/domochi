@@ -26,7 +26,7 @@ Defer the Android SDK and Capacitor until Phase 8.
 
 | Purpose | Tool |
 |---|---|
-| Game framework | Phaser 3 (latest 3.x), TypeScript strict mode |
+| Game framework | Phaser 4 (latest), TypeScript strict mode |
 | Build / dev | Vite |
 | Tests | Vitest (logic), Playwright (scene flow plus screenshots) |
 | Android | Capacitor (Phase 8) |
