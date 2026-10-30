@@ -1,6 +1,9 @@
 {
   "_note": "All game tuning numbers live here (CLAUDE.md). Arrays marked 'by day' are indexed from day 1; days past the end reuse the last entry.",
   "customersPerDay": [4, 5, 6, 7, 8, 9],
+  "_maxActive": "by day: most customers in line or waiting at once. A new one only comes once someone is served (after afterServeSec).",
+  "maxActiveByDay": [2, 2, 3, 3, 4, 4],
+  "afterServeSec": { "min": 2, "max": 7 },
   "spawn": {
     "firstDelaySec": 1.5,
     "intervalSec": { "min": 9, "max": 15 },
@@ -22,6 +25,7 @@
     "startTargetF": 350,
     "dial": { "minF": 250, "maxF": 425 },
     "heatLagPerSec": 0.35,
+    "oilDriftF": 60,
     "idealRangeF": { "min": 340, "max": 360 },
     "cookRate": { "zeroAtF": 250, "oneAtF": 350, "max": 1.8 },
     "secondsPerSide": 9,
@@ -31,8 +35,9 @@
     "oil": { "start": 1, "perDonut": 0.04, "topUp": 0.25, "lowThreshold": 0.35, "minToFry": 0.05 },
     "unevenAtEmpty": 0.5,
     "doneness": { "perfectWithin": 0.1, "zeroAt": 0.6 },
+    "burntAt": 1.75,
     "evennessZeroAtStdDev": 0.25,
-    "prepBatchSize": 3,
+    "slots": 6,
     "rackCapacity": 12,
     "scoreWeights": { "doneness": 0.6, "temperature": 0.25, "evenness": 0.15 }
   }

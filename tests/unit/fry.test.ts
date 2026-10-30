@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import balanceJson from '../../src/data/balance.json';
 import type { Balance } from '../../src/systems/balance';
-import { cookRateAt, Fryer, fryColor, sideScore, type FryBalance } from '../../src/stations/fry';
+import { cookRateAt, Fryer, fryColor, fryResultFromDonuts, sideScore, type FryBalance } from '../../src/stations/fry';
 
 const B = (balanceJson as Balance).fry;
 
@@ -10,9 +10,9 @@ function run(f: Fryer, seconds: number, step = 1 / 60): void {
   for (let t = 0; t < seconds - 1e-9; t += step) f.tick(Math.min(step, seconds - t));
 }
 
-/** A fryer already sitting at a steady temperature. */
+/** A fryer sitting at a steady temperature, with no drop-cooling or oil drift to muddy the numbers. */
 function hotFryer(tempF: number, over: Partial<FryBalance> = {}): Fryer {
-  const f = new Fryer({ ...B, ...over, dropCoolPerDonutF: 0 });
+  const f = new Fryer({ ...B, dropCoolPerDonutF: 0, oilDriftF: 0, ...over });
   f.temp = tempF;
   f.setTarget(tempF);
   return f;
@@ -20,7 +20,7 @@ function hotFryer(tempF: number, over: Partial<FryBalance> = {}): Fryer {
 
 describe('oil temperature', () => {
   it('eases toward the dial setting without overshooting', () => {
-    const f = new Fryer(B);
+    const f = new Fryer({ ...B, oilDriftF: 0 });
     f.temp = 300;
     f.setTarget(350);
     const seen: number[] = [];
@@ -49,40 +49,66 @@ describe('oil temperature', () => {
     expect(f.target).toBe(B.dial.minF);
   });
 
-  it('dropping donuts and adding cold oil cool the vat', () => {
+  it('less oil runs hotter at the same dial setting, so it must be dialled back down', () => {
+    const f = new Fryer(B);
+    f.setTarget(350);
+    expect(f.settleTemp).toBe(350);
+    f.oil = 0.5;
+    expect(f.settleTemp).toBe(350 + B.oilDriftF * 0.5);
+    run(f, 30);
+    expect(f.inIdealRange).toBe(false);
+    f.setTarget(350 - B.oilDriftF * 0.5);
+    run(f, 30);
+    expect(f.inIdealRange).toBe(true);
+  });
+
+  it('dropping a donut and adding cold oil cool the vat', () => {
     const f = new Fryer(B);
     f.temp = 350;
-    f.drop(1, 4);
-    expect(f.temp).toBeCloseTo(350 - B.dropCoolPerDonutF * 4);
+    f.drop();
+    expect(f.temp).toBeCloseTo(350 - B.dropCoolPerDonutF);
     const before = f.temp;
     expect(f.addOil()).toBe(true);
     expect(f.temp).toBeLessThan(before);
   });
 });
 
-describe('oil level', () => {
-  it('each batch soaks up oil; topping up refills but never past full', () => {
+describe('slots and oil', () => {
+  it('donuts go in one at a time, up to the number of slots', () => {
     const f = new Fryer(B);
-    f.drop(1, 5);
+    for (let i = 0; i < B.slots; i++) expect(f.drop()).toBe(i);
+    expect(f.count).toBe(B.slots);
+    expect(f.canDrop).toBe(false);
+    expect(f.drop()).toBe(-1);
+  });
+
+  it('a freed slot is reused by the next drop', () => {
+    const f = new Fryer(B);
+    f.drop();
+    f.drop();
+    f.drop();
+    f.trash(1);
+    expect(f.drop()).toBe(1);
+  });
+
+  it('each donut soaks up oil; topping up refills but never past full', () => {
+    const f = new Fryer(B);
+    for (let i = 0; i < 5; i++) f.drop();
     expect(f.oil).toBeCloseTo(1 - B.oil.perDonut * 5);
-    f.pull();
     f.addOil();
     expect(f.oil).toBe(1);
     expect(f.addOil()).toBe(false);
   });
 
-  it('cannot drop with a batch already in, or with almost no oil', () => {
+  it('cannot drop with almost no oil', () => {
     const f = new Fryer(B);
-    expect(f.drop(1, 2)).toBe(true);
-    expect(f.drop(2, 2)).toBe(false);
-    f.pull();
     f.oil = B.oil.minToFry / 2;
     expect(f.canDrop).toBe(false);
-    expect(f.drop(3, 1)).toBe(false);
+    expect(f.drop()).toBe(-1);
   });
 });
 
-describe('cooking', () => {
+describe('cooking a donut', () => {
   it('cook rate is 0 when cold, 1 at the reference temp, capped when very hot', () => {
     expect(cookRateAt(B.cookRate.zeroAtF - 50, B)).toBe(0);
     expect(cookRateAt(B.cookRate.oneAtF, B)).toBeCloseTo(1);
@@ -91,81 +117,97 @@ describe('cooking', () => {
 
   it('textbook fry: one side, flip, other side at ideal temp → near-perfect score', () => {
     const f = hotFryer(350);
-    f.drop(1, 3);
+    const slot = f.drop();
     run(f, B.secondsPerSide);
-    f.flip();
-    // The floating top already cooked a little (topFactorFloating), so the second side needs less time.
+    f.flip(slot);
+    // The floating top already cooked a little, so the second side needs less time.
     run(f, B.secondsPerSide * (1 - B.topFactorFloating));
-    const r = f.pull();
-    expect(r.score).toBeGreaterThanOrEqual(95);
-    expect(r.temperature).toBe(1);
-    expect(r.evenness).toBeGreaterThan(0.95);
+    const d = f.take(slot)!;
+    expect(d.score).toBeGreaterThanOrEqual(95);
+    expect(d.temperature).toBe(1);
   });
 
-  it('never flipping and never pressing the grate leaves the top raw', () => {
+  it('floating tops creep along slowly; the grate cooks them much faster', () => {
+    const floating = hotFryer(350);
+    floating.drop();
+    run(floating, 2);
+    const pressed = hotFryer(350);
+    pressed.drop();
+    pressed.setGrate(true);
+    run(pressed, 2);
+    expect(floating.slots[0]!.up).toBeCloseTo((2 / B.secondsPerSide) * B.topFactorFloating, 2);
+    expect(pressed.slots[0]!.up).toBeCloseTo((2 / B.secondsPerSide) * B.topFactorGrate, 2);
+  });
+
+  it('flipping one donut leaves the others alone', () => {
     const f = hotFryer(350);
-    f.drop(1, 2);
-    run(f, B.secondsPerSide);
-    const r = f.pull();
-    // Floating tops still creep along slowly, but nowhere near golden.
-    expect(Math.max(...r.sides.b)).toBeCloseTo(B.topFactorFloating, 2);
-    expect(Math.max(...r.sides.b)).toBeLessThan(0.3);
-    expect(r.doneness).toBeLessThan(0.6);
-  });
-
-  it('holding the grate cooks the top side too', () => {
-    const f = hotFryer(350);
-    f.drop(1, 1);
-    f.setGrate(true);
-    run(f, 2);
-    const top = f.batch!.up[0]!;
-    expect(top).toBeCloseTo((2 / B.secondsPerSide) * B.topFactorGrate, 2);
-  });
-
-  it('leaving it in too long burns it', () => {
-    const f = hotFryer(350);
-    f.drop(1, 2);
-    run(f, B.secondsPerSide * 2.2);
-    f.flip();
-    run(f, B.secondsPerSide * 2.2);
-    expect(f.pull().score).toBeLessThan(10);
-  });
-
-  it('frying cold scores badly on temperature', () => {
-    const f = hotFryer(300);
-    f.drop(1, 2);
-    run(f, 4);
-    expect(f.pull().temperature).toBe(0);
-  });
-
-  it('low oil makes donuts uneven; full oil keeps them even', () => {
-    const full = hotFryer(350);
-    full.drop(1, 6);
-    run(full, B.secondsPerSide);
-    const evenFull = full.pull().evenness;
-
-    const low = hotFryer(350);
-    low.oil = B.oil.minToFry + 0.24; // ends below the low threshold after soaking
-    low.drop(1, 6);
-    run(low, B.secondsPerSide);
-    const evenLow = low.pull().evenness;
-    expect(evenFull).toBe(1);
-    expect(evenLow).toBeLessThan(evenFull);
+    f.drop();
+    f.drop();
+    run(f, 3);
+    f.flip(0);
+    expect(f.slots[0]!.up).toBeGreaterThan(f.slots[1]!.up);
+    expect(f.slots[0]!.flips).toBe(1);
+    expect(f.slots[1]!.flips).toBe(0);
   });
 
   it('sides are reported by original side regardless of flips', () => {
     const f = hotFryer(350);
-    f.drop(1, 1);
+    f.drop();
     run(f, 3);
-    f.flip();
-    f.flip();
-    f.flip(); // odd flips: side A is now facing up
-    const r = f.pull();
-    expect(r.sides.a[0]!).toBeGreaterThan(r.sides.b[0]!);
+    f.flip(0);
+    f.flip(0);
+    f.flip(0); // odd flips: side A is now facing up
+    const d = f.take(0)!;
+    expect(d.a).toBeGreaterThan(d.b);
   });
 
-  it('pulling an empty fryer is an error', () => {
-    expect(() => new Fryer(B).pull()).toThrow();
+  it('a donut left in burns and is thrown out automatically', () => {
+    const f = hotFryer(350);
+    f.drop();
+    f.drop();
+    run(f, 2);
+    f.trash(1);
+    run(f, B.secondsPerSide * B.burntAt + 1);
+    expect(f.slots[0]).toBeNull();
+    expect(f.burnt).toEqual([0]);
+  });
+
+  it('frying cold scores badly on temperature', () => {
+    const f = hotFryer(300);
+    f.drop();
+    run(f, 4);
+    expect(f.take(0)!.temperature).toBe(0);
+  });
+
+  it('taking, trashing or flipping an empty slot does nothing', () => {
+    const f = new Fryer(B);
+    expect(f.take(0)).toBeNull();
+    expect(f.trash(0)).toBe(false);
+    expect(f.flip(0)).toBe(false);
+  });
+});
+
+describe('order results from rack donuts', () => {
+  it('low oil fries unevenly from slot to slot, which shows up as uneven orders', () => {
+    const fry = (oilAfterDrops: number) => {
+      const f = hotFryer(350);
+      f.oil = oilAfterDrops + B.oil.perDonut * 6;
+      for (let i = 0; i < 6; i++) f.drop();
+      run(f, B.secondsPerSide);
+      f.flipAll();
+      run(f, B.secondsPerSide * (1 - B.topFactorFloating));
+      return fryResultFromDonuts(1, f.slots.map((_, i) => f.take(i)!), B);
+    };
+    const full = fry(0.95);
+    const low = fry(B.oil.minToFry);
+    expect(full.evenness).toBe(1);
+    expect(low.evenness).toBeLessThan(full.evenness);
+    expect(low.score).toBeLessThan(full.score);
+  });
+
+  it('an overdone set scores near zero even fried at a perfect temperature', () => {
+    const r = fryResultFromDonuts(1, [{ a: 1.7, b: 1.7, temperature: 1, score: 0 }], B);
+    expect(r.score).toBeLessThan(5);
   });
 });
 

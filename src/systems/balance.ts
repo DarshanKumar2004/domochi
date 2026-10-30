@@ -8,6 +8,10 @@ export interface Range {
 
 export interface Balance {
   customersPerDay: number[];
+  /** By day: most customers in line or waiting at once. */
+  maxActiveByDay: number[];
+  /** After serving someone, the next customer arrives this long later (random in range). */
+  afterServeSec: Range;
   spawn: {
     firstDelaySec: number;
     intervalSec: Range;
@@ -33,6 +37,9 @@ export function validateBalance(b: Balance): string[] {
   const errors: string[] = [];
   if (b.customersPerDay.length === 0) errors.push('customersPerDay is empty');
   for (const n of b.customersPerDay) if (!(Number.isInteger(n) && n >= 1)) errors.push(`customersPerDay entry ${n} must be an integer >= 1`);
+  if (b.maxActiveByDay.length === 0) errors.push('maxActiveByDay is empty');
+  for (const n of b.maxActiveByDay) if (!(Number.isInteger(n) && n >= 1)) errors.push(`maxActiveByDay entry ${n} must be an integer >= 1`);
+  if (badRange(b.afterServeSec, 0)) errors.push('afterServeSec needs 0 <= min <= max');
   if (!(b.spawn.firstDelaySec >= 0)) errors.push('spawn.firstDelaySec must be >= 0');
   if (badRange(b.spawn.intervalSec, 0.1)) errors.push('spawn.intervalSec must have 0.1 <= min <= max');
   if (!(Number.isInteger(b.spawn.maxInLine) && b.spawn.maxInLine >= 1)) errors.push('spawn.maxInLine must be an integer >= 1');
@@ -51,9 +58,9 @@ export function validateBalance(b: Balance): string[] {
     errors.push('fry needs 0 <= topFactorFloating < topFactorGrate <= 1');
   }
   if (!(f.doneness.perfectWithin < f.doneness.zeroAt)) errors.push('fry.doneness needs perfectWithin < zeroAt');
-  if (!(Number.isInteger(f.prepBatchSize) && f.prepBatchSize >= 1 && f.rackCapacity >= f.prepBatchSize)) {
-    errors.push('fry needs prepBatchSize >= 1 and rackCapacity >= prepBatchSize');
-  }
+  if (!(Number.isInteger(f.slots) && f.slots >= 1 && f.rackCapacity >= 1)) errors.push('fry needs slots >= 1 and rackCapacity >= 1');
+  if (!(f.burntAt > 1 + f.doneness.zeroAt)) errors.push('fry.burntAt must be past the point where a side scores 0');
+  if (!(f.oilDriftF >= 0)) errors.push('fry.oilDriftF must be >= 0');
   if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');
   return errors;
 }

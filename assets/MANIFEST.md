@@ -27,6 +27,7 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `fryer` | `public/assets/fryer.png` | 760×440 | 1 | Placeholder (code) | Fryer vat seen from the front-top. The oil surface (where donuts float) is the inner area at about (56, 56, 648, 328). Controls (dial, gauges) are separate UI, not part of this art. |
 | `fry-grate` | `public/assets/fry-grate.png` | 690×360 | 1 | Placeholder (code) | Pressing grate laid over the oil; moves down while held. Mostly transparent between the bars. |
 | `fry-dispenser` | `public/assets/fry-dispenser.png` | 215×175 | 1 | Placeholder (code) | Mochi donut depositor over the vat. Donuts drop from its nozzle at the bottom centre (100, 170). |
+| `trash-bin` | `public/assets/trash-bin.png` | 160×160 | 1 | Placeholder (code) | Trash can at the Fry station: drag donuts here to throw them out; burnt donuts fly here on their own. |
 | `donut-fry` | `public/assets/donut-fry.png` | 160×160 | 1 | Placeholder (code) | **Must be white or greyscale:** it's tinted at runtime from raw (pale) to golden to burnt by `fryColor()`. Plain pon de ring, no glaze. |
 | `glaze-bowl` | `public/assets/glaze-bowl.png` | 260×170 | 1 | Placeholder (code) | Bowl of glaze at the Glaze station. |
 | `topping-jar` | `public/assets/topping-jar.png` | 160×220 | 1 | Placeholder (code) | Jar of toppings at the Toppings station. |

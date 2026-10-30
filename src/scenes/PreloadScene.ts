@@ -12,10 +12,10 @@ import { startMainGame } from './flow';
 import { SceneKeys } from './sceneKeys';
 
 /**
- * Minimum time the loading screen shows, so the truck and Ethan are seen even
- * when loading is instant. UI pacing only, not game balance.
+ * When there are real files to load, the bar shows for at least this long so
+ * it doesn't flash. With nothing to load there's no bar at all. UI pacing only.
  */
-const MIN_SHOW_MS = 1200;
+const MIN_SHOW_MS = 600;
 const BAR_WIDTH = 700;
 const BAR_HEIGHT = 44;
 
@@ -29,6 +29,8 @@ export class PreloadScene extends Phaser.Scene {
   private loadProgress = 0;
   private elapsed = 0;
   private ready = false;
+  /** Are there any files left to load after Boot? If not, skip the bar. */
+  private hasWork = false;
 
   constructor() {
     super(SceneKeys.Preload);
@@ -59,6 +61,9 @@ export class PreloadScene extends Phaser.Scene {
     this.load.on(Phaser.Loader.Events.PROGRESS, (value: number) => {
       this.loadProgress = value;
     });
+    this.hasWork = ASSET_FILES.some((file) => !file.boot);
+    this.barBg.setVisible(this.hasWork);
+    this.barFill.setVisible(this.hasWork);
     for (const file of ASSET_FILES) {
       if (!file.boot) queueAssetFile(this, file);
     }
@@ -94,6 +99,10 @@ export class PreloadScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     if (this.ready) return;
+    if (!this.hasWork) {
+      this.showPrompt();
+      return;
+    }
     this.elapsed += delta;
     const shown = Math.min(this.loadProgress, this.elapsed / MIN_SHOW_MS);
     this.barFill.scaleX = shown;

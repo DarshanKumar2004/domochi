@@ -120,3 +120,21 @@ Kumar shared photos of the real trailer and A-frame sign, confirmed the setting 
 - **Drop and pull animations:** a dough depositor (`fry-dispenser`) sits on the vat's corner. On Drop, each ring plops out of the nozzle in turn with a bounce and an oil-splash ring, and the depositor squishes as each one drops. On Pull, donuts lift out: order donuts rise and fade, while prep donuts fly onto the rack. Animation offsets are tweened on plain objects and layered onto the per-frame slot positions, so the allocation-free render loop stays as it was.
 - **Prep batches (frying without an order):** if there's no unfried active ticket, Drop fries a **prep batch** of `prepBatchSize` (3). Pulled prep donuts go to a **cooling rack** (capacity `rackCapacity`, 12; any excess is thrown away). Each racked donut keeps its own score, taken from its two sides plus its batch's temperature and evenness. A ticket can **use rack** donuts (oldest first) instead of frying fresh, and its fry score is the average of the donuts it took. The button label says what Drop will do: "Drop #2" or "Prep 3".
 - **Bug avoided:** I first named the animation-offset array `anims`, which would have overwritten Phaser's own `scene.anims` animation manager and broken Ethan's wave. TypeScript caught the clash and it's now `donutAnims`. The same kind of clash happened earlier with `TabBar.setActive`, `TabBar.active` and `HoldButton.w`, so watch for Phaser base-class names.
+
+## Fry station v2: one donut at a time (2026-10-30, Kumar's feedback)
+
+- **The vat has 6 slots, and donuts go in one at a time.** Each **Drop** plops one ring into the first free slot. Every donut cooks, scores and burns independently (`FryDonut` in `stations/fry.ts`; batches are gone).
+- **Per-donut controls:**
+  - **Tap a donut to flip it** (with a quick squash animation).
+  - **Drag it onto the rack** to take it out, or **drag it into the trash can** to throw it away and fry a fresh one.
+  - **Pull all** and **Hold grate** buttons stay.
+  - Phaser's `dragDistanceThreshold` (16 px) separates a tap from a drag.
+- **Every fried donut goes to the cooling rack. Orders take theirs from the rack** ("use rack"), so frying is a production line and you can fry ahead. An order's fry score comes from its donuts: average doneness and time-in-range, plus evenness across the set. Each rack donut also has its own score.
+- **Burnt donuts take themselves out:** once either side reaches `burntAt` (1.75), the donut is thrown out automatically with a smoke puff and a "burnt!" flash, via a session `burnt` event. Trashed and burnt donuts are counted (`session.trashed`) for the Phase 6 day summary.
+- **Low oil runs hot (the knob drifts):** the oil settles at `dial + oilDriftF × (1 − oil level)` (60°F at empty). As donuts soak up oil, the same dial setting gets hotter, so you have to turn it back down. Adding oil reverses this. A hint explains it ("less oil runs hotter: dial it back down").
+- **Each donut gets a small two-bar meter (underside / top)** in place of the old shared meters, turning gold when a side is in the golden band.
+
+## Loading screen and customer pacing (2026-10-30)
+
+- **No loading bar when there's nothing to load.** Only the logo is loaded, and that happens in Boot. If `ASSET_FILES` gains non-boot files later, the bar comes back automatically, with a short 0.6 s minimum so it doesn't flash.
+- **Customer pacing** (Kumar: "customer 3 only comes after you served customer 1"): `maxActiveByDay` caps how many customers are in line or waiting at once (2 on day 1, up to 4). After each serve, the next arrival is pushed at least `afterServeSec` (2–7 s, random) later. The spawn check now counts customers with plain loops instead of `filter`, because it runs every frame while someone is due.

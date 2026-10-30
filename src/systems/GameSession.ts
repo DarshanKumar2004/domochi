@@ -1,6 +1,6 @@
 // One day at the trailer: customers arriving, orders, tickets and serving.
 // Pure logic driven by tick(dtMs); scenes render from it and call its actions.
-import { donutsFromResult, Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../stations/fry';
+import { Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../stations/fry';
 import { forDay, type Balance } from './balance';
 import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
 import { Emitter } from './events';
@@ -50,6 +50,8 @@ export interface SessionEvents extends Record<string, unknown> {
   /** Anything visible changed (customers, tickets, selection, box in hand). */
   changed: undefined;
   served: ServedEvent;
+  /** Donuts that burnt and were thrown out automatically. */
+  burnt: { slots: number[] };
   dayComplete: undefined;
 }
 
@@ -78,6 +80,8 @@ export class GameSession {
   private activeNo: number | null = null;
   private heldNo: number | null = null;
   private readonly rackDonuts: FriedDonut[] = [];
+  /** Donuts thrown away today (burnt or trashed), for the day summary. */
+  private trashedCount = 0;
 
   constructor(private readonly deps: SessionDeps) {
     this.day = deps.day;
@@ -117,6 +121,24 @@ export class GameSession {
     return this.heldNo === null ? undefined : this.ticket(this.heldNo);
   }
 
+  get trashed(): number {
+    return this.trashedCount;
+  }
+
+  /** Customers here now: in line, ordering or waiting. */
+  get activeCustomers(): number {
+    let n = 0;
+    for (const c of this.allCustomers) if (c.state !== 'served') n++;
+    return n;
+  }
+
+  /** Customers in line (checked every frame while someone is due, so no array is built). */
+  private get lineLength(): number {
+    let n = 0;
+    for (const c of this.allCustomers) if (c.state === 'inLine' || c.state === 'ordering') n++;
+    return n;
+  }
+
   get servedCount(): number {
     return this.allCustomers.filter((c) => c.state === 'served').length;
   }
@@ -148,9 +170,21 @@ export class GameSession {
   tick(dtMs: number): void {
     this.now += dtMs;
     this.fryer.tick(dtMs / 1000);
+    if (this.fryer.burnt.length) {
+      const slots = this.fryer.burnt.splice(0);
+      this.trashedCount += slots.length;
+      this.events.emit('burnt', { slots });
+      this.events.emit('changed', undefined);
+    }
     const { spawn } = this.deps.balance;
-    // If the line is full, the next customer arrives as soon as there's room.
-    if (this.spawned < this.customersToday && this.now >= this.nextSpawnAtMs && this.line.length < spawn.maxInLine) {
+    // If the line is full (or enough people are already here), the next customer
+    // arrives as soon as there's room; serving someone pushes that a little later.
+    if (
+      this.spawned < this.customersToday &&
+      this.now >= this.nextSpawnAtMs &&
+      this.lineLength < spawn.maxInLine &&
+      this.activeCustomers < forDay(this.deps.balance.maxActiveByDay, this.day)
+    ) {
       this.spawn();
       this.nextSpawnAtMs = this.now + this.deps.rng.int(spawn.intervalSec.min * 1000, spawn.intervalSec.max * 1000);
     }
@@ -209,63 +243,71 @@ export class GameSession {
     return true;
   }
 
-  /** Fried donuts on the cooling rack, oldest first (from prep batches). */
+  // ---- Frying -----------------------------------------------------------------
+
+  /** Fried donuts on the cooling rack, oldest first. Orders take theirs from here. */
   get rack(): readonly FriedDonut[] {
     return this.rackDonuts;
   }
 
-  /** Ticket whose donuts are in the fryer right now (undefined for a prep batch). */
-  get fryingTicket(): Ticket | undefined {
-    const no = this.fryer.batch?.ticketNo;
-    return no == null ? undefined : this.ticket(no);
+  get rackFull(): boolean {
+    return this.rackDonuts.length >= this.deps.balance.fry.rackCapacity;
   }
 
-  /** The active ticket, if it still needs frying. */
+  /** Drop one raw donut into the vat. Returns its slot, or -1 if it can't. */
+  dropDonut(): number {
+    const slot = this.fryer.drop();
+    if (slot >= 0) this.events.emit('changed', undefined);
+    return slot;
+  }
+
+  flipDonut(slot: number): boolean {
+    return this.fryer.flip(slot);
+  }
+
+  /** Take a donut out of the oil onto the rack. Fails (null) if the rack is full. */
+  pullDonut(slot: number): FriedDonut | null {
+    if (this.rackFull || !this.fryer.slots[slot]) return null;
+    const d = this.fryer.take(slot);
+    if (!d) return null;
+    this.rackDonuts.push(d);
+    this.events.emit('changed', undefined);
+    return d;
+  }
+
+  /** Take every donut out onto the rack (as many as fit). Returns the slots taken. */
+  pullAll(): number[] {
+    const taken: number[] = [];
+    for (let i = 0; i < this.fryer.slots.length; i++) {
+      if (this.fryer.slots[i] && !this.rackFull) {
+        this.rackDonuts.push(this.fryer.take(i)!);
+        taken.push(i);
+      }
+    }
+    if (taken.length) this.events.emit('changed', undefined);
+    return taken;
+  }
+
+  /** Throw a donut in the oil away (to fry a fresh one). */
+  trashDonut(slot: number): boolean {
+    const ok = this.fryer.trash(slot);
+    if (ok) {
+      this.trashedCount++;
+      this.events.emit('changed', undefined);
+    }
+    return ok;
+  }
+
+  /** The active ticket, if it still needs fried donuts. */
   private get ticketToFry(): Ticket | undefined {
     const t = this.activeTicket;
     return t && t.status === 'open' && !t.results.fry ? t : undefined;
   }
 
-  /** What Drop would fry right now: the active ticket's donuts, or a prep batch for the rack. */
-  get nextDrop(): { ticketNo: number | null; count: number } {
-    const t = this.ticketToFry;
-    return t ? { ticketNo: t.no, count: t.order.flavors.length } : { ticketNo: null, count: this.deps.balance.fry.prepBatchSize };
-  }
-
-  get canStartFrying(): boolean {
-    return this.fryer.canDrop;
-  }
-
-  /** Drop donuts: for the active ticket if it needs frying, otherwise a prep batch for the rack. */
-  startFrying(): { ticketNo: number | null; count: number } {
-    if (!this.canStartFrying) throw new Error('cannot start frying now');
-    const drop = this.nextDrop;
-    this.fryer.drop(drop.ticketNo, drop.count);
-    this.events.emit('changed', undefined);
-    return drop;
-  }
-
-  /**
-   * Lift the batch out. A ticket batch's score is stored on that ticket; a prep
-   * batch goes to the cooling rack (anything past its capacity is thrown away).
-   */
-  pullFry(): FryResult {
-    const result = this.fryer.pull();
-    const t = result.ticketNo === null ? undefined : this.ticket(result.ticketNo);
-    if (t) {
-      t.results.fry = result;
-    } else {
-      const room = this.deps.balance.fry.rackCapacity - this.rackDonuts.length;
-      this.rackDonuts.push(...donutsFromResult(result, this.deps.balance.fry).slice(0, Math.max(0, room)));
-    }
-    this.events.emit('changed', undefined);
-    return result;
-  }
-
-  /** Can the active ticket take its donuts from the rack instead of frying fresh? */
+  /** Can the active ticket take its donuts from the rack? */
   get canUseRack(): boolean {
     const t = this.ticketToFry;
-    return !!t && this.fryer.batch?.ticketNo !== t.no && this.rackDonuts.length >= t.order.flavors.length;
+    return !!t && this.rackDonuts.length >= t.order.flavors.length;
   }
 
   /** Give the active ticket the oldest donuts from the rack. */
@@ -300,6 +342,8 @@ export class GameSession {
       return { ok: false, reason: 'notMine', line: pickLine(this.typeOf(c).lines.notMine, this.deps.rng, { ticket: c.ticketNo ?? '?' }) };
     }
 
+    const { afterServeSec } = this.deps.balance;
+    this.nextSpawnAtMs = Math.max(this.nextSpawnAtMs, this.now + this.deps.rng.int(afterServeSec.min * 1000, afterServeSec.max * 1000));
     held.status = 'served';
     held.servedAtMs = this.now;
     c.state = 'served';

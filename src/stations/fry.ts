@@ -1,5 +1,9 @@
 // Fry station simulation. Pure: no Phaser, no clock; driven by tick(dtSec).
 // See balance.json "fry" for every tuning number.
+//
+// The vat has a fixed number of slots. Donuts are dropped in one at a time,
+// cook independently, and are flipped, taken out (to the cooling rack) or
+// trashed one at a time. Orders take their fried donuts from the rack.
 
 export interface FryBalance {
   roomTempF: number;
@@ -8,6 +12,11 @@ export interface FryBalance {
   dial: { minF: number; maxF: number };
   /** Fraction of the gap to the target temperature closed per second. */
   heatLagPerSec: number;
+  /**
+   * Less oil heats hotter at the same dial setting: the oil settles at
+   * dial + oilDriftF × (1 − oil level), so a low vat has to be dialled back down.
+   */
+  oilDriftF: number;
   idealRangeF: { min: number; max: number };
   /** Cook speed multiplier: 0 at zeroAtF, 1 at oneAtF, capped at max. */
   cookRate: { zeroAtF: number; oneAtF: number; max: number };
@@ -19,41 +28,51 @@ export interface FryBalance {
   topFactorGrate: number;
   dropCoolPerDonutF: number;
   oil: { start: number; perDonut: number; topUp: number; lowThreshold: number; minToFry: number };
-  /** Per-donut cook-speed spread when the oil is empty (scaled down as oil rises to lowThreshold). */
+  /** Per-slot cook-speed spread when the oil is empty (scaled down as oil rises to lowThreshold). */
   unevenAtEmpty: number;
   doneness: { perfectWithin: number; zeroAt: number };
+  /** A donut with either side this done is burnt and is thrown out automatically. */
+  burntAt: number;
   evennessZeroAtStdDev: number;
-  /** Donuts dropped when frying ahead without an order. */
-  prepBatchSize: number;
+  /** Donuts the vat holds at once. */
+  slots: number;
   /** Most fried donuts the cooling rack holds. */
   rackCapacity: number;
   scoreWeights: { doneness: number; temperature: number; evenness: number };
 }
 
-export interface FryBatch {
-  /** The order this batch is for, or null for a prep batch headed to the rack. */
-  ticketNo: number | null;
-  count: number;
-  /** Doneness of the side facing down, per donut. */
-  down: number[];
-  /** Doneness of the side facing up, per donut. */
-  up: number[];
+/** A donut in the oil. */
+export interface FryDonut {
+  id: number;
+  /** Doneness of the side facing down / up right now. */
+  down: number;
+  up: number;
   flips: number;
   seconds: number;
   secondsInRange: number;
 }
 
+/** A fried donut, out of the oil (on the rack or in an order). */
+export interface FriedDonut {
+  /** Doneness of each side (a = the side that went in face-down). */
+  a: number;
+  b: number;
+  /** Fraction of its frying time spent in the ideal range (0–1). */
+  temperature: number;
+  /** This donut's own 0–100 score. */
+  score: number;
+}
+
+/** An order's fry result, from the donuts it took off the rack. */
 export interface FryResult {
-  ticketNo: number | null;
+  ticketNo: number;
   /** 0–100 overall. */
   score: number;
   /** 0–1 component scores. */
   doneness: number;
   temperature: number;
   evenness: number;
-  /** Final doneness of both sides per donut (side A = first down). */
-  sides: { a: number[]; b: number[] };
-  seconds: number;
+  donuts: FriedDonut[];
 }
 
 /** Fixed per-slot cook-speed offsets, so low-oil unevenness is deterministic. */
@@ -76,21 +95,69 @@ export function cookRateAt(tempF: number, b: FryBalance): number {
   return clamp((tempF - zeroAtF) / (oneAtF - zeroAtF), 0, max);
 }
 
+/**
+ * Overall 0–1 score. Temperature and evenness only count as far as the donuts
+ * are cooked well: a burnt batch fried at a perfect temperature is still burnt.
+ */
+function combine(doneness: number, temperature: number, evenness: number, b: FryBalance): number {
+  const w = b.scoreWeights;
+  return (w.doneness * doneness + (w.temperature * temperature + w.evenness * evenness) * doneness) / (w.doneness + w.temperature + w.evenness);
+}
+
+/** Score a donut taken out of the oil. */
+export function scoreDonut(d: FryDonut, b: FryBalance): FriedDonut {
+  const flippedOdd = d.flips % 2 === 1;
+  const a = flippedOdd ? d.up : d.down;
+  const bSide = flippedOdd ? d.down : d.up;
+  const temperature = d.seconds > 0 ? clamp(d.secondsInRange / d.seconds, 0, 1) : 0;
+  const doneness = (sideScore(a, b) + sideScore(bSide, b)) / 2;
+  return { a, b: bSide, temperature, score: Math.round(combine(doneness, temperature, 1, b) * 100) };
+}
+
+/** An order's fry result: doneness and temperature averaged, plus how even the donuts are. */
+export function fryResultFromDonuts(ticketNo: number, donuts: readonly FriedDonut[], b: FryBalance): FryResult {
+  const n = Math.max(donuts.length, 1);
+  const doneness = donuts.reduce((s, d) => s + (sideScore(d.a, b) + sideScore(d.b, b)) / 2, 0) / n;
+  const temperature = donuts.reduce((s, d) => s + d.temperature, 0) / n;
+  const perDonut = donuts.map((d) => (d.a + d.b) / 2);
+  const mean = perDonut.reduce((s, x) => s + x, 0) / n;
+  const sd = Math.sqrt(perDonut.reduce((s, x) => s + (x - mean) ** 2, 0) / n);
+  const evenness = clamp(1 - sd / b.evennessZeroAtStdDev, 0, 1);
+  return {
+    ticketNo,
+    score: Math.round(combine(doneness, temperature, evenness, b) * 100),
+    doneness,
+    temperature,
+    evenness,
+    donuts: donuts.map((d) => ({ ...d })),
+  };
+}
+
 export class Fryer {
   temp: number;
+  /** The dial setting. */
   target: number;
   oil: number;
   grateHeld = false;
-  batch: FryBatch | null = null;
+  readonly slots: (FryDonut | null)[];
+  /** Slots whose donut burnt since the session last checked (it empties this). */
+  readonly burnt: number[] = [];
+  private nextId = 1;
 
   constructor(private readonly b: FryBalance) {
     this.temp = b.startTempF;
     this.target = b.startTargetF;
     this.oil = b.oil.start;
+    this.slots = new Array<FryDonut | null>(b.slots).fill(null);
   }
 
   get balance(): FryBalance {
     return this.b;
+  }
+
+  /** Where the oil temperature is heading: the dial plus the low-oil drift. */
+  get settleTemp(): number {
+    return this.target + this.b.oilDriftF * (1 - this.oil);
   }
 
   get inIdealRange(): boolean {
@@ -101,8 +168,18 @@ export class Fryer {
     return this.oil < this.b.oil.lowThreshold;
   }
 
+  get count(): number {
+    let n = 0;
+    for (const d of this.slots) if (d) n++;
+    return n;
+  }
+
+  get freeSlot(): number {
+    return this.slots.indexOf(null);
+  }
+
   get canDrop(): boolean {
-    return this.batch === null && this.oil >= this.b.oil.minToFry;
+    return this.freeSlot >= 0 && this.oil >= this.b.oil.minToFry;
   }
 
   setTarget(f: number): void {
@@ -122,136 +199,72 @@ export class Fryer {
     return true;
   }
 
-  /** Drop a batch of raw donuts for a ticket (or null: a prep batch for the rack). */
-  drop(ticketNo: number | null, count: number): boolean {
-    if (!this.canDrop || count < 1) return false;
-    this.batch = {
-      ticketNo,
-      count,
-      down: new Array<number>(count).fill(0),
-      up: new Array<number>(count).fill(0),
-      flips: 0,
-      seconds: 0,
-      secondsInRange: 0,
-    };
-    this.temp -= this.b.dropCoolPerDonutF * count;
-    this.oil = Math.max(0, this.oil - this.b.oil.perDonut * count);
+  /** Drop one raw donut into the first free slot. Returns the slot, or -1. */
+  drop(): number {
+    if (!this.canDrop) return -1;
+    const slot = this.freeSlot;
+    this.slots[slot] = { id: this.nextId++, down: 0, up: 0, flips: 0, seconds: 0, secondsInRange: 0 };
+    this.temp -= this.b.dropCoolPerDonutF;
+    this.oil = Math.max(0, this.oil - this.b.oil.perDonut);
+    return slot;
+  }
+
+  flip(slot: number): boolean {
+    const d = this.slots[slot];
+    if (!d) return false;
+    const t = d.down;
+    d.down = d.up;
+    d.up = t;
+    d.flips++;
     return true;
   }
 
-  flip(): void {
-    const batch = this.batch;
-    if (!batch) return;
-    const { down, up } = batch;
-    for (let i = 0; i < batch.count; i++) {
-      const t = down[i]!;
-      down[i] = up[i]!;
-      up[i] = t;
-    }
-    batch.flips++;
+  flipAll(): void {
+    for (let i = 0; i < this.slots.length; i++) this.flip(i);
   }
 
-  /** Advance time. No allocations: this runs every frame. */
+  /** Take a donut out and score it. */
+  take(slot: number): FriedDonut | null {
+    const d = this.slots[slot];
+    if (!d) return null;
+    this.slots[slot] = null;
+    if (this.count === 0) this.grateHeld = false;
+    return scoreDonut(d, this.b);
+  }
+
+  /** Throw a donut away. */
+  trash(slot: number): boolean {
+    if (!this.slots[slot]) return false;
+    this.slots[slot] = null;
+    if (this.count === 0) this.grateHeld = false;
+    return true;
+  }
+
+  /** Advance time. No allocations unless something burns: this runs every frame. */
   tick(dtSec: number): void {
-    // Oil temperature eases toward the dial setting (exponential lag, never overshoots).
+    // Oil eases toward the dial setting (plus low-oil drift); exponential, never overshoots.
     const k = 1 - Math.exp(-this.b.heatLagPerSec * dtSec);
-    this.temp += (this.target - this.temp) * k;
+    this.temp += (this.settleTemp - this.temp) * k;
 
-    const batch = this.batch;
-    if (!batch) return;
-    batch.seconds += dtSec;
-    if (this.inIdealRange) batch.secondsInRange += dtSec;
-
+    const inRange = this.inIdealRange;
     const base = (cookRateAt(this.temp, this.b) / this.b.secondsPerSide) * dtSec;
     const topFactor = this.grateHeld ? this.b.topFactorGrate : this.b.topFactorFloating;
     const uneven = this.oilLow ? ((this.b.oil.lowThreshold - this.oil) / this.b.oil.lowThreshold) * this.b.unevenAtEmpty : 0;
-    for (let i = 0; i < batch.count; i++) {
-      const slot = 1 + (SLOT_SPREAD[i % SLOT_SPREAD.length] ?? 0) * uneven;
-      batch.down[i] = batch.down[i]! + base * slot;
-      batch.up[i] = batch.up[i]! + base * slot * topFactor;
+    for (let i = 0; i < this.slots.length; i++) {
+      const d = this.slots[i];
+      if (!d) continue;
+      const rate = base * (1 + (SLOT_SPREAD[i % SLOT_SPREAD.length] ?? 0) * uneven);
+      d.down += rate;
+      d.up += rate * topFactor;
+      d.seconds += dtSec;
+      if (inRange) d.secondsInRange += dtSec;
+      if (d.down >= this.b.burntAt || d.up >= this.b.burntAt) {
+        this.slots[i] = null;
+        this.burnt.push(i);
+      }
     }
+    if (this.grateHeld && this.count === 0) this.grateHeld = false;
   }
-
-  /** Take the batch out and score it. */
-  pull(): FryResult {
-    const batch = this.batch;
-    if (!batch) throw new Error('nothing in the fryer');
-    this.batch = null;
-    this.grateHeld = false;
-    // Side A is whichever side started face-down.
-    const flippedOdd = batch.flips % 2 === 1;
-    const a = flippedOdd ? batch.up : batch.down;
-    const bSide = flippedOdd ? batch.down : batch.up;
-    return scoreFry(batch.ticketNo, a, bSide, batch.seconds, batch.secondsInRange, this.b);
-  }
-}
-
-export function scoreFry(ticketNo: number | null, a: number[], bSide: number[], seconds: number, secondsInRange: number, b: FryBalance): FryResult {
-  const all = [...a, ...bSide];
-  const doneness = all.reduce((s, d) => s + sideScore(d, b), 0) / all.length;
-  const temperature = seconds > 0 ? clamp(secondsInRange / seconds, 0, 1) : 0;
-
-  // Evenness: how similar the donuts are to each other (each donut = mean of its sides).
-  const perDonut = a.map((d, i) => (d + (bSide[i] ?? 0)) / 2);
-  const mean = perDonut.reduce((s, d) => s + d, 0) / perDonut.length;
-  const sd = Math.sqrt(perDonut.reduce((s, d) => s + (d - mean) ** 2, 0) / perDonut.length);
-  const evenness = clamp(1 - sd / b.evennessZeroAtStdDev, 0, 1);
-
-  const total = combine(doneness, temperature, evenness, b);
-  return {
-    ticketNo,
-    score: Math.round(total * 100),
-    doneness,
-    temperature,
-    evenness,
-    sides: { a: [...a], b: [...bSide] },
-    seconds,
-  };
-}
-
-/** One fried donut waiting on the cooling rack. */
-export interface FriedDonut {
-  /** Doneness of each side. */
-  a: number;
-  b: number;
-  /** Its batch's temperature and evenness components (0–1). */
-  temperature: number;
-  evenness: number;
-  /** This donut's own 0–100 score. */
-  score: number;
-}
-
-/**
- * Overall 0–1 score. Temperature and evenness only count as far as the donuts
- * are cooked well: a burnt batch fried at a perfect temperature is still burnt.
- */
-function combine(doneness: number, temperature: number, evenness: number, b: FryBalance): number {
-  const w = b.scoreWeights;
-  return (w.doneness * doneness + (w.temperature * temperature + w.evenness * evenness) * doneness) / (w.doneness + w.temperature + w.evenness);
-}
-
-/** Split a batch result into individually scored donuts (for the rack). */
-export function donutsFromResult(r: FryResult, b: FryBalance): FriedDonut[] {
-  return r.sides.a.map((a, i) => {
-    const bSide = r.sides.b[i] ?? 0;
-    const doneness = (sideScore(a, b) + sideScore(bSide, b)) / 2;
-    return { a, b: bSide, temperature: r.temperature, evenness: r.evenness, score: Math.round(combine(doneness, r.temperature, r.evenness, b) * 100) };
-  });
-}
-
-/** A ticket's fry result built from rack donuts: the average of their scores. */
-export function fryResultFromDonuts(ticketNo: number, donuts: readonly FriedDonut[], b: FryBalance): FryResult {
-  const n = Math.max(donuts.length, 1);
-  const avg = (f: (d: FriedDonut) => number) => donuts.reduce((s, d) => s + f(d), 0) / n;
-  return {
-    ticketNo,
-    score: Math.round(avg((d) => d.score)),
-    doneness: avg((d) => (sideScore(d.a, b) + sideScore(d.b, b)) / 2),
-    temperature: avg((d) => d.temperature),
-    evenness: avg((d) => d.evenness),
-    sides: { a: donuts.map((d) => d.a), b: donuts.map((d) => d.b) },
-    seconds: 0,
-  };
 }
 
 /** Color stops for doneness, raw → golden → burnt. */
@@ -278,10 +291,10 @@ export function fryColor(doneness: number): number {
   return COLOR_STOPS[COLOR_STOPS.length - 1]![1];
 }
 
-/** A short word for a fry result, for the station's feedback. */
+/** A short word for a fry score, for the station's feedback. */
 export function fryVerdict(score: number): string {
   if (score >= 90) return 'perfectly golden!';
   if (score >= 70) return 'nice fry!';
   if (score >= 40) return 'not bad';
-  return 'hmm, rough batch';
+  return 'hmm, rough one';
 }
