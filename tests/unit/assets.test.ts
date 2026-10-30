@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import manifest from '../../assets/MANIFEST.md?raw';
 import { AnimKeys, TextureKeys } from '../../src/assets/keys';
-import { GAME_WIDTH, MIN_HIT_SIZE } from '../../src/ui/layout';
+import { MIN_HIT_SIZE, SAFE_SHORT } from '../../src/ui/layout';
 import { STATION_TABS } from '../../src/ui/tabs';
 
 describe('assets/MANIFEST.md', () => {
@@ -12,7 +12,8 @@ describe('assets/MANIFEST.md', () => {
 
 describe('tab bar', () => {
   it('gives every tab a hit target of at least MIN_HIT_SIZE', () => {
-    expect(GAME_WIDTH / STATION_TABS.length).toBeGreaterThanOrEqual(MIN_HIT_SIZE);
+    // Narrowest case: portrait, where tabs share the 1080 px short side.
+    expect(SAFE_SHORT / STATION_TABS.length).toBeGreaterThanOrEqual(MIN_HIT_SIZE);
   });
 
   it('has unique scenes', () => {

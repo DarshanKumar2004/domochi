@@ -2,13 +2,29 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { save } from '../systems/services';
 import { Button } from '../ui/Button';
-import { GAME_WIDTH, PLAY_AREA_HEIGHT } from '../ui/layout';
+import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { Truck } from '../ui/Truck';
+import { onLayout } from '../ui/viewport';
 import { SceneKeys } from './sceneKeys';
 
-const GROUND_Y = 1000;
-const LINE_Y = 1480;
+/** Positions inside the content area, per orientation. */
+const LAYOUT = {
+  portrait: {
+    groundY: 1000,
+    truck: { x: 540, y: 640, scale: 0.9 },
+    line: { x: [560, 760, 960], feetY: 1590 },
+    tagY: 1190,
+    waiting: { x: 200, y: 1460, labelY: 1630 },
+  },
+  landscape: {
+    groundY: 560,
+    truck: { x: 480, y: 330, scale: 0.75 },
+    line: { x: [1000, 1200, 1400], feetY: 880 },
+    tagY: 480,
+    waiting: { x: 1720, y: 700, labelY: 870 },
+  },
+} as const;
 
 /** The truck's parking lot. Phase 1: static line of placeholder customers. */
 export class LobbyScene extends Phaser.Scene {
@@ -20,32 +36,28 @@ export class LobbyScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.sky);
-    this.add.rectangle(0, GROUND_Y, GAME_WIDTH, PLAY_AREA_HEIGHT - GROUND_Y, COLORS.asphalt).setOrigin(0);
-    for (let x = 60; x < GAME_WIDTH; x += 240) {
-      this.add.rectangle(x, GROUND_Y + 60, 120, 14, 0xe8e8e8).setOrigin(0, 0.5);
-    }
-
-    new Truck(this, GAME_WIDTH / 2, 640).setScale(0.9);
+    const ground = this.add.graphics();
+    const truck = new Truck(this, 0, 0);
 
     // Waiting area (customers move here after ordering, Phase 2).
-    this.add.rectangle(200, LINE_Y - 20, 300, 260, 0xffffff, 0.12).setStrokeStyle(6, 0xffffff, 0.5);
-    this.add
-      .text(200, LINE_Y + 150, 'Waiting', { fontFamily: FONT_FAMILY, fontSize: '40px', color: CSS.cream })
+    const waiting = this.add.rectangle(0, 0, 300, 260, 0xffffff, 0.12).setStrokeStyle(6, 0xffffff, 0.5);
+    const waitingLabel = this.add
+      .text(0, 0, 'Waiting', { fontFamily: FONT_FAMILY, fontSize: '40px', color: CSS.cream })
       .setOrigin(0.5);
 
-    // Customer line: front of the line is on the left.
-    const lineX = [560, 760, 960];
-    lineX.forEach((x, i) => {
-      const c = this.add.image(x, LINE_Y + 110, TextureKeys.Customer).setOrigin(0.5, 1);
+    // Customer line: front of the line is nearest the truck.
+    const customers = [0, 1, 2].map((i) => {
+      const c = this.add.image(0, 0, TextureKeys.Customer).setOrigin(0.5, 1);
       if (i === 0) {
         c.setName('customer-front').setInteractive({ useHandCursor: true });
-        c.on(Phaser.Input.Events.POINTER_UP, () => this.openOrder());
+        c.on(Phaser.Input.Events.POINTER_UP, () => this.openOverlay(SceneKeys.Order));
       } else {
         c.setAlpha(0.85);
       }
+      return c;
     });
-    const nextTag = this.add
-      .text(lineX[0] ?? 0, LINE_Y - 290, 'Tap me!', {
+    const tag = this.add
+      .text(0, 0, 'Tap me!', {
         fontFamily: FONT_FAMILY,
         fontSize: '42px',
         fontStyle: 'bold',
@@ -54,9 +66,9 @@ export class LobbyScene extends Phaser.Scene {
         padding: { x: 18, y: 10 },
       })
       .setOrigin(0.5);
-    this.tweens.add({ targets: nextTag, y: nextTag.y - 16, duration: 500, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: tag, scale: 1.1, duration: 500, yoyo: true, repeat: -1 });
 
-    this.dayText = this.add.text(40, 50, '', {
+    this.dayText = this.add.text(0, 0, '', {
       fontFamily: FONT_FAMILY,
       fontSize: '56px',
       fontStyle: 'bold',
@@ -68,20 +80,39 @@ export class LobbyScene extends Phaser.Scene {
       this.events.off(Phaser.Scenes.Events.WAKE, this.refreshHeader, this);
     });
 
-    new Button(this, GAME_WIDTH - 170, 90, 'Settings', () => this.openOverlay(SceneKeys.Settings), {
+    const settings = new Button(this, 0, 0, 'Settings', () => this.openOverlay(SceneKeys.Settings), {
       width: 280,
       height: 120,
       fontSize: 44,
       name: 'btn-settings',
     });
+
+    onLayout(this, (v: Viewport) => {
+      const L = LAYOUT[v.orientation];
+      const c = v.content;
+      const groundY = c.y + L.groundY;
+
+      // The ground fills the whole screen width and runs under the tab bar.
+      ground.clear();
+      ground.fillStyle(COLORS.asphalt);
+      ground.fillRect(0, groundY, v.width, v.height - groundY);
+      ground.fillStyle(0xe8e8e8);
+      for (let x = 60; x < v.width; x += 240) ground.fillRect(x, groundY + 53, 120, 14);
+
+      truck.setPosition(c.x + L.truck.x, c.y + L.truck.y).setScale(L.truck.scale);
+      customers.forEach((cust, i) => cust.setPosition(c.x + (L.line.x[i] ?? 0), c.y + L.line.feetY));
+      tag.setPosition(c.x + L.line.x[0], c.y + L.tagY);
+      waiting.setPosition(c.x + L.waiting.x, c.y + L.waiting.y);
+      waitingLabel.setPosition(c.x + L.waiting.x, c.y + L.waiting.labelY);
+
+      // HUD chrome hugs the real screen corners, not the safe area.
+      this.dayText.setPosition(40, 50);
+      settings.setPosition(v.width - 170, 90);
+    });
   }
 
   private refreshHeader(): void {
     this.dayText.setText(`Day ${save().data.day}`);
-  }
-
-  private openOrder(): void {
-    this.openOverlay(SceneKeys.Order);
   }
 
   private openOverlay(key: typeof SceneKeys.Order | typeof SceneKeys.Settings): void {

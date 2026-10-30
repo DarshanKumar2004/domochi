@@ -1,5 +1,4 @@
-import { expect, type Page } from '@playwright/test';
-import { GAME_WIDTH } from '../../src/ui/layout';
+import { expect, test, type Page } from '@playwright/test';
 
 // Helpers that drive the game through window.__game (exposed in src/main.ts).
 
@@ -10,34 +9,56 @@ type AnyObj = {
   getBounds?: () => { centerX: number; centerY: number };
 };
 
+type GameHandle = {
+  scale: { width: number; height: number };
+  scene: {
+    isActive(k: string): boolean;
+    isSleeping(k: string): boolean;
+    getScenes(active: boolean): { sys: { settings: { key: string } } }[];
+    getScene(k: string): { children: { list: unknown[] } };
+  };
+};
+
 export async function waitForScene(page: Page, key: string, active = true): Promise<void> {
   await page.waitForFunction(
     ([k, want]) => {
-      const g = (window as unknown as { __game?: { scene: { isActive(k: string): boolean } } }).__game;
+      const g = (window as unknown as { __game?: GameHandle }).__game;
       return (g?.scene.isActive(k) ?? false) === want;
     },
     [key, active] as const,
   );
 }
 
+/** Active scenes, ordered bottom to top. */
 export async function activeScenes(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const g = (window as unknown as { __game: { scene: { getScenes(active: boolean): { sys: { settings: { key: string } } }[] } } }).__game;
+    const g = (window as unknown as { __game: GameHandle }).__game;
     return g.scene.getScenes(true).map((s) => s.sys.settings.key);
+  });
+}
+
+export async function isSleeping(page: Page, key: string): Promise<boolean> {
+  return page.evaluate((k) => (window as unknown as { __game: GameHandle }).__game.scene.isSleeping(k), key);
+}
+
+export async function gameSize(page: Page): Promise<{ width: number; height: number }> {
+  return page.evaluate(() => {
+    const g = (window as unknown as { __game: GameHandle }).__game;
+    return { width: g.scale.width, height: g.scale.height };
   });
 }
 
 /** Assert `key` is drawn above every other active scene (popups must cover the tab bar). */
 export async function expectOnTop(page: Page, key: string): Promise<void> {
-  const scenes = await activeScenes(page); // ordered bottom to top
+  const scenes = await activeScenes(page);
   expect(scenes.at(-1)).toBe(key);
 }
 
 /** Find a named, visible game object (searching inside containers) and return its centre in game coordinates. */
-async function findNamed(page: Page, sceneKey: string, name: string): Promise<{ x: number; y: number }> {
+export async function findNamed(page: Page, sceneKey: string, name: string): Promise<{ x: number; y: number }> {
   const handle = await page.waitForFunction(
     ([sk, n]) => {
-      const g = (window as unknown as { __game: { scene: { getScene(k: string): { children: { list: unknown[] } } } } }).__game;
+      const g = (window as unknown as { __game: GameHandle }).__game;
       const stack = [...g.scene.getScene(sk).children.list] as AnyObj[];
       while (stack.length) {
         const o = stack.pop()!;
@@ -54,12 +75,23 @@ async function findNamed(page: Page, sceneKey: string, name: string): Promise<{ 
   return (await handle.jsonValue()) as { x: number; y: number };
 }
 
-/** Tap a point given in game coordinates (1080×1920). */
+/** Tap (touch devices) or click (desktop) a point given in game coordinates. */
 export async function tapGame(page: Page, x: number, y: number): Promise<void> {
   const box = await page.locator('#game canvas').boundingBox();
   expect(box).not.toBeNull();
-  const scale = box!.width / GAME_WIDTH;
-  await page.touchscreen.tap(box!.x + x * scale, box!.y + y * scale);
+  const { width } = await gameSize(page);
+  const scale = box!.width / width;
+  const px = box!.x + x * scale;
+  const py = box!.y + y * scale;
+  // Tapped points must be on screen, or the layout put something out of reach.
+  const vp = page.viewportSize()!;
+  expect(px).toBeGreaterThanOrEqual(0);
+  expect(py).toBeGreaterThanOrEqual(0);
+  expect(px).toBeLessThanOrEqual(vp.width);
+  expect(py).toBeLessThanOrEqual(vp.height);
+
+  if (test.info().project.use.hasTouch) await page.touchscreen.tap(px, py);
+  else await page.mouse.click(px, py);
 }
 
 export async function tapNamed(page: Page, sceneKey: string, name: string): Promise<void> {
@@ -67,8 +99,18 @@ export async function tapNamed(page: Page, sceneKey: string, name: string): Prom
   await tapGame(page, p.x, p.y);
 }
 
+/** Screenshot into test-results/screens/<project>/<name>.png. */
 export async function shot(page: Page, name: string): Promise<void> {
   // Let tweens settle a moment so screenshots are representative.
   await page.waitForTimeout(250);
-  await page.screenshot({ path: `test-results/screens/${name}.png` });
+  await page.screenshot({ path: `test-results/screens/${test.info().project.name}/${name}.png` });
+}
+
+/** Skip the tutorial on first load by pre-seeding the save. */
+export async function seedTutorialDone(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('domochi.save')) {
+      localStorage.setItem('domochi.save', JSON.stringify({ tutorialDone: true }));
+    }
+  });
 }

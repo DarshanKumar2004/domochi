@@ -2,9 +2,10 @@ import Phaser from 'phaser';
 import { ASSET_FILES, queueAssetFile } from '../assets/files';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
 import { save } from '../systems/services';
-import { GAME_WIDTH } from '../ui/layout';
+import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { Truck } from '../ui/Truck';
+import { onLayout } from '../ui/viewport';
 import { startMainGame } from './flow';
 import { SceneKeys } from './sceneKeys';
 
@@ -17,6 +18,10 @@ const BAR_WIDTH = 700;
 const BAR_HEIGHT = 44;
 
 export class PreloadScene extends Phaser.Scene {
+  private title!: Phaser.GameObjects.Text;
+  private subtitle!: Phaser.GameObjects.Text;
+  private truck!: Truck;
+  private barBg!: Phaser.GameObjects.Rectangle;
   private barFill!: Phaser.GameObjects.Rectangle;
   private prompt!: Phaser.GameObjects.Text;
   private loadProgress = 0;
@@ -31,43 +36,22 @@ export class PreloadScene extends Phaser.Scene {
     this.loadProgress = 0;
     this.elapsed = 0;
     this.ready = false;
-    const cx = GAME_WIDTH / 2;
 
-    this.add
-      .text(cx, 300, 'Domochi Donuts', {
-        fontFamily: FONT_FAMILY,
-        fontSize: '110px',
-        fontStyle: 'bold',
-        color: CSS.cream,
-      })
+    this.title = this.add
+      .text(0, 0, 'Domochi Donuts', { fontFamily: FONT_FAMILY, fontSize: '110px', fontStyle: 'bold', color: CSS.cream })
       .setOrigin(0.5);
-    this.add
-      .text(cx, 410, 'Fresh mochi donuts · Lafayette, LA', {
-        fontFamily: FONT_FAMILY,
-        fontSize: '44px',
-        color: CSS.muted,
-      })
+    this.subtitle = this.add
+      .text(0, 0, 'Fresh mochi donuts · Lafayette, LA', { fontFamily: FONT_FAMILY, fontSize: '44px', color: CSS.muted })
       .setOrigin(0.5);
-
-    new Truck(this, cx, 880);
-
-    const barY = 1340;
-    this.add.rectangle(cx, barY, BAR_WIDTH + 16, BAR_HEIGHT + 16, COLORS.tabBar).setOrigin(0.5);
-    this.barFill = this.add
-      .rectangle(cx - BAR_WIDTH / 2, barY, BAR_WIDTH, BAR_HEIGHT, COLORS.pink)
-      .setOrigin(0, 0.5)
-      .setScale(0, 1);
-
+    this.truck = new Truck(this, 0, 0);
+    this.barBg = this.add.rectangle(0, 0, BAR_WIDTH + 16, BAR_HEIGHT + 16, COLORS.tabBar);
+    this.barFill = this.add.rectangle(0, 0, BAR_WIDTH, BAR_HEIGHT, COLORS.pink).setOrigin(0, 0.5).setScale(0, 1);
     this.prompt = this.add
-      .text(cx, 1520, 'Tap to start', {
-        fontFamily: FONT_FAMILY,
-        fontSize: '72px',
-        fontStyle: 'bold',
-        color: CSS.pink,
-      })
+      .text(0, 0, 'Tap to start', { fontFamily: FONT_FAMILY, fontSize: '72px', fontStyle: 'bold', color: CSS.pink })
       .setOrigin(0.5)
       .setName('prompt-start')
       .setVisible(false);
+    onLayout(this, (v) => this.layout(v));
 
     this.load.on(Phaser.Loader.Events.PROGRESS, (value: number) => {
       this.loadProgress = value;
@@ -75,6 +59,20 @@ export class PreloadScene extends Phaser.Scene {
     for (const file of ASSET_FILES) {
       if (!file.boot) queueAssetFile(this, file);
     }
+  }
+
+  private layout(v: Viewport): void {
+    const s = v.safe;
+    const cx = v.width / 2;
+    // [title, subtitle, truck, bar, prompt] y positions and truck scale, per orientation.
+    const L = v.orientation === 'landscape';
+    const y = L ? [130, 225, 545, 870, 975] : [300, 410, 880, 1340, 1520];
+    this.title.setPosition(cx, s.y + y[0]!);
+    this.subtitle.setPosition(cx, s.y + y[1]!);
+    this.truck.setPosition(cx, s.y + y[2]!).setScale(L ? 0.75 : 1);
+    this.barBg.setPosition(cx, s.y + y[3]!);
+    this.barFill.setPosition(cx - BAR_WIDTH / 2, s.y + y[3]!);
+    this.prompt.setPosition(cx, s.y + y[4]!);
   }
 
   create(): void {

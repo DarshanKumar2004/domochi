@@ -1,8 +1,21 @@
 import { expect, test } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { activeScenes, expectOnTop, shot, tapGame, tapNamed, waitForScene } from './helpers';
+import {
+  activeScenes,
+  expectOnTop,
+  gameSize,
+  isSleeping,
+  seedTutorialDone,
+  shot,
+  tapGame,
+  tapNamed,
+  waitForScene,
+} from './helpers';
 
-test('full Phase 1 scene flow on a phone', async ({ page }) => {
+// Runs once per Playwright project: phone portrait, phone landscape, desktop.
+test('full scene flow', async ({ page }) => {
+  // One long walk through the whole game; the 30 s default is too tight when projects run in parallel.
+  test.setTimeout(90_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -18,7 +31,8 @@ test('full Phase 1 scene flow on a phone', async ({ page }) => {
   await shot(page, '02-tutorial');
 
   // Advance one line, then skip
-  await tapGame(page, 540, 1200);
+  const size = await gameSize(page);
+  await tapGame(page, size.width / 2, size.height / 2);
   await shot(page, '03-tutorial-line2');
   await tapNamed(page, SceneKeys.Tutorial, 'btn-skip');
   await waitForScene(page, SceneKeys.Lobby);
@@ -59,11 +73,7 @@ test('full Phase 1 scene flow on a phone', async ({ page }) => {
   await waitForScene(page, SceneKeys.Serve, false);
 
   // Stations we left are asleep (state kept), and returning wakes them
-  const frySleeping = await page.evaluate(
-    (k) => (window as unknown as { __game: { scene: { isSleeping(k: string): boolean } } }).__game.scene.isSleeping(k),
-    SceneKeys.Fry,
-  );
-  expect(frySleeping).toBe(true);
+  expect(await isSleeping(page, SceneKeys.Fry)).toBe(true);
   await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
   await waitForScene(page, SceneKeys.Fry);
   await tapNamed(page, SceneKeys.Hud, 'tab-Lobby');
@@ -101,6 +111,55 @@ test('full Phase 1 scene flow on a phone', async ({ page }) => {
   await waitForScene(page, SceneKeys.Tutorial);
   const saved = await page.evaluate(() => localStorage.getItem('domochi.save'));
   expect(JSON.parse(saved ?? '{}').tutorialDone).toBe(false);
+
+  expect(errors).toEqual([]);
+});
+
+test('rotating the phone switches layout without losing state', async ({ page }, info) => {
+  test.skip(info.project.name !== 'phone-portrait', 'rotation is simulated from the portrait phone only');
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  await seedTutorialDone(page);
+  await page.goto('/');
+  await tapNamed(page, SceneKeys.Preload, 'prompt-start');
+  await waitForScene(page, SceneKeys.Lobby);
+
+  // Go to a station and open nothing else, then rotate.
+  await tapNamed(page, SceneKeys.Hud, 'tab-Glaze');
+  await waitForScene(page, SceneKeys.Glaze);
+  const portrait = await gameSize(page);
+  expect(portrait.height).toBeGreaterThan(portrait.width);
+
+  const vp = page.viewportSize()!;
+  await page.setViewportSize({ width: vp.height, height: vp.width });
+  await page.waitForFunction(() => {
+    const g = (window as unknown as { __game: { scale: { width: number; height: number } } }).__game;
+    return g.scale.width > g.scale.height;
+  });
+  await shot(page, 'rotated-glaze-landscape');
+
+  // Same station still showing, sleeping Lobby kept, tabs still work after the relayout.
+  expect(await activeScenes(page)).toEqual(expect.arrayContaining([SceneKeys.Glaze, SceneKeys.Hud]));
+  expect(await isSleeping(page, SceneKeys.Lobby)).toBe(true);
+  await tapNamed(page, SceneKeys.Hud, 'tab-Lobby');
+  await waitForScene(page, SceneKeys.Lobby);
+  await shot(page, 'rotated-lobby-landscape');
+
+  // Sleeping scenes were re-laid-out too: the Lobby customer is reachable in landscape.
+  await tapNamed(page, SceneKeys.Lobby, 'customer-front');
+  await waitForScene(page, SceneKeys.Order);
+  await shot(page, 'rotated-order-landscape');
+
+  // And back to portrait.
+  await page.setViewportSize(vp);
+  await page.waitForFunction(() => {
+    const g = (window as unknown as { __game: { scale: { width: number; height: number } } }).__game;
+    return g.scale.height > g.scale.width;
+  });
+  await shot(page, 'rotated-back-order-portrait');
+  await tapNamed(page, SceneKeys.Order, 'btn-take-order');
+  await waitForScene(page, SceneKeys.Order, false);
 
   expect(errors).toEqual([]);
 });

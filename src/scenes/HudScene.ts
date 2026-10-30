@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
+import { onLayout } from '../ui/viewport';
 import { SceneKeys } from './sceneKeys';
 
 /**
@@ -19,6 +20,7 @@ export class HudScene extends Phaser.Scene {
     this.current = SceneKeys.Lobby;
     this.tabBar = new TabBar(this, STATION_TABS, (key) => this.goTo(key));
     this.tabBar.selectTab(this.current);
+    onLayout(this, (v) => this.tabBar.layout(v));
   }
 
   get currentStation(): StationKey {

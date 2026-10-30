@@ -39,7 +39,10 @@ Keep dependencies minimal. Ask before adding any new library.
 
 ## Display
 
-- Portrait **1080×1920** logical resolution, using `Phaser.Scale.FIT` with auto-centering.
+- **Both orientations are supported, and the layout follows the window's shape.** A wide window (PC, or a phone held sideways) uses **landscape**. A tall window (a phone browser held upright, e.g. after scanning the truck's QR code) uses **portrait**. Rotating mid-game re-lays out live, without restarting anything.
+- **Safe area plus fill (no black bars):** important UI goes in a centred safe area, **1920×1080** in landscape and **1080×1920** in portrait. The game canvas grows to the screen's shape, and backgrounds must fill the whole canvas. The short side is always 1080 logical px. Maths and tests: `src/ui/layout.ts`.
+- **Every scene positions its objects in a `layout(v)` callback** through `onLayout()` (`src/ui/viewport.ts`), never at fixed coordinates in `create()`. Every new scene or station needs a portrait *and* a landscape layout, and Playwright runs every flow on phone-portrait, phone-landscape and desktop.
+- **Android app (Phase 8):** landscape by default, with a Settings option for Landscape / Portrait / Auto. Locking orientation needs a Capacitor plugin, so ask before adding it. On the web, the layout always follows the window.
 - Touch first: every interaction must work with one finger. Mouse support comes for free.
 - Hit targets must be at least 120px at logical resolution.
 
