@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
 import {
   activeScenes,
+  expectFillsScreen,
   expectOnTop,
   gameSize,
   isSleeping,
@@ -137,6 +138,7 @@ test('rotating the phone switches layout without losing state', async ({ page },
     const g = (window as unknown as { __game: { scale: { width: number; height: number } } }).__game;
     return g.scale.width > g.scale.height;
   });
+  await expectFillsScreen(page);
   await shot(page, 'rotated-glaze-landscape');
 
   // Same station still showing, sleeping Lobby kept, tabs still work after the relayout.
@@ -157,6 +159,7 @@ test('rotating the phone switches layout without losing state', async ({ page },
     const g = (window as unknown as { __game: { scale: { width: number; height: number } } }).__game;
     return g.scale.height > g.scale.width;
   });
+  await expectFillsScreen(page);
   await shot(page, 'rotated-back-order-portrait');
   await tapNamed(page, SceneKeys.Order, 'btn-take-order');
   await waitForScene(page, SceneKeys.Order, false);

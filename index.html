@@ -18,12 +18,22 @@
         overflow: hidden;
         background: #1f1a17; /* domochi ink */
         touch-action: none;
+        overscroll-behavior: none;
         -webkit-user-select: none;
         user-select: none;
       }
+      /*
+        Pinned to the screen and clipped: while a phone rotates, the canvas is
+        briefly the old orientation's size. If it could overflow the page,
+        mobile browsers zoom out to fit it and the game gets stuck as a small box.
+      */
       #game {
-        width: 100%;
-        height: 100%;
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+      }
+      #game canvas {
+        display: block;
       }
     </style>
   </head>

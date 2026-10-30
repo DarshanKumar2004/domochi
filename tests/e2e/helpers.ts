@@ -48,6 +48,25 @@ export async function gameSize(page: Page): Promise<{ width: number; height: num
   });
 }
 
+/**
+ * Assert the canvas covers the whole browser viewport (no shrunken box, no bars),
+ * waiting up to `timeout` for post-rotation settling.
+ */
+export async function expectFillsScreen(page: Page, timeout = 2000): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const box = await page.locator('#game canvas').boundingBox();
+        const vp = page.viewportSize()!;
+        if (!box) return 'no canvas';
+        const off = Math.max(Math.abs(box.x), Math.abs(box.y), Math.abs(box.width - vp.width), Math.abs(box.height - vp.height));
+        return off <= 2 ? 'fills' : `canvas ${box.width}x${box.height} at ${box.x},${box.y} vs viewport ${vp.width}x${vp.height}`;
+      },
+      { timeout },
+    )
+    .toBe('fills');
+}
+
 /** Assert `key` is drawn above every other active scene (popups must cover the tab bar). */
 export async function expectOnTop(page: Page, key: string): Promise<void> {
   const scenes = await activeScenes(page);

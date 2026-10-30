@@ -55,3 +55,15 @@ Kumar asked for the real branding and flavours from https://www.domochitreats.co
 - **Palette:** ink `#1f1a17` and cream `#fffaf0` from the site, with strawberry-glaze pink `#f4a6c0` as the accent. Ethan wears black with a cream outline, echoing the logo's ink outlines and keeping him visible on dark backgrounds.
 - **Text:** the loading screen shows "domochi" plus the tagline, the truck sign is lowercase, and Ethan's tutorial lines use the shop's own "what's a mochi donut?" copy.
 - **Not done yet, waiting on Kumar:** the official logo PNG is not in the repo (see open questions in chat). The setting is still a truck, but the real business is a walk-up window at the shop plus pop-ups.
+
+## Rotation bug fix (2026-10-30)
+
+**Bug (found by Kumar on a real phone):** after rotating to landscape and back to portrait, the game showed as a smaller box inside the screen.
+
+- **Cause:** `watchWindowSize` only acted when the computed *game size changed*. Rotating back to portrait gives the same game size as before, so nothing told Phaser to re-fit the canvas, and it kept the display size it had mid-rotation. Window sizes read inside rotation events can also be stale, so one event wasn't trustworthy either.
+- **Fix:**
+  - `watchContainerSize` measures the `#game` container rather than `window.innerWidth`.
+  - It re-checks 100, 300 and 700 ms after the last event and listens to `ResizeObserver` and `visualViewport` as well.
+  - It always calls `scale.refresh()`.
+  - `#game` is now `position: fixed` with overflow clipped, so a briefly oversized canvas can't widen the page and trigger mobile zoom-to-fit.
+- **Tests (`tests/e2e/layout.spec.ts`):** the canvas fills the screen on load, after rapid back-and-forth rotations, and after being forced oversized. The rotation flow in `smoke.spec.ts` also asserts the canvas fills the screen. I checked that the oversized test **fails on the old code** with the canvas stuck at 3× the screen.
