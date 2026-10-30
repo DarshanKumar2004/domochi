@@ -40,5 +40,17 @@
     "slots": 6,
     "rackCapacity": 12,
     "scoreWeights": { "doneness": 0.6, "temperature": 0.25, "evenness": 0.15 }
+  },
+  "glaze": {
+    "_note": "Coordinates are normalised to the donut (centre 0,0, edges ±1). Scores: coverage/goodCoverage × (1 − spill/spillZeroAt), × wrongGlazeFactor for the wrong glaze.",
+    "gridSize": 48,
+    "ringRadius": 0.65,
+    "ballOverlap": 1.15,
+    "edgeMargin": 0.08,
+    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.07 },
+    "goodCoverage": { "dip": 0.9, "dust": 0.85, "drizzle": 0.75 },
+    "spillZeroAt": 0.6,
+    "wrongGlazeFactor": 0.3,
+    "stripes": { "count": 3, "spacing": 0.42, "width": 0.12, "angleDeg": 20, "margin": 0.08 }
   }
 }

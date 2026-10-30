@@ -1,6 +1,7 @@
 // One day at the trailer: customers arriving, orders, tickets and serving.
 // Pure logic driven by tick(dtMs); scenes render from it and call its actions.
 import { Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../stations/fry';
+import { GlazeJob, type GlazeLayer, type GlazeResult } from '../stations/glaze';
 import { forDay, type Balance } from './balance';
 import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
 import { Emitter } from './events';
@@ -32,7 +33,7 @@ export interface Ticket {
   takenAtMs: number;
   servedAtMs?: number;
   /** Per-station results, filled in as the order moves through the kitchen. */
-  results: { fry?: FryResult };
+  results: { fry?: FryResult; glaze?: GlazeResult };
 }
 
 export interface ServedEvent {
@@ -80,6 +81,7 @@ export class GameSession {
   private activeNo: number | null = null;
   private heldNo: number | null = null;
   private readonly rackDonuts: FriedDonut[] = [];
+  private readonly glazeJobs = new Map<number, GlazeJob>();
   /** Donuts thrown away today (burnt or trashed), for the day summary. */
   private trashedCount = 0;
 
@@ -318,6 +320,41 @@ export class GameSession {
     t.results.fry = fryResultFromDonuts(t.no, donuts, this.deps.balance.fry);
     this.events.emit('changed', undefined);
     return t.results.fry;
+  }
+
+  // ---- Glazing ----------------------------------------------------------------
+
+  /** The active ticket, if it's fried and still needs glazing. */
+  get ticketToGlaze(): Ticket | undefined {
+    const t = this.activeTicket;
+    return t && t.status === 'open' && t.results.fry && !t.results.glaze ? t : undefined;
+  }
+
+  /** The glaze job for the active ticket (created on first use, kept if you leave). */
+  get activeGlazeJob(): GlazeJob | undefined {
+    const t = this.ticketToGlaze;
+    if (!t) return undefined;
+    let job = this.glazeJobs.get(t.no);
+    if (!job) {
+      job = new GlazeJob(t.no, t.order.flavors, this.deps.menu, this.deps.balance.glaze);
+      this.glazeJobs.set(t.no, job);
+    }
+    return job;
+  }
+
+  glazeJob(ticketNo: number): GlazeJob | undefined {
+    return this.glazeJobs.get(ticketNo);
+  }
+
+  /** Finish the current glaze layer; when the last one is done the ticket gets its glaze result. */
+  finishGlazeLayer(): GlazeLayer {
+    const t = this.ticketToGlaze;
+    const job = this.activeGlazeJob;
+    if (!t || !job) throw new Error('nothing to glaze');
+    const layer = job.finish();
+    if (job.done) t.results.glaze = job.result();
+    this.events.emit('changed', undefined);
+    return layer;
   }
 
   /** Close the box on the active ticket and pick it up. */

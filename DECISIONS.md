@@ -138,3 +138,21 @@ Kumar shared photos of the real trailer and A-frame sign, confirmed the setting 
 
 - **No loading bar when there's nothing to load.** Only the logo is loaded, and that happens in Boot. If `ASSET_FILES` gains non-boot files later, the bar comes back automatically, with a short 0.6 s minimum so it doesn't flash.
 - **Customer pacing** (Kumar: "customer 3 only comes after you served customer 1"): `maxActiveByDay` caps how many customers are in line or waiting at once (2 on day 1, up to 4). After each serve, the next arrival is pushed at least `afterServeSec` (2–7 s, random) later. The spawn check now counts customers with plain loops instead of `filter`, because it runs every frame while someone is due.
+
+## Phase 4: Glaze station (2026-10-30)
+
+- **The logic is `src/stations/glaze.ts`,** pure with 16 unit tests plus session tests. Coordinates are normalised to the donut square (centre 0,0, edges ±1), using the same ring geometry as the art (`ringRadius` 0.65, which matches `donut-fry`).
+- **Steps per order (`glazeSteps`):** each donut gets its **base coat** (a *dip* glaze painted over the ring, or a *dust* for beignet's powdered sugar), then a **drizzle** if the flavour has one. Strawberry and cookie butter get the white icing, from the A-frame photo. The menu data drives all of it.
+- **Painting follows CLAUDE.md:** pick a glaze bowl, then drag your finger. A `PaintMask` grid (48×48) tracks coverage incrementally as each stroke stamps discs. Dip and dust use wide brushes; drizzle uses a thin one along three dashed guide stripes.
+- **Scoring per layer:** `min(coverage / goodCoverage, 1) × (1 − min(spill / spillZeroAt, 1))`, × 0.3 for the wrong glaze. The order's glaze score is the average of its layers.
+  - **Spill is measured against the target's size, not against total paint.** The first version measured spill as a share of what you'd painted, so scrubbing the whole board still scored about 42%. Measured runs: careful 0.04, sloppy 0.27, scrub-everything 0.75. With `spillZeroAt` 0.6 that gives about 93, 55 and 0.
+  - The drizzle brush went from 0.05 to 0.07, because tracing the guides perfectly only covered 61% of the stripes at 0.05.
+  - The drizzle's allowed area includes the donut's hole, since icing stripes cross it. Painting off the stripes or off the donut counts as spill.
+- **The job lives in the session (`GlazeJob` per ticket)** and keeps every stroke, so leaving mid-donut and coming back redraws exactly what you painted. Switching glaze after painting wipes that layer (no mixing). The ticket needs fried donuts first; the station offers **grab from rack**.
+- **Rendering:**
+  - Strokes are drawn onto a 420 px `CanvasTexture`, which is uploaded at most once per frame however many pointer events arrive.
+  - Dust is drawn as deterministic speckles, so redraws match.
+  - Ball outlines and a little gloss are drawn over the paint, so a glazed donut still reads as eight mochi bubbles. Without them, full coverage looked like a flat bagel.
+  - The base donut is tinted with that donut's actual fry colour.
+- **Rail and result card:** the rail shows "glazed", and the result card shows the glaze score.
+- **Test speed:** `drawPath` looks up the canvas once per path, not once per point. Per-point lookups made a careful three-circle paint take over two minutes in software rendering.

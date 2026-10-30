@@ -281,3 +281,41 @@ describe('GameSession: customer pacing', () => {
     expect(s.activeCustomers).toBe(2);
   });
 });
+
+describe('GameSession: glazing', () => {
+  function friedTicket() {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11);
+    s.fryer.temp = 350;
+    for (let i = 0; i < 3; i++) s.dropDonut();
+    s.tick(1000);
+    s.pullAll();
+    const { ticket } = orderFront(s);
+    return { s, ticket };
+  }
+
+  it('there is nothing to glaze until the ticket is fried', () => {
+    const { s, ticket } = friedTicket();
+    expect(s.ticketToGlaze).toBeUndefined();
+    expect(s.activeGlazeJob).toBeUndefined();
+    s.useRack();
+    expect(s.ticketToGlaze?.no).toBe(ticket.no);
+    expect(s.activeGlazeJob?.ticketNo).toBe(ticket.no);
+  });
+
+  it('the job is kept between visits and finishing every layer stores the result', () => {
+    const { s, ticket } = friedTicket();
+    s.useRack();
+    const job = s.activeGlazeJob!;
+    expect(s.activeGlazeJob).toBe(job); // same job each time
+    let changes = 0;
+    s.events.on('changed', () => changes++);
+    while (!job.done) {
+      job.choose(job.step!.glazeId);
+      job.paint(-0.6, -0.6, 0.6, 0.6);
+      s.finishGlazeLayer();
+    }
+    expect(s.ticket(ticket.no)!.results.glaze).toEqual(job.result());
+    expect(s.ticketToGlaze).toBeUndefined();
+    expect(changes).toBe(job.layers.length);
+  });
+});

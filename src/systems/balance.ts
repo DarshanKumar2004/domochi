@@ -1,5 +1,6 @@
 // Types and helpers for src/data/balance.json.
 import type { FryBalance } from '../stations/fry';
+import type { GlazeBalance } from '../stations/glaze';
 
 export interface Range {
   min: number;
@@ -20,6 +21,7 @@ export interface Balance {
   orderSizeByDay: Range[];
   favoriteWeight: number;
   fry: FryBalance;
+  glaze: GlazeBalance;
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */
@@ -61,6 +63,13 @@ export function validateBalance(b: Balance): string[] {
   if (!(Number.isInteger(f.slots) && f.slots >= 1 && f.rackCapacity >= 1)) errors.push('fry needs slots >= 1 and rackCapacity >= 1');
   if (!(f.burntAt > 1 + f.doneness.zeroAt)) errors.push('fry.burntAt must be past the point where a side scores 0');
   if (!(f.oilDriftF >= 0)) errors.push('fry.oilDriftF must be >= 0');
+  const g = b.glaze;
+  if (!(Number.isInteger(g.gridSize) && g.gridSize >= 16)) errors.push('glaze.gridSize must be an integer >= 16');
+  for (const s of ['dip', 'dust', 'drizzle'] as const) {
+    if (!(g.brushRadius[s] > 0 && g.goodCoverage[s] > 0 && g.goodCoverage[s] <= 1)) errors.push(`glaze.${s} needs brushRadius > 0 and 0 < goodCoverage <= 1`);
+  }
+  if (!(g.spillZeroAt > 0 && g.wrongGlazeFactor >= 0 && g.wrongGlazeFactor < 1)) errors.push('glaze needs spillZeroAt > 0 and 0 <= wrongGlazeFactor < 1');
+  if (!(g.ringRadius > 0 && g.ringRadius < 1)) errors.push('glaze.ringRadius must be between 0 and 1');
   if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');
   return errors;
 }

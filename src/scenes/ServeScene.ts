@@ -6,7 +6,7 @@ import { CSS, FONT_FAMILY } from '../ui/theme';
 import { onLayout } from '../ui/viewport';
 import { SceneKeys } from './sceneKeys';
 
-const ROWS = ['Glaze', 'Toppings', 'Box'];
+const ROWS = ['Toppings', 'Box'];
 const CARD_W = 860;
 const CARD_H = 900; // fits both orientations (landscape height is 1080)
 
@@ -56,6 +56,7 @@ export class ServeScene extends Phaser.Scene {
     const fry = ticket?.results.fry;
     const rows: [string, string][] = [
       ['Fry', fry ? String(fry.score) : 'not fried'],
+      ['Glaze', ticket?.results.glaze ? String(ticket.results.glaze.score) : 'not glazed'],
       ...ROWS.map((r): [string, string] => [r, '—']),
       ['Wait time', `${Math.round(this.waitMs / 1000)}s`],
     ];

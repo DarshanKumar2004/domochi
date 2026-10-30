@@ -139,6 +139,42 @@ export async function advance(page: Page, ms: number, stepMs = 100): Promise<voi
   );
 }
 
+/** Bounds (game coordinates) of a named, visible object. */
+export async function boundsNamed(page: Page, sceneKey: string, name: string): Promise<{ x: number; y: number; w: number; h: number }> {
+  await findNamed(page, sceneKey, name);
+  return page.evaluate(
+    ([sk, n]) => {
+      type O = { name?: string; list?: O[]; getBounds?: () => { x: number; y: number; width: number; height: number } };
+      const g = (window as unknown as { __game: { scene: { getScene(k: string): { children: { list: O[] } } } } }).__game;
+      const stack = [...g.scene.getScene(sk).children.list];
+      while (stack.length) {
+        const o = stack.pop()!;
+        if (o.name === n && o.getBounds) {
+          const b = o.getBounds();
+          return { x: b.x, y: b.y, w: b.width, h: b.height };
+        }
+        if (o.list) stack.push(...o.list);
+      }
+      throw new Error('not found: ' + n);
+    },
+    [sceneKey, name] as const,
+  );
+}
+
+/** Draw a path with the mouse through points given in game coordinates. */
+export async function drawPath(page: Page, points: { x: number; y: number }[]): Promise<void> {
+  if (points.length === 0) return;
+  // Look up the canvas once (each lookup is a round trip), then convert every point locally.
+  const box = (await page.locator('#game canvas').boundingBox())!;
+  const { width } = await gameSize(page);
+  const scale = box.width / width;
+  const px = (p: { x: number; y: number }) => [box.x + p.x * scale, box.y + p.y * scale] as const;
+  await page.mouse.move(...px(points[0]!));
+  await page.mouse.down();
+  for (const p of points.slice(1)) await page.mouse.move(...px(p));
+  await page.mouse.up();
+}
+
 /** Tap (touch devices) or click (desktop) a point given in game coordinates. */
 export async function tapGame(page: Page, x: number, y: number): Promise<void> {
   const { px, py } = await toPage(page, x, y);
