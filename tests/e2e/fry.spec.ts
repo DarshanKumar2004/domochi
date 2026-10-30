@@ -41,8 +41,11 @@ test('fry an order: heat, drop, flip, grate, dial, pull, then serve it', async (
   await tapNamed(page, SceneKeys.Fry, 'btn-fry-primary');
   await expect.poll(async () => (await fryer(page)).batch?.count ?? 0).toBeGreaterThan(0);
 
-  // Cook the underside, flip, cook the other side.
-  await advance(page, 6000);
+  // Watch the depositor drop them in, then cook the underside, flip, cook the other side.
+  await page.waitForTimeout(250);
+  await shot(page, 'fry-1b-dropping');
+  const side = await page.evaluate(() => (window as unknown as { __session: { fryer: { balance: { secondsPerSide: number; topFactorFloating: number } } } }).__session.fryer.balance);
+  await advance(page, side.secondsPerSide * 1000);
   await shot(page, 'fry-2-cooking');
   await tapNamed(page, SceneKeys.Fry, 'btn-flip');
   await expect.poll(async () => (await fryer(page)).batch?.flips).toBe(1);
@@ -54,7 +57,8 @@ test('fry an order: heat, drop, flip, grate, dial, pull, then serve it', async (
   await release();
   await expect.poll(async () => (await fryer(page)).grateHeld).toBe(false);
 
-  await advance(page, 5500);
+  // The floating top already cooked a little, so the second side needs a bit less time.
+  await advance(page, side.secondsPerSide * (1 - side.topFactorFloating) * 1000 - 300);
 
   // Turning the dial to the right raises the target temperature.
   const before = (await fryer(page)).target;
@@ -84,6 +88,51 @@ test('fry an order: heat, drop, flip, grate, dial, pull, then serve it', async (
   });
   expect(shown).toBe(String(score));
   await shot(page, 'fry-5-served');
+
+  expect(errors).toEqual([]);
+});
+
+test('prep a batch before any order, then give it to an order from the rack', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const rackSize = () => page.evaluate(() => (window as unknown as { __session: { rack: unknown[] } }).__session.rack.length);
+
+  await seedTutorialDone(page);
+  await page.goto('/?seed=7');
+  await tapNamed(page, SceneKeys.Preload, 'prompt-start');
+  await waitForScene(page, SceneKeys.Lobby);
+  await pauseClock(page); // no customers until we say so
+
+  // No order yet: Drop becomes a prep batch.
+  await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
+  await waitForScene(page, SceneKeys.Fry);
+  await advance(page, 8000);
+  await tapNamed(page, SceneKeys.Fry, 'btn-fry-primary');
+  await expect.poll(async () => (await fryer(page)).batch?.count).toBe(3);
+  await advance(page, 9000);
+  await tapNamed(page, SceneKeys.Fry, 'btn-flip');
+  await advance(page, 8000);
+  await tapNamed(page, SceneKeys.Fry, 'btn-fry-primary');
+  await expect.poll(rackSize).toBe(3);
+  await page.waitForTimeout(700); // donuts fly to the rack
+  await shot(page, 'fry-6-rack');
+
+  // A customer orders; their ticket takes donuts from the rack instead of frying fresh.
+  await tapNamed(page, SceneKeys.Hud, 'tab-Lobby');
+  await advance(page, 2000);
+  await tapNamed(page, SceneKeys.Lobby, 'customer-front');
+  await waitForScene(page, SceneKeys.Order);
+  await tapNamed(page, SceneKeys.Order, 'btn-take-order');
+  await findNamed(page, SceneKeys.Lobby, 'waiting-1');
+  const need = await page.evaluate(() => (window as unknown as { __session: { ticket(n: number): { order: { flavors: string[] } } } }).__session.ticket(1).order.flavors.length);
+
+  await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
+  await waitForScene(page, SceneKeys.Fry);
+  await shot(page, 'fry-7-use-rack');
+  await tapNamed(page, SceneKeys.Fry, 'btn-use-rack');
+  await findNamed(page, SceneKeys.Hud, 'ticket-1-fried');
+  expect(await rackSize()).toBe(3 - need);
 
   expect(errors).toEqual([]);
 });

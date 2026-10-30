@@ -94,7 +94,8 @@ describe('cooking', () => {
     f.drop(1, 3);
     run(f, B.secondsPerSide);
     f.flip();
-    run(f, B.secondsPerSide * 0.97); // the top already cooked a touch while floating
+    // The floating top already cooked a little (topFactorFloating), so the second side needs less time.
+    run(f, B.secondsPerSide * (1 - B.topFactorFloating));
     const r = f.pull();
     expect(r.score).toBeGreaterThanOrEqual(95);
     expect(r.temperature).toBe(1);
@@ -106,7 +107,9 @@ describe('cooking', () => {
     f.drop(1, 2);
     run(f, B.secondsPerSide);
     const r = f.pull();
-    expect(Math.max(...r.sides.b)).toBeLessThan(0.2);
+    // Floating tops still creep along slowly, but nowhere near golden.
+    expect(Math.max(...r.sides.b)).toBeCloseTo(B.topFactorFloating, 2);
+    expect(Math.max(...r.sides.b)).toBeLessThan(0.3);
     expect(r.doneness).toBeLessThan(0.6);
   });
 

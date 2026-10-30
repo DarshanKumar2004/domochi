@@ -51,6 +51,9 @@ export function validateBalance(b: Balance): string[] {
     errors.push('fry needs 0 <= topFactorFloating < topFactorGrate <= 1');
   }
   if (!(f.doneness.perfectWithin < f.doneness.zeroAt)) errors.push('fry.doneness needs perfectWithin < zeroAt');
+  if (!(Number.isInteger(f.prepBatchSize) && f.prepBatchSize >= 1 && f.rackCapacity >= f.prepBatchSize)) {
+    errors.push('fry needs prepBatchSize >= 1 and rackCapacity >= prepBatchSize');
+  }
   if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');
   return errors;
 }

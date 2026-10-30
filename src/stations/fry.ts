@@ -23,11 +23,16 @@ export interface FryBalance {
   unevenAtEmpty: number;
   doneness: { perfectWithin: number; zeroAt: number };
   evennessZeroAtStdDev: number;
+  /** Donuts dropped when frying ahead without an order. */
+  prepBatchSize: number;
+  /** Most fried donuts the cooling rack holds. */
+  rackCapacity: number;
   scoreWeights: { doneness: number; temperature: number; evenness: number };
 }
 
 export interface FryBatch {
-  ticketNo: number;
+  /** The order this batch is for, or null for a prep batch headed to the rack. */
+  ticketNo: number | null;
   count: number;
   /** Doneness of the side facing down, per donut. */
   down: number[];
@@ -39,7 +44,7 @@ export interface FryBatch {
 }
 
 export interface FryResult {
-  ticketNo: number;
+  ticketNo: number | null;
   /** 0–100 overall. */
   score: number;
   /** 0–1 component scores. */
@@ -117,8 +122,8 @@ export class Fryer {
     return true;
   }
 
-  /** Drop a batch of raw donuts for a ticket. */
-  drop(ticketNo: number, count: number): boolean {
+  /** Drop a batch of raw donuts for a ticket (or null: a prep batch for the rack). */
+  drop(ticketNo: number | null, count: number): boolean {
     if (!this.canDrop || count < 1) return false;
     this.batch = {
       ticketNo,
@@ -181,7 +186,7 @@ export class Fryer {
   }
 }
 
-export function scoreFry(ticketNo: number, a: number[], bSide: number[], seconds: number, secondsInRange: number, b: FryBalance): FryResult {
+export function scoreFry(ticketNo: number | null, a: number[], bSide: number[], seconds: number, secondsInRange: number, b: FryBalance): FryResult {
   const all = [...a, ...bSide];
   const doneness = all.reduce((s, d) => s + sideScore(d, b), 0) / all.length;
   const temperature = seconds > 0 ? clamp(secondsInRange / seconds, 0, 1) : 0;
@@ -192,12 +197,7 @@ export function scoreFry(ticketNo: number, a: number[], bSide: number[], seconds
   const sd = Math.sqrt(perDonut.reduce((s, d) => s + (d - mean) ** 2, 0) / perDonut.length);
   const evenness = clamp(1 - sd / b.evennessZeroAtStdDev, 0, 1);
 
-  // Temperature and evenness only count as far as the donuts are actually cooked
-  // well: a burnt batch fried at a perfect temperature is still a burnt batch.
-  const w = b.scoreWeights;
-  const total =
-    (w.doneness * doneness + (w.temperature * temperature + w.evenness * evenness) * doneness) /
-    (w.doneness + w.temperature + w.evenness);
+  const total = combine(doneness, temperature, evenness, b);
   return {
     ticketNo,
     score: Math.round(total * 100),
@@ -206,6 +206,51 @@ export function scoreFry(ticketNo: number, a: number[], bSide: number[], seconds
     evenness,
     sides: { a: [...a], b: [...bSide] },
     seconds,
+  };
+}
+
+/** One fried donut waiting on the cooling rack. */
+export interface FriedDonut {
+  /** Doneness of each side. */
+  a: number;
+  b: number;
+  /** Its batch's temperature and evenness components (0–1). */
+  temperature: number;
+  evenness: number;
+  /** This donut's own 0–100 score. */
+  score: number;
+}
+
+/**
+ * Overall 0–1 score. Temperature and evenness only count as far as the donuts
+ * are cooked well: a burnt batch fried at a perfect temperature is still burnt.
+ */
+function combine(doneness: number, temperature: number, evenness: number, b: FryBalance): number {
+  const w = b.scoreWeights;
+  return (w.doneness * doneness + (w.temperature * temperature + w.evenness * evenness) * doneness) / (w.doneness + w.temperature + w.evenness);
+}
+
+/** Split a batch result into individually scored donuts (for the rack). */
+export function donutsFromResult(r: FryResult, b: FryBalance): FriedDonut[] {
+  return r.sides.a.map((a, i) => {
+    const bSide = r.sides.b[i] ?? 0;
+    const doneness = (sideScore(a, b) + sideScore(bSide, b)) / 2;
+    return { a, b: bSide, temperature: r.temperature, evenness: r.evenness, score: Math.round(combine(doneness, r.temperature, r.evenness, b) * 100) };
+  });
+}
+
+/** A ticket's fry result built from rack donuts: the average of their scores. */
+export function fryResultFromDonuts(ticketNo: number, donuts: readonly FriedDonut[], b: FryBalance): FryResult {
+  const n = Math.max(donuts.length, 1);
+  const avg = (f: (d: FriedDonut) => number) => donuts.reduce((s, d) => s + f(d), 0) / n;
+  return {
+    ticketNo,
+    score: Math.round(avg((d) => d.score)),
+    doneness: avg((d) => (sideScore(d.a, b) + sideScore(d.b, b)) / 2),
+    temperature: avg((d) => d.temperature),
+    evenness: avg((d) => d.evenness),
+    sides: { a: donuts.map((d) => d.a), b: donuts.map((d) => d.b) },
+    seconds: 0,
   };
 }
 

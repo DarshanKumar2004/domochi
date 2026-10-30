@@ -199,7 +199,7 @@ describe('GameSession: frying', () => {
     const r = s.pullFry();
     expect(s.ticket(a.ticket.no)!.results.fry).toBe(r);
     expect(s.fryingTicket).toBeUndefined();
-    expect(s.canStartFrying).toBe(false); // already fried
+    expect(s.nextDrop.ticketNo).toBeNull(); // already fried: Drop would now be a prep batch
   });
 
   it('a batch keeps belonging to its ticket even if you select another', () => {
@@ -216,9 +216,56 @@ describe('GameSession: frying', () => {
     expect(s.ticket(b.ticket.no)!.results.fry).toBeUndefined();
   });
 
-  it('cannot start frying without an active ticket', () => {
+  it('with no order to fry, Drop fries a prep batch that goes to the rack', () => {
     const s = makeSession(fastSpawn);
-    expect(s.canStartFrying).toBe(false);
-    expect(() => s.startFrying()).toThrow();
+    expect(s.nextDrop).toEqual({ ticketNo: null, count: baseBalance.fry.prepBatchSize });
+    s.startFrying();
+    expect(s.fryingTicket).toBeUndefined();
+    s.tick(5000);
+    const r = s.pullFry();
+    expect(r.ticketNo).toBeNull();
+    expect(s.rack).toHaveLength(baseBalance.fry.prepBatchSize);
+    for (const d of s.rack) expect(d.score).toBeGreaterThanOrEqual(0);
+  });
+
+  it('a ticket can take its donuts from the rack, oldest first', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [3] }, 1, 11);
+    s.startFrying(); // prep batch before anyone has ordered
+    s.tick(6000);
+    s.pullFry();
+    s.startFrying(); // and a second one
+    s.tick(6000);
+    s.pullFry();
+    const racked = s.rack.length;
+    const { ticket } = orderFront(s);
+    const n = ticket.order.flavors.length;
+    const oldest = s.rack.slice(0, n).map((d) => d.score);
+
+    expect(s.canUseRack).toBe(true);
+    const r = s.useRack();
+    expect(s.ticket(ticket.no)!.results.fry).toBe(r);
+    expect(r.score).toBe(Math.round(oldest.reduce((a, b) => a + b, 0) / n));
+    expect(s.rack).toHaveLength(racked - n);
+    expect(s.canUseRack).toBe(false); // already fried
+  });
+
+  it('cannot use the rack when it has too few donuts', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [3] }, 1, 11);
+    s.tick(1000);
+    orderFront(s);
+    expect(s.rack).toHaveLength(0);
+    expect(s.canUseRack).toBe(false);
+    expect(() => s.useRack()).toThrow();
+  });
+
+  it('the rack never holds more than its capacity', () => {
+    const s = makeSession(fastSpawn);
+    for (let i = 0; i < 10; i++) {
+      s.startFrying();
+      s.tick(3000);
+      s.pullFry();
+      s.fryer.addOil();
+    }
+    expect(s.rack.length).toBe(baseBalance.fry.rackCapacity);
   });
 });

@@ -278,6 +278,29 @@ function paintFryGrate(g: G): void {
   g.fillRoundedRect(620, 150, 60, 60, 12);
 }
 
+/** Mochi donut depositor: a hopper of dough that drops rings into the oil from its nozzle (bottom centre). */
+function paintFryDispenser(g: G): void {
+  const ink = COLORS.ink;
+  // Hopper
+  g.fillStyle(0xc9ced3);
+  g.fillPoints([new Phaser.Math.Vector2(20, 20), new Phaser.Math.Vector2(180, 20), new Phaser.Math.Vector2(130, 130), new Phaser.Math.Vector2(70, 130)], true);
+  g.lineStyle(6, ink);
+  g.strokePoints([new Phaser.Math.Vector2(20, 20), new Phaser.Math.Vector2(180, 20), new Phaser.Math.Vector2(130, 130), new Phaser.Math.Vector2(70, 130)], true);
+  // Dough visible at the top
+  g.fillStyle(0xf4ead2);
+  g.fillEllipse(100, 26, 150, 22);
+  // Nozzle
+  g.fillStyle(0x8a9097);
+  g.fillRect(82, 130, 36, 40);
+  g.lineStyle(5, ink);
+  g.strokeRect(82, 130, 36, 40);
+  // Crank
+  g.lineStyle(8, ink);
+  g.lineBetween(180, 60, 200, 60);
+  g.fillStyle(COLORS.pink);
+  g.fillCircle(200, 60, 12);
+}
+
 /** Plain white pon de ring, tinted at runtime by doneness (see fryColor). */
 function paintDonutFry(g: G): void {
   const ring = 52;
@@ -390,6 +413,7 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.DonutPlain]: { width: 320, height: 320, paint: paintDonut },
   [TextureKeys.Fryer]: { width: 760, height: 440, paint: paintFryer },
   [TextureKeys.FryGrate]: { width: 690, height: 360, paint: paintFryGrate },
+  [TextureKeys.FryDispenser]: { width: 215, height: 175, paint: paintFryDispenser },
   [TextureKeys.DonutFry]: { width: 160, height: 160, paint: paintDonutFry },
   [TextureKeys.GlazeBowl]: { width: 260, height: 170, paint: paintGlazeBowl },
   [TextureKeys.ToppingJar]: { width: 160, height: 220, paint: paintToppingJar },

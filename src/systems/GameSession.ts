@@ -1,6 +1,6 @@
 // One day at the trailer: customers arriving, orders, tickets and serving.
 // Pure logic driven by tick(dtMs); scenes render from it and call its actions.
-import { Fryer, type FryResult } from '../stations/fry';
+import { donutsFromResult, Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../stations/fry';
 import { forDay, type Balance } from './balance';
 import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
 import { Emitter } from './events';
@@ -77,6 +77,7 @@ export class GameSession {
   private readonly allTickets: Ticket[] = [];
   private activeNo: number | null = null;
   private heldNo: number | null = null;
+  private readonly rackDonuts: FriedDonut[] = [];
 
   constructor(private readonly deps: SessionDeps) {
     this.day = deps.day;
@@ -208,34 +209,73 @@ export class GameSession {
     return true;
   }
 
-  /** Ticket whose donuts are in the fryer right now. */
+  /** Fried donuts on the cooling rack, oldest first (from prep batches). */
+  get rack(): readonly FriedDonut[] {
+    return this.rackDonuts;
+  }
+
+  /** Ticket whose donuts are in the fryer right now (undefined for a prep batch). */
   get fryingTicket(): Ticket | undefined {
-    const b = this.fryer.batch;
-    return b ? this.ticket(b.ticketNo) : undefined;
+    const no = this.fryer.batch?.ticketNo;
+    return no == null ? undefined : this.ticket(no);
   }
 
-  /** Can the active ticket's donuts go in the fryer? */
+  /** The active ticket, if it still needs frying. */
+  private get ticketToFry(): Ticket | undefined {
+    const t = this.activeTicket;
+    return t && t.status === 'open' && !t.results.fry ? t : undefined;
+  }
+
+  /** What Drop would fry right now: the active ticket's donuts, or a prep batch for the rack. */
+  get nextDrop(): { ticketNo: number | null; count: number } {
+    const t = this.ticketToFry;
+    return t ? { ticketNo: t.no, count: t.order.flavors.length } : { ticketNo: null, count: this.deps.balance.fry.prepBatchSize };
+  }
+
   get canStartFrying(): boolean {
-    const t = this.activeTicket;
-    return !!t && t.status === 'open' && !t.results.fry && this.fryer.canDrop;
+    return this.fryer.canDrop;
   }
 
-  /** Drop the active ticket's donuts into the fryer. */
-  startFrying(): Ticket {
-    const t = this.activeTicket;
-    if (!t || !this.canStartFrying) throw new Error('cannot start frying now');
-    this.fryer.drop(t.no, t.order.flavors.length);
+  /** Drop donuts: for the active ticket if it needs frying, otherwise a prep batch for the rack. */
+  startFrying(): { ticketNo: number | null; count: number } {
+    if (!this.canStartFrying) throw new Error('cannot start frying now');
+    const drop = this.nextDrop;
+    this.fryer.drop(drop.ticketNo, drop.count);
     this.events.emit('changed', undefined);
-    return t;
+    return drop;
   }
 
-  /** Lift the batch out; its score is stored on that ticket. */
+  /**
+   * Lift the batch out. A ticket batch's score is stored on that ticket; a prep
+   * batch goes to the cooling rack (anything past its capacity is thrown away).
+   */
   pullFry(): FryResult {
     const result = this.fryer.pull();
-    const t = this.ticket(result.ticketNo);
-    if (t) t.results.fry = result;
+    const t = result.ticketNo === null ? undefined : this.ticket(result.ticketNo);
+    if (t) {
+      t.results.fry = result;
+    } else {
+      const room = this.deps.balance.fry.rackCapacity - this.rackDonuts.length;
+      this.rackDonuts.push(...donutsFromResult(result, this.deps.balance.fry).slice(0, Math.max(0, room)));
+    }
     this.events.emit('changed', undefined);
     return result;
+  }
+
+  /** Can the active ticket take its donuts from the rack instead of frying fresh? */
+  get canUseRack(): boolean {
+    const t = this.ticketToFry;
+    return !!t && this.fryer.batch?.ticketNo !== t.no && this.rackDonuts.length >= t.order.flavors.length;
+  }
+
+  /** Give the active ticket the oldest donuts from the rack. */
+  useRack(): FryResult {
+    const t = this.ticketToFry;
+    if (!t || !this.canUseRack) throw new Error('cannot use the rack now');
+    const donuts = this.rackDonuts.splice(0, t.order.flavors.length);
+    t.results.fry = fryResultFromDonuts(t.no, donuts, this.deps.balance.fry);
+    this.events.emit('changed', undefined);
+    return t.results.fry;
   }
 
   /** Close the box on the active ticket and pick it up. */

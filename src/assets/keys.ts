@@ -13,6 +13,7 @@ export const TextureKeys = {
   DonutPlain: 'donut-plain',
   Fryer: 'fryer',
   FryGrate: 'fry-grate',
+  FryDispenser: 'fry-dispenser',
   DonutFry: 'donut-fry',
   GlazeBowl: 'glaze-bowl',
   ToppingJar: 'topping-jar',

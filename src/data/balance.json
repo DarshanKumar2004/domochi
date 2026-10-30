@@ -24,14 +24,16 @@
     "heatLagPerSec": 0.35,
     "idealRangeF": { "min": 340, "max": 360 },
     "cookRate": { "zeroAtF": 250, "oneAtF": 350, "max": 1.8 },
-    "secondsPerSide": 6,
-    "topFactorFloating": 0.05,
+    "secondsPerSide": 9,
+    "topFactorFloating": 0.15,
     "topFactorGrate": 0.6,
     "dropCoolPerDonutF": 5,
     "oil": { "start": 1, "perDonut": 0.04, "topUp": 0.25, "lowThreshold": 0.35, "minToFry": 0.05 },
     "unevenAtEmpty": 0.5,
     "doneness": { "perfectWithin": 0.1, "zeroAt": 0.6 },
     "evennessZeroAtStdDev": 0.25,
+    "prepBatchSize": 3,
+    "rackCapacity": 12,
     "scoreWeights": { "doneness": 0.6, "temperature": 0.25, "evenness": 0.15 }
   }
 }
