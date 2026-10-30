@@ -71,7 +71,21 @@ test('full scene flow', async ({ page }) => {
   const running = await activeScenes(page);
   expect(running.filter((k) => [SceneKeys.Lobby, SceneKeys.Fry, SceneKeys.Glaze, SceneKeys.Toppings].includes(k as never))).toEqual([]);
 
-  // Closing the box hands it straight to customer #1 and shows the result card in the Lobby
+  // Put one (quickly made) donut in the box; closing the lid hands it straight to
+  // customer #1 and shows the result card in the Lobby. (pack.spec makes them by hand.)
+  await page.evaluate(() => {
+    type W = { pour(g: string, a: number, b: number, c: number, d: number): boolean };
+    const s = (window as unknown as {
+      __session: { dropDonut(): number; pullAll(): number[]; startGlazing(i: number): W | null; finishGlazing(): unknown; boxDonut(i: number): number };
+    }).__session;
+    s.dropDonut();
+    s.pullAll();
+    s.startGlazing(0)!.pour('strawberry', -0.6, -0.3, 0.6, -0.3);
+    s.finishGlazing();
+    s.boxDonut(0);
+  });
+  await findNamed(page, SceneKeys.Box, 'box-slot-0');
+  await shot(page, '06b-station-box-packed');
   await tapNamed(page, SceneKeys.Box, 'btn-serve');
   await waitForScene(page, SceneKeys.Lobby);
   await waitForScene(page, SceneKeys.Serve);

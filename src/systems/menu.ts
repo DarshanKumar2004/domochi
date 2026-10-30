@@ -13,10 +13,21 @@ export interface Glaze {
   speckles?: { colors: string[]; density: number };
 }
 
+/** 'sprinkle': shaken on in many small pieces. 'piece': placed one at a time (a whole cookie). */
+export type ToppingStyle = 'sprinkle' | 'piece';
+/** How a piece is drawn. */
+export type ToppingShape = 'crumb' | 'loop' | 'biscuit';
+
 export interface Topping {
   id: string;
   name: string;
   colors: string[];
+  style: ToppingStyle;
+  shape: ToppingShape;
+  /** Piece radius, normalised to the donut (edges ±1). */
+  size: number;
+  /** Pieces on the donut for full marks. */
+  amount: { min: number; max: number };
 }
 
 export interface Flavor {
@@ -51,6 +62,8 @@ export interface Menu {
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const STYLES: readonly string[] = ['dip', 'drizzle', 'dust'];
+const TOPPING_STYLES: readonly string[] = ['sprinkle', 'piece'];
+const SHAPES: readonly string[] = ['crumb', 'loop', 'biscuit'];
 
 function duplicates(ids: string[]): string[] {
   return ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -82,6 +95,12 @@ export function validateMenu(menu: Menu): string[] {
   for (const t of menu.toppings) {
     if (t.colors.length === 0) errors.push(`topping "${t.id}" has no colors`);
     for (const c of t.colors) if (!HEX.test(c)) errors.push(`topping "${t.id}" color "${c}" is not #rrggbb`);
+    if (!TOPPING_STYLES.includes(t.style)) errors.push(`topping "${t.id}" has unknown style "${t.style}"`);
+    if (!SHAPES.includes(t.shape)) errors.push(`topping "${t.id}" has unknown shape "${t.shape}"`);
+    if (!(t.size > 0 && t.size < 0.5)) errors.push(`topping "${t.id}" size must be between 0 and 0.5`);
+    if (!(t.amount && Number.isInteger(t.amount.min) && t.amount.min >= 1 && t.amount.max >= t.amount.min)) {
+      errors.push(`topping "${t.id}" amount needs integer 1 <= min <= max`);
+    }
   }
   for (const f of menu.flavors) {
     const base = glazeById.get(f.glaze);

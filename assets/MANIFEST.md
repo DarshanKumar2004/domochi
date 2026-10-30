@@ -31,8 +31,8 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `donut-fry` | `public/assets/donut-fry.png` | 160×160 | 1 | Placeholder (code) | **Must be white or greyscale:** it's tinted at runtime from raw (pale) to golden to burnt by `fryColor()`. Plain pon de ring, no glaze. |
 | `glaze-cup` | `public/assets/glaze-cup.png` | 150×160 | 1 | Placeholder (code) | Pouring cup for the Glaze station. **Draw it white/light grey:** it's tinted per glaze at runtime, which makes the coloured cups. Spout at the top left (about 6, 26); the stream falls from there. |
 | `sugar-sifter` | `public/assets/sugar-sifter.png` | 160×140 | 1 | Placeholder (code) | Powdered-sugar sifter (beignet's dust). Not tinted. |
-| `topping-jar` | `public/assets/topping-jar.png` | 160×220 | 1 | Placeholder (code) | Jar of toppings at the Toppings station. |
-| `donut-box` | `public/assets/donut-box.png` | 620×420 | 1 | Placeholder (code) | Open box with 6 slots at the Box station. |
+| `topping-jar` | `public/assets/topping-jar.png` | 160×220 | 1 | Placeholder (code) | Empty glass jar with a lid at the Toppings station; glass ≈ x 15–145, y 35–215, lid at the top. The topping inside is drawn over it in code, per topping, and it's held upside down to shake. |
+| `donut-box` | `public/assets/donut-box.png` | 620×420 | 1 | Placeholder (code) | Closed box lid (plain kraft) that shuts over the open box at the Box station. The open box and its slots (3, 6 or 12) are drawn in code; the logo is placed on the lid in code. |
 | `icon-lobby` | `public/assets/icons/lobby.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
 | `icon-fry` | `public/assets/icons/fry.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
 | `icon-glaze` | `public/assets/icons/glaze.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |

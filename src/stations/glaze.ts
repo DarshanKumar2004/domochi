@@ -70,6 +70,8 @@ function clamp(v: number, lo: number, hi: number): number {
 export interface MaskTemplate {
   target: Uint8Array;
   allowed: Uint8Array;
+  /** Allowed for a drizzle: also the hole (icing poured across it falls through, like the real thing). */
+  allowedDrizzle: Uint8Array;
   targetCount: number;
   /** Ball index for each target cell, -1 elsewhere. */
   ballOf: Int8Array;
@@ -86,6 +88,7 @@ export function ringMask(b: GlazeBalance): MaskTemplate {
   const r = ringBallRadius(b.ringRadius, balls.length, b.ballOverlap);
   const target = new Uint8Array(n * n);
   const allowed = new Uint8Array(n * n);
+  const allowedDrizzle = new Uint8Array(n * n);
   const ballOf = new Int8Array(n * n).fill(-1);
   const ballCells = new Array<number>(balls.length).fill(0);
   let targetCount = 0;
@@ -110,23 +113,28 @@ export function ringMask(b: GlazeBalance): MaskTemplate {
         ballCells[bestBall]!++;
       }
       if (best <= b.edgeMargin) allowed[idx] = 1;
+      if (allowed[idx] || Math.hypot(x, y) < b.ringRadius) allowedDrizzle[idx] = 1;
     }
   }
-  return { target, allowed, targetCount, ballOf, ballCells };
+  return { target, allowed, allowedDrizzle, targetCount, ballOf, ballCells };
 }
 
 /** A coverage grid for one layer. Counts update incrementally, so reading them is free. */
 export class PaintMask {
   private readonly painted: Uint8Array;
   private readonly perBall: number[];
+  private readonly allowed: Uint8Array;
   paintedTotal = 0;
   paintedTarget = 0;
   paintedOutside = 0;
 
+  /** @param drizzle Paint over the hole isn't spill (see allowedDrizzle). */
   constructor(
     private readonly tpl: MaskTemplate,
     private readonly n: number,
+    drizzle = false,
   ) {
+    this.allowed = drizzle ? tpl.allowedDrizzle : tpl.allowed;
     this.painted = new Uint8Array(n * n);
     this.perBall = new Array<number>(tpl.ballCells.length).fill(0);
   }
@@ -175,7 +183,7 @@ export class PaintMask {
           const ball = this.tpl.ballOf[k]!;
           if (ball >= 0) this.perBall[ball]!++;
         }
-        if (!this.tpl.allowed[k]) this.paintedOutside++;
+        if (!this.allowed[k]) this.paintedOutside++;
       }
     }
   }
@@ -281,7 +289,7 @@ export class GlazeWork {
       if (existing >= 0) {
         // Back to a layer you'd already started: keep adding to it.
         const layer = this.layers.splice(existing, 1)[0]!;
-        const mask = new PaintMask(this.tpl, this.b.gridSize);
+        const mask = new PaintMask(this.tpl, this.b.gridSize, layer.kind === 'drizzle');
         const r = this.brushFor(glazeId);
         for (let k = 0; k < layer.segments.length; k += 4) {
           mask.stroke(layer.segments[k]!, layer.segments[k + 1]!, layer.segments[k + 2]!, layer.segments[k + 3]!, r);
@@ -291,7 +299,7 @@ export class GlazeWork {
         const g = this.menu.glazes.find((x) => x.id === glazeId)!;
         this.current = {
           layer: { kind: this.kindOf(glazeId)!, glazeId, style: g.style, segments: [], coverage: 0, spill: 0, ballsTouched: 0 },
-          mask: new PaintMask(this.tpl, this.b.gridSize),
+          mask: new PaintMask(this.tpl, this.b.gridSize, this.kindOf(glazeId) === 'drizzle'),
         };
       }
     }

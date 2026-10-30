@@ -13,6 +13,8 @@ import { StationScene } from './StationScene';
 /** Doneness shown on the per-donut meters goes 0 → METER_MAX (golden = 1). */
 const METER_MAX = 1.5;
 const RACK_SHOWN = 6;
+/** Two taps on the trash can this close together (ms) empty the rack. */
+const DOUBLE_TAP_MS = 500;
 const DIAL_R = 120;
 /** Dial sweep either side of 12 o'clock, in degrees. */
 const DIAL_SWEEP = 135;
@@ -98,6 +100,10 @@ export class FryScene extends StationScene {
   private dispenser!: Phaser.GameObjects.Image;
   private trashBin!: Phaser.GameObjects.Image;
   private rackTray!: Phaser.GameObjects.Graphics;
+  /** Grab the rack itself (not a donut on it) to slide the whole rack into the trash. */
+  private rackHandle!: Phaser.GameObjects.Zone;
+  private rackOffset = { dx: 0, dy: 0 };
+  private lastTrashTap = 0;
   private slotViews: SlotView[] = [];
   private tempMeter!: Meter;
   private oilMeter!: Meter;
@@ -153,6 +159,7 @@ export class FryScene extends StationScene {
     this.vat = this.add.image(0, 0, TextureKeys.Fryer);
     this.rackTray = this.add.graphics();
     this.trashBin = this.add.image(0, 0, TextureKeys.TrashBin).setName('fry-trash');
+    this.buildRackHandle();
     for (let i = 0; i < fb.slots; i++) this.slotViews.push(this.makeSlot(i));
     this.grate = this.add.image(0, 0, TextureKeys.FryGrate).setDepth(3);
     this.dispenser = this.add.image(0, 0, TextureKeys.FryDispenser).setDepth(6);
@@ -243,7 +250,74 @@ export class FryScene extends StationScene {
     return view;
   }
 
-/** A rack donut: drag it into the trash to throw just that one away. */
+  /**
+   * The whole rack: drag it (by the tray, not a donut) into the trash, or
+   * double-tap the trash can, to throw every rack donut away.
+   */
+  private buildRackHandle(): void {
+    this.rackOffset = { dx: 0, dy: 0 };
+    this.lastTrashTap = 0;
+    this.rackHandle = this.add.zone(0, 0, 1, 1).setName('fry-rack-tray').setDepth(1);
+    this.rackHandle.setInteractive({ draggable: true, useHandCursor: true });
+    let from = { x: 0, y: 0 };
+    this.rackHandle.on(Phaser.Input.Events.DRAG_START, () => {
+      this.tweens.killTweensOf(this.rackOffset);
+      from = { x: this.rackHandle.x, y: this.rackHandle.y };
+    });
+    this.rackHandle.on(Phaser.Input.Events.DRAG, (_p: Phaser.Input.Pointer, x: number, y: number) => {
+      this.setRackOffset(x - from.x, y - from.y);
+    });
+    this.rackHandle.on(Phaser.Input.Events.DRAG_END, (p: Phaser.Input.Pointer) => {
+      this.rackHandle.setPosition(from.x, from.y);
+      if (this.overTrash(p.worldX, p.worldY) && session().rack.length) {
+        this.trashWholeRack();
+        this.setRackOffset(0, 0);
+        return;
+      }
+      this.tweens.add({
+        targets: this.rackOffset,
+        dx: 0,
+        dy: 0,
+        duration: 220,
+        ease: 'Back.Out',
+        onUpdate: () => this.setRackOffset(this.rackOffset.dx, this.rackOffset.dy),
+      });
+    });
+
+    this.trashBin.setInteractive({ useHandCursor: true });
+    this.trashBin.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      // Wall-clock time of the tap, not the scene clock: that only moves once a frame, so a slow frame could split a quick double-tap.
+      const now = performance.now();
+      if (now - this.lastTrashTap < DOUBLE_TAP_MS) {
+        this.lastTrashTap = 0;
+        if (session().rack.length) this.trashWholeRack();
+        else this.flash('the rack is already empty');
+        return;
+      }
+      this.lastTrashTap = now;
+    });
+  }
+
+  /** Shift the rack and everything on it while it's dragged. */
+  private setRackOffset(dx: number, dy: number): void {
+    this.rackOffset.dx = dx;
+    this.rackOffset.dy = dy;
+    this.rackTray.setPosition(dx, dy);
+    const midY = this.rackMini.y + dy;
+    this.rackLabel.setPosition(this.rackArea.x + 24 + dx, midY);
+    this.rackMinis.forEach((m, i) => m.setPosition(this.rackMini.x + i * this.rackMini.step + dx, midY));
+    this.rackMore.setPosition(this.rackMini.x + RACK_SHOWN * this.rackMini.step - this.rackMini.size / 2 + 4 + dx, midY);
+  }
+
+  private trashWholeRack(): void {
+    const shown = this.rackMinis.filter((m) => m.visible).map((m) => ({ x: m.x, y: m.y, tint: m.tintTopLeft, size: m.displayWidth }));
+    const n = session().trashRack();
+    if (!n) return;
+    shown.forEach((m, k) => this.ghost(m.x, m.y, m.tint, m.size, { x: this.trashBin.x, y: this.trashBin.y - 10, size: 20 }, k * 50));
+    this.flash(`rack emptied (${n} donut${n === 1 ? '' : 's'})`);
+  }
+
+  /** A rack donut: drag it into the trash to throw just that one away. */
   private makeRackMini(i: number): Phaser.GameObjects.Image {
     const img = this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false).setName(`fry-rack-${i}`).setDepth(5);
     img.setInteractive({ draggable: true, useHandCursor: true });
@@ -376,6 +450,9 @@ export class FryScene extends StationScene {
     this.rackTray.strokeRoundedRect(ra.x, ra.y, ra.w, ra.h, 18);
     const midY = ra.y + ra.h / 2;
     this.rackLabel.setPosition(ra.x + 24, midY);
+    this.rackHandle.setPosition(ra.x + ra.w / 2, ra.y + ra.h / 2).setSize(ra.w, ra.h);
+    this.rackTray.setPosition(0, 0);
+    this.rackOffset = { dx: 0, dy: 0 };
     this.rackMini = { x: c.x + L.rack.minisX, y: midY, step: L.rack.step, size: L.rack.size };
     this.rackMinis.forEach((m, i) => m.setPosition(this.rackMini.x + i * L.rack.step, midY).setDisplaySize(L.rack.size, L.rack.size));
     this.rackMore.setPosition(this.rackMini.x + RACK_SHOWN * L.rack.step - L.rack.size / 2 + 4, midY);
@@ -509,7 +586,7 @@ export class FryScene extends StationScene {
     const HINTS: Record<HintKey, string> = {
       empty: 'drop donuts in one at a time',
       noOil: 'the vat is nearly empty: add oil',
-      rackFull: 'the rack is full: glaze or trash some',
+      rackFull: 'the rack is full: glaze some,\nor double-tap the trash to empty it',
       oilLow: 'oil is low: frying unevenly!',
       drift: 'less oil runs hotter: dial it back down',
       cool: 'oil is cool: turn up the heat',

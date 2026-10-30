@@ -26,11 +26,15 @@ function pourRing(pour: Pour): void {
   }
 }
 
-/** A Freezeria-style zig-zag drizzle back and forth across the donut. */
-function zigzag(pour: Pour, passes = 7): void {
+/**
+ * A Freezeria-style drizzle: a few stripes across the donut, kept on it. The
+ * stream is as thick as the glaze, so 3 stripes cover about half the ring.
+ */
+function zigzag(pour: Pour, passes = 3, span = 0.6): void {
   for (let k = 0; k < passes; k++) {
-    const y = -0.8 + (1.6 * k) / (passes - 1);
-    pour(-0.85, y, 0.85, y + 0.12);
+    const y = -span + (2 * span * k) / (passes - 1);
+    const x = Math.sqrt(0.8 * 0.8 - y * y);
+    pour(-x, y, x, y);
   }
 }
 
@@ -131,7 +135,20 @@ describe('glazeScoreFor: matching a glazed donut to a flavour', () => {
   }
 
   it('a careful strawberry with a zig-zag drizzle scores high as strawberry', () => {
-    expect(glazeScoreFor(make('strawberry', 'white-icing'), flavor('strawberry'), B)).toBeGreaterThan(0.75);
+    expect(glazeScoreFor(make('strawberry', 'white-icing'), flavor('strawberry'), B)).toBeGreaterThan(0.85);
+  });
+
+  it('drizzle over the hole is fine (it falls through), but smothering the donut is not', () => {
+    const w = new GlazeWork(1, fried, menu, B);
+    w.pour('white-icing', -0.8, 0, 0.8, 0);
+    expect(w.currentLayer!.spill).toBeLessThan(0.02);
+    const smothered = new GlazeWork(1, fried, menu, B);
+    zigzag((a, b, c, d) => smothered.pour('white-icing', a, b, c, d), 7, 0.7);
+    expect(drizzleQuality(smothered.currentLayer!, B)).toBeLessThan(0.2);
+  });
+
+  it('the drizzle pours as thick as the glaze', () => {
+    expect(B.brushRadius.drizzle).toBe(B.brushRadius.dip);
   });
 
   it('missing the drizzle costs the drizzle share', () => {

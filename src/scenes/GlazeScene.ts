@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
-import { fryColor, type FriedDonut } from '../stations/fry';
-import type { GlazedDonut, GlazeLayer, GlazeWork, PourCheck } from '../stations/glaze';
+import type { GlazeWork, PourCheck } from '../stations/glaze';
 import type { Glaze } from '../systems/menu';
 import { flavorsForDay } from '../systems/menu';
 import { balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { hexToNumber } from '../ui/DonutIcon';
+import { donutIcon, drawGlazeLayers, drawGlazeSegment, fryTint, pruneDonutIcons } from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
@@ -17,8 +17,6 @@ import { StationScene } from './StationScene';
 /** Paint canvas resolution (px per side) for the donut on the board. */
 const CANVAS = 420;
 const CANVAS_KEY = 'glaze-paint';
-/** Shelf icon texture size. */
-const ICON = 128;
 const SLOTS = 6;
 /** How far above your finger the cup hovers while pouring (game px). */
 const CUP_LIFT = 170;
@@ -105,8 +103,6 @@ export class GlazeScene extends StationScene {
   private lastLand = { stroke: -1, nx: 0, ny: 0 };
   private dirty = false;
   private shownWork: GlazeWork | null = null;
-  /** Shelf icon textures we've made, by donut id (removed when the donut leaves the shelf). */
-  private iconKeys = new Map<number, string>();
 
   constructor() {
     super(SceneKeys.Glaze, 'Glaze Station', 0x6b4a5a, null);
@@ -122,7 +118,6 @@ export class GlazeScene extends StationScene {
     this.trayImgs = [];
     this.shelfImgs = [];
     this.drops = [];
-    this.iconKeys = new Map();
     this.selected = null;
     this.pouring = false;
     this.shownWork = null;
@@ -172,7 +167,6 @@ export class GlazeScene extends StationScene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.SLEEP, this.stopPour, this);
       if (this.textures.exists(CANVAS_KEY)) this.textures.remove(CANVAS_KEY);
-      for (const key of this.iconKeys.values()) if (this.textures.exists(key)) this.textures.remove(key);
     });
     listen(this, session().events, 'changed', () => this.refresh());
   }
@@ -191,7 +185,11 @@ export class GlazeScene extends StationScene {
     img.on(Phaser.Input.Events.DRAG, (_p: Phaser.Input.Pointer, x: number, y: number) => img.setPosition(x, y));
     img.on(Phaser.Input.Events.DRAG_END, (p: Phaser.Input.Pointer) => {
       img.setDepth(5);
-      if (this.overTrash(p.worldX, p.worldY) && session().trashRackDonut(i)) this.toTrash(p.worldX, p.worldY, img);
+      if (this.overTrash(p.worldX, p.worldY)) {
+        const ghost = this.ghostOf(img);
+        if (session().trashRackDonut(i)) this.toTrash(p.worldX, p.worldY, ghost, true);
+        else ghost.destroy();
+      }
       this.refresh();
     });
     img.on(Phaser.Input.Events.POINTER_UP, () => {
@@ -207,7 +205,11 @@ export class GlazeScene extends StationScene {
     img.on(Phaser.Input.Events.DRAG, (_p: Phaser.Input.Pointer, x: number, y: number) => img.setPosition(x, y));
     img.on(Phaser.Input.Events.DRAG_END, (p: Phaser.Input.Pointer) => {
       img.setDepth(5);
-      if (this.overTrash(p.worldX, p.worldY) && session().trashShelfDonut(i)) this.toTrash(p.worldX, p.worldY, img);
+      if (this.overTrash(p.worldX, p.worldY)) {
+        const ghost = this.ghostOf(img);
+        if (session().trashShelfDonut(i)) this.toTrash(p.worldX, p.worldY, ghost, true);
+        else ghost.destroy();
+      }
       this.refresh();
     });
     return img;
@@ -284,14 +286,14 @@ export class GlazeScene extends StationScene {
     this.trayImgs.forEach((img, i) => {
       const d = s.rack[i];
       img.setVisible(!!d);
-      if (d) img.setPosition(this.trayPos.x + i * this.trayPos.step, this.trayPos.y).setDisplaySize(this.trayPos.size, this.trayPos.size).setTint(this.tintOf(d));
+      if (d) img.setPosition(this.trayPos.x + i * this.trayPos.step, this.trayPos.y).setDisplaySize(this.trayPos.size, this.trayPos.size).setTint(fryTint(d));
     });
-    this.syncIcons(s.shelf);
+    pruneDonutIcons(this);
     this.shelfImgs.forEach((img, i) => {
       const d = s.shelf[i];
       img.setVisible(!!d);
       if (d) {
-        img.setTexture(this.iconKeys.get(d.id)!).clearTint();
+        img.setTexture(donutIcon(this, d)).clearTint();
         img.setPosition(this.shelfPos.x + i * this.shelfPos.step, this.shelfPos.y).setDisplaySize(this.shelfPos.size, this.shelfPos.size);
       }
     });
@@ -300,7 +302,7 @@ export class GlazeScene extends StationScene {
     this.board.setVisible(!!work);
     this.paint.setVisible(!!work);
     this.bubbles.setVisible(!!work);
-    if (work) this.board.setTint(this.tintOf(work.fry));
+    if (work) this.board.setTint(fryTint(work.fry));
     if (work !== this.shownWork) {
       this.shownWork = work;
       this.redrawCanvas();
@@ -332,10 +334,6 @@ export class GlazeScene extends StationScene {
     else if (!layer) this.readout.setText(this.selected ? 'press on the donut to pour' : 'pick a cup');
     else if (layer.kind === 'drizzle') this.readout.setText(`drizzle ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`);
     else this.readout.setText(`glaze ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`);
-  }
-
-  private tintOf(d: FriedDonut): number {
-    return fryColor((d.a + d.b) / 2);
   }
 
   // ---- Pouring ----------------------------------------------------------------
@@ -426,7 +424,7 @@ export class GlazeScene extends StationScene {
       d.stroke = this.stroke;
       d.glazeId = this.selected;
       const g = menu.glazes.find((x) => x.id === this.selected)!;
-      d.circle.setFillStyle(hexToNumber(g.color)).setRadius(g.style === 'drizzle' ? 7 : g.style === 'dust' ? 5 : 15).setVisible(true);
+      d.circle.setFillStyle(hexToNumber(g.color)).setRadius(g.style === 'dust' ? 5 : 15).setVisible(true);
     }
 
     // Drops fall (accelerating) and land after fallMs.
@@ -463,87 +461,18 @@ export class GlazeScene extends StationScene {
     this.lastLand.ny = ny;
     if (!work.pour(d.glazeId, x0, y0, nx, ny)) return;
     const layer = work.currentLayer!;
-    this.drawSegment(this.canvas.context, CANVAS, d.glazeId, x0, y0, nx, ny, layer.segments.length);
+    drawGlazeSegment(this.canvas.context, CANVAS, d.glazeId, x0, y0, nx, ny, layer.segments.length);
     this.dirty = true;
     if (layer.segments.length === 4) this.refresh(); // first glaze on this donut: update the instruction
   }
 
   // ---- Drawing ----------------------------------------------------------------
 
-  /** Draw one poured segment in a glaze's style (with its speckles), onto any canvas. */
-  private drawSegment(ctx: CanvasRenderingContext2D, size: number, glazeId: string, x0: number, y0: number, x1: number, y1: number, seed: number): void {
-    const g = menu.glazes.find((x) => x.id === glazeId);
-    if (!g) return;
-    const half = size / 2;
-    const r = balance.glaze.brushRadius[g.style] * half;
-    const px = (v: number) => (v + 1) * half;
-    let s = (Math.abs(seed) * 9301 + 49297) % 233280;
-    const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
-    const len = Math.hypot(x1 - x0, y1 - y0) * half;
-
-    if (g.style === 'dust') {
-      const steps = Math.max(1, Math.ceil(len / (r * 0.5)));
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      for (let k = 0; k <= steps; k++) {
-        const t = k / steps;
-        const cx = px(x0 + (x1 - x0) * t);
-        const cy = px(y0 + (y1 - y0) * t);
-        for (let n = 0; n < 12; n++) {
-          const a = rnd() * Math.PI * 2;
-          const dist = Math.sqrt(rnd()) * r;
-          ctx.beginPath();
-          ctx.arc(cx + Math.cos(a) * dist, cy + Math.sin(a) * dist, (1.5 + rnd() * 2.5) * (size / CANVAS), 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      return;
-    }
-
-    ctx.strokeStyle = g.color;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = r * 2;
-    ctx.beginPath();
-    ctx.moveTo(px(x0), px(y0));
-    ctx.lineTo(px(x1) + 0.01, px(y1));
-    ctx.stroke();
-
-    // Detail flecks: strawberry seeds, cookie crumbs, nut bits…
-    if (g.speckles) {
-      const count = Math.round(g.speckles.density * (len / r + 1) * 5);
-      for (let n = 0; n < count; n++) {
-        const t = rnd();
-        const a = rnd() * Math.PI * 2;
-        const dist = Math.sqrt(rnd()) * r * 0.85;
-        ctx.fillStyle = g.speckles.colors[Math.floor(rnd() * g.speckles.colors.length)]!;
-        ctx.beginPath();
-        ctx.ellipse(
-          px(x0 + (x1 - x0) * t) + Math.cos(a) * dist,
-          px(y0 + (y1 - y0) * t) + Math.sin(a) * dist,
-          (2 + rnd() * 3) * (size / CANVAS),
-          (1.2 + rnd() * 1.6) * (size / CANVAS),
-          rnd() * Math.PI,
-          0,
-          Math.PI * 2,
-        );
-        ctx.fill();
-      }
-    }
-  }
-
-  private drawLayers(ctx: CanvasRenderingContext2D, size: number, layers: GlazeLayer[]): void {
-    for (const layer of layers) {
-      for (let k = 0; k < layer.segments.length; k += 4) {
-        this.drawSegment(ctx, size, layer.glazeId, layer.segments[k]!, layer.segments[k + 1]!, layer.segments[k + 2]!, layer.segments[k + 3]!, k + 4);
-      }
-    }
-  }
-
   private redrawCanvas(): void {
     const ctx = this.canvas.context;
     ctx.clearRect(0, 0, CANVAS, CANVAS);
     const work = session().glazeWork;
-    if (work) this.drawLayers(ctx, CANVAS, work.allLayers);
+    if (work) drawGlazeLayers(ctx, CANVAS, work.allLayers);
     this.canvas.refresh();
   }
 
@@ -565,48 +494,6 @@ export class GlazeScene extends StationScene {
       g.arc(cx, cy, r * 0.62, Math.PI * 1.08, Math.PI * 1.42);
       g.strokePath();
     }
-  }
-
-  /** Make a small picture of a glazed donut (fried ring + its glaze), for the shelf. */
-  private makeIcon(d: GlazedDonut): string {
-    const key = `glazed-${d.id}`;
-    if (this.textures.exists(key)) return key;
-    const tex = this.textures.createCanvas(key, ICON, ICON)!;
-    const ctx = tex.context;
-    const gb = balance.glaze;
-    const half = ICON / 2;
-    const r = ringBallRadius(gb.ringRadius, 8, gb.ballOverlap) * half;
-    const balls = ringBallCenters(half, half, gb.ringRadius * half);
-    const tint = this.tintOf(d.fry);
-    ctx.fillStyle = `#${tint.toString(16).padStart(6, '0')}`;
-    for (const p of balls) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    this.drawLayers(ctx, ICON, d.layers);
-    ctx.strokeStyle = 'rgba(31,26,23,0.5)';
-    ctx.lineWidth = 2;
-    for (const p of balls) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    tex.refresh();
-    return key;
-  }
-
-  /** Keep shelf icon textures in step with the shelf (make new ones, drop old ones). */
-  private syncIcons(shelf: readonly GlazedDonut[]): void {
-    const ids = new Set(shelf.map((d) => d.id));
-    for (const [id, key] of this.iconKeys) {
-      if (!ids.has(id)) {
-        this.shelfImgs.forEach((img) => img.texture.key === key && img.setTexture(TextureKeys.DonutFry));
-        if (this.textures.exists(key)) this.textures.remove(key);
-        this.iconKeys.delete(id);
-      }
-    }
-    for (const d of shelf) if (!this.iconKeys.has(d.id)) this.iconKeys.set(d.id, this.makeIcon(d));
   }
 
   // ---- Actions ----------------------------------------------------------------
@@ -657,9 +544,8 @@ export class GlazeScene extends StationScene {
       if (s.shelfFull) this.flash('the glazed shelf is full!');
       return;
     }
-    const key = this.iconKeys.get(d.id);
-    if (key) {
-      const ghost = this.add.image(this.boardPos.x, this.boardPos.y, key).setDisplaySize(this.boardPos.size, this.boardPos.size).setDepth(15);
+    {
+      const ghost = this.add.image(this.boardPos.x, this.boardPos.y, donutIcon(this, d)).setDisplaySize(this.boardPos.size, this.boardPos.size).setDepth(15);
       this.tweens.add({
         targets: ghost,
         x: this.shelfPos.x + before * this.shelfPos.step,
@@ -671,6 +557,13 @@ export class GlazeScene extends StationScene {
         onComplete: () => ghost.destroy(),
       });
     }
+  }
+
+  /** A loose copy of an image (made before trashing, while it still shows the donut). */
+  private ghostOf(img: Phaser.GameObjects.Image): Phaser.GameObjects.Image {
+    const g = this.add.image(img.x, img.y, img.texture.key).setDisplaySize(img.displayWidth, img.displayHeight).setDepth(15);
+    if (img.isTinted) g.setTint(img.tintTopLeft);
+    return g;
   }
 
   private overTrash(x: number, y: number): boolean {

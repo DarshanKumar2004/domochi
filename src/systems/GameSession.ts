@@ -2,11 +2,13 @@
 // Pure logic driven by tick(dtMs); scenes render from it and call its actions.
 //
 // The kitchen is a production line: fried donuts go to the rack, rack donuts
-// are glazed one at a time on the glazing board and go to the glazed shelf,
-// and closing the box for an order packs the best-matching shelf donuts and
-// hands them straight to that customer.
+// are glazed one at a time and go to the shelf, shelf donuts can go to the
+// toppings board and back, and the Box station packs shelf donuts into the
+// selected order's box. Closing the lid hands it straight to that customer.
+import { identifyFlavor, matchDonuts, scoreBox, type BoxResult } from '../stations/box';
 import { Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../stations/fry';
-import { GlazeWork, glazeScoreFor, ringMask, type GlazedDonut, type MaskTemplate } from '../stations/glaze';
+import { GlazeWork, glazeScoreFor, ringMask, type MaskTemplate } from '../stations/glaze';
+import { ToppingWork, toppingScoreFor, type FinishedDonut } from '../stations/toppings';
 import { forDay, type Balance } from './balance';
 import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
 import { Emitter } from './events';
@@ -27,12 +29,14 @@ export interface Customer {
 
 export type TicketStatus = 'open' | 'served';
 
-/** One donut slot in a served order: what was asked for and what went in the box. */
+/** One ordered donut in a served box: what was asked for and the donut matched to it. */
 export interface PackedDonut {
   flavorId: string;
-  donut?: GlazedDonut;
-  /** 0–1 glaze match for this flavour (0 if the slot was empty). */
+  donut?: FinishedDonut;
+  /** 0–1 glaze match for this flavour (0 if nothing was there). */
   glazeScore: number;
+  /** 0–1 toppings match for this flavour (0 if nothing was there). */
+  toppingScore: number;
 }
 
 export interface Ticket {
@@ -45,7 +49,15 @@ export interface Ticket {
   takenAtMs: number;
   servedAtMs?: number;
   /** Filled in when the box is closed and served. */
-  results: { fry?: FryResult; glaze?: { score: number }; packed?: PackedDonut[]; missing?: number };
+  results: {
+    fry?: FryResult;
+    glaze?: { score: number };
+    toppings?: { score: number };
+    box?: BoxResult;
+    packed?: PackedDonut[];
+    /** Ordered donuts with nothing in the box to match them. */
+    missing?: number;
+  };
 }
 
 export interface ServedEvent {
@@ -87,8 +99,11 @@ export class GameSession {
   private readonly allTickets: Ticket[] = [];
   private activeNo: number | null = null;
   private readonly rackDonuts: FriedDonut[] = [];
-  private readonly shelfDonuts: GlazedDonut[] = [];
+  private readonly shelfDonuts: FinishedDonut[] = [];
   private work: GlazeWork | null = null;
+  private topWork: ToppingWork | null = null;
+  /** The open box at the Box station (slot i holds a donut or nothing). */
+  private readonly boxSlots: (FinishedDonut | undefined)[] = [];
   private readonly glazeMask: MaskTemplate;
   /** Donuts thrown away today (burnt or trashed), for the day summary. */
   private trashedCount = 0;
@@ -245,6 +260,7 @@ export class GameSession {
     const t = this.ticket(no);
     if (!t || t.status !== 'open') return false;
     this.activeNo = no;
+    this.fitBox();
     this.events.emit('changed', undefined);
     return true;
   }
@@ -301,6 +317,16 @@ export class GameSession {
     return ok;
   }
 
+  /** Throw every donut on the rack away. Returns how many. */
+  trashRack(): number {
+    const n = this.rackDonuts.length;
+    if (!n) return 0;
+    this.rackDonuts.length = 0;
+    this.trashedCount += n;
+    this.events.emit('changed', undefined);
+    return n;
+  }
+
   /** Throw one donut on the rack away. */
   trashRackDonut(index: number): boolean {
     if (!this.rackDonuts[index]) return false;
@@ -316,13 +342,14 @@ export class GameSession {
     return this.work;
   }
 
-  /** Glazed donuts on the shelf, oldest first, waiting to be boxed. */
-  get shelf(): readonly GlazedDonut[] {
+  /** Finished (glazed, maybe topped) donuts on the shelf, oldest first, waiting to be boxed. */
+  get shelf(): readonly FinishedDonut[] {
     return this.shelfDonuts;
   }
 
+  /** Full counts the donut on the toppings board: its spot is kept for it. */
   get shelfFull(): boolean {
-    return this.shelfDonuts.length >= this.deps.balance.glaze.shelfCapacity;
+    return this.shelfDonuts.length + (this.topWork ? 1 : 0) >= this.deps.balance.glaze.shelfCapacity;
   }
 
   /** Move a rack donut onto the glazing board (one at a time). */
@@ -337,7 +364,7 @@ export class GameSession {
   }
 
   /** Done glazing: the donut goes to the shelf. Null if there's nothing to finish or the shelf is full. */
-  finishGlazing(): GlazedDonut | null {
+  finishGlazing(): FinishedDonut | null {
     if (!this.work || !this.work.hasGlaze || this.shelfFull) return null;
     const d = this.work.finish();
     this.shelfDonuts.push(d);
@@ -361,12 +388,126 @@ export class GameSession {
     return true;
   }
 
+  // ---- Toppings ---------------------------------------------------------------
+
+  /** The donut on the toppings board, if any. */
+  get toppingWork(): ToppingWork | null {
+    return this.topWork;
+  }
+
+  /** Move a shelf donut onto the toppings board (one at a time). */
+  startToppings(shelfIndex: number): ToppingWork | null {
+    if (this.topWork) return null;
+    const d = this.shelfDonuts[shelfIndex];
+    if (!d) return null;
+    this.shelfDonuts.splice(shelfIndex, 1);
+    this.topWork = new ToppingWork(d, this.deps.menu, this.deps.balance.toppings, this.deps.balance.glaze);
+    this.events.emit('changed', undefined);
+    return this.topWork;
+  }
+
+  /** Done: the donut goes back on the shelf (its spot was kept). */
+  finishToppings(): FinishedDonut | null {
+    if (!this.topWork) return null;
+    const d = this.topWork.finish();
+    this.topWork = null;
+    this.shelfDonuts.push(d);
+    this.events.emit('changed', undefined);
+    return d;
+  }
+
+  /** Redo: throw away the donut on the toppings board. */
+  trashToppings(): boolean {
+    if (!this.topWork) return false;
+    this.topWork = null;
+    this.trashed1();
+    return true;
+  }
+
+  // ---- Box --------------------------------------------------------------------
+
+  /** Slots in the selected order's box (0 if no order is selected). */
+  get boxSize(): number {
+    const t = this.activeTicket;
+    return t ? (this.deps.menu.boxes.find((b) => b.id === t.order.boxId)?.size ?? t.order.flavors.length) : 0;
+  }
+
+  /** What's in the open box, slot by slot. */
+  get box(): readonly (FinishedDonut | undefined)[] {
+    return this.boxSlots;
+  }
+
+  get boxCount(): number {
+    let n = 0;
+    for (const d of this.boxSlots) if (d) n++;
+    return n;
+  }
+
+  /** Which flavour a donut is, if it exactly matches one. */
+  flavorOf(d: FinishedDonut): string | null {
+    return identifyFlavor(d, this.deps.menu);
+  }
+
+  /**
+   * Put a shelf donut in the box: in `slot` if it's free, otherwise the first
+   * free slot. Returns the slot used, or -1 if there's no order or no room.
+   */
+  boxDonut(shelfIndex: number, slot?: number): number {
+    const size = this.boxSize;
+    const d = this.shelfDonuts[shelfIndex];
+    if (!d || !size) return -1;
+    let to = slot !== undefined && slot >= 0 && slot < size && !this.boxSlots[slot] ? slot : -1;
+    for (let i = 0; i < size && to < 0; i++) if (!this.boxSlots[i]) to = i;
+    if (to < 0) return -1;
+    this.shelfDonuts.splice(shelfIndex, 1);
+    this.boxSlots[to] = d;
+    this.events.emit('changed', undefined);
+    return to;
+  }
+
+  /** Take a donut out of the box, back onto the shelf. False if the shelf is full. */
+  unboxDonut(slot: number): boolean {
+    const d = this.boxSlots[slot];
+    if (!d || this.shelfFull) return false;
+    this.boxSlots[slot] = undefined;
+    this.shelfDonuts.push(d);
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
+  /** Move a boxed donut to another slot, swapping with whatever is there. */
+  moveBoxDonut(from: number, to: number): boolean {
+    const d = this.boxSlots[from];
+    if (!d || from === to || to < 0 || to >= this.boxSize) return false;
+    this.boxSlots[from] = this.boxSlots[to];
+    this.boxSlots[to] = d;
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
+  /** After the box size changes (another order selected): pull donuts past the end into free slots, or shelve them. */
+  private fitBox(): void {
+    const size = this.boxSize;
+    if (!size) return;
+    for (let i = size; i < this.boxSlots.length; i++) {
+      const d = this.boxSlots[i];
+      if (!d) continue;
+      let free = -1;
+      for (let k = 0; k < size && free < 0; k++) if (!this.boxSlots[k]) free = k;
+      if (free >= 0) this.boxSlots[free] = d;
+      // Rare (a smaller box picked while the shelf is full): the shelf goes one over.
+      else this.shelfDonuts.push(d);
+    }
+    if (this.boxSlots.length > size) this.boxSlots.length = size;
+  }
+
   // ---- Serving ----------------------------------------------------------------
 
   /**
-   * Close the box on the active ticket and hand it straight to that customer.
-   * Packs the best-matching glazed donut from the shelf for each flavour; any
-   * flavour with nothing left on the shelf goes in empty and scores 0.
+   * Close the lid on the active ticket's box and hand it straight to that
+   * customer. The box score is about the right donuts in the right slots; each
+   * ordered flavour is then matched to a boxed donut to score how well it was
+   * fried, glazed and topped. Ordered donuts with no match score 0.
    */
   serveActiveTicket(): ServedEvent {
     const t = this.activeTicket;
@@ -375,32 +516,34 @@ export class GameSession {
     if (!c || (c.state !== 'waiting' && c.state !== 'ordering')) throw new Error('customer is not here');
 
     const { menu, balance } = this.deps;
-    const packed: PackedDonut[] = t.order.flavors.map((flavorId) => {
-      const flavor = menu.flavors.find((f) => f.id === flavorId)!;
-      let best = -1;
-      let bestScore = -1;
-      this.shelfDonuts.forEach((d, i) => {
-        const s = glazeScoreFor(d, flavor, balance.glaze);
-        if (s > bestScore) {
-          bestScore = s;
-          best = i;
-        }
-      });
-      if (best < 0) return { flavorId, glazeScore: 0 };
-      const donut = this.shelfDonuts.splice(best, 1)[0]!;
-      return { flavorId, donut, glazeScore: bestScore };
+    const expected = t.order.flavors;
+    const needed = expected.length;
+    const donuts = [...this.boxSlots];
+    this.boxSlots.length = 0;
+    const identified = donuts.map((d) => (d ? identifyFlavor(d, menu) : undefined));
+    const flavorById = (id: string) => menu.flavors.find((f) => f.id === id)!;
+    const glazeQ = (d: FinishedDonut, id: string) => glazeScoreFor(d, flavorById(id), balance.glaze);
+    const topQ = (d: FinishedDonut, id: string) => toppingScoreFor(d, flavorById(id), menu, balance.toppings);
+    const match = matchDonuts(expected, donuts, identified, (d, id) => glazeQ(d, id) + topQ(d, id));
+    const packed: PackedDonut[] = expected.map((flavorId, i) => {
+      const donut = match[i]! >= 0 ? donuts[match[i]!] : undefined;
+      return donut
+        ? { flavorId, donut, glazeScore: glazeQ(donut, flavorId), toppingScore: topQ(donut, flavorId) }
+        : { flavorId, glazeScore: 0, toppingScore: 0 };
     });
 
-    const needed = t.order.flavors.length;
-    const donuts = packed.flatMap((p) => (p.donut ? [p.donut.fry] : []));
-    const fry = fryResultFromDonuts(t.no, donuts, balance.fry);
-    // Empty slots count as zero.
-    fry.score = Math.round((fry.score * donuts.length) / needed);
+    const fried = packed.flatMap((p) => (p.donut ? [p.donut.fry] : []));
+    const fry = fryResultFromDonuts(t.no, fried, balance.fry);
+    // Missing donuts count as zero.
+    fry.score = Math.round((fry.score * fried.length) / needed);
+    const avg = (f: (p: PackedDonut) => number) => Math.round((packed.reduce((s, p) => s + f(p), 0) / needed) * 100);
     t.results = {
       fry,
-      glaze: { score: Math.round((packed.reduce((s, p) => s + p.glazeScore, 0) / needed) * 100) },
+      glaze: { score: avg((p) => p.glazeScore) },
+      toppings: { score: avg((p) => p.toppingScore) },
+      box: scoreBox(expected, identified, balance.box),
       packed,
-      missing: needed - donuts.length,
+      missing: needed - fried.length,
     };
 
     const { afterServeSec } = balance;

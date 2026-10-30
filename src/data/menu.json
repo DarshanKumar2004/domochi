@@ -1,5 +1,5 @@
 {
-  "_source": "Real domochi menu from domochitreats.com (Square Online store), fetched 2026-10-30. Names and prices are exact. Game fields (glaze style, colors, unlockDay) are game design, not from the shop. Drizzles and the cookie on cookie butter are from the A-frame sign photo Kumar shared (2026-10-30). Glaze speckles (strawberry seeds, cookie crumbs, nut bits) are game art detail.",
+  "_source": "Real domochi menu from domochitreats.com (Square Online store), fetched 2026-10-30. Names and prices are exact. Game fields (glaze style, colors, unlockDay) are game design, not from the shop. Drizzles and the cookie on cookie butter are from the A-frame sign photo Kumar shared (2026-10-30). Glaze speckles (strawberry seeds, cookie crumbs, nut bits) are game art detail. Topping style/shape/size/amount (how it is applied, drawn and how much is ideal) are game design.",
   "currency": "USD",
   "glazes": [
     {
@@ -82,7 +82,14 @@
       "colors": [
         "#b5763a",
         "#8f5a2b"
-      ]
+      ],
+      "style": "piece",
+      "shape": "biscuit",
+      "size": 0.17,
+      "amount": {
+        "min": 1,
+        "max": 1
+      }
     },
     {
       "id": "crushed-cookies",
@@ -90,7 +97,14 @@
       "colors": [
         "#2b2420",
         "#4a3f39"
-      ]
+      ],
+      "style": "sprinkle",
+      "shape": "crumb",
+      "size": 0.035,
+      "amount": {
+        "min": 30,
+        "max": 70
+      }
     },
     {
       "id": "fruity-cereal",
@@ -101,7 +115,14 @@
         "#ffe066",
         "#7fd1ae",
         "#9b8cff"
-      ]
+      ],
+      "style": "sprinkle",
+      "shape": "loop",
+      "size": 0.045,
+      "amount": {
+        "min": 20,
+        "max": 45
+      }
     }
   ],
   "flavors": [

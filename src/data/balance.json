@@ -47,9 +47,9 @@
     "ringRadius": 0.65,
     "ballOverlap": 1.15,
     "edgeMargin": 0.08,
-    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.045 },
+    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.16 },
     "goodCoverage": { "dip": 0.9, "dust": 0.85 },
-    "drizzleAmount": { "idealMin": 0.18, "idealMax": 0.5, "zeroAt": 0.9 },
+    "drizzleAmount": { "idealMin": 0.25, "idealMax": 0.65, "zeroAt": 0.95 },
     "drizzleBallTouched": 0.06,
     "spillZeroAt": 0.6,
     "wrongGlazeFactor": 0.3,
@@ -58,5 +58,22 @@
     "drizzleWeight": 0.35,
     "fallMs": 140,
     "shelfCapacity": 6
+  },
+  "toppings": {
+    "_note": "Pieces are placed in normalised donut coordinates. Per wanted topping: amount (menu topping.amount, too much is 0 at max × tooMuchZeroAtFactor) × evenness over the 8 balls × (1 − share that fell off / messZeroAt). Each unwanted topping multiplies by unwantedFactor.",
+    "sprinkleEveryMs": 60,
+    "scatter": 0.09,
+    "fallMs": 220,
+    "maxPieces": 160,
+    "onDonutMargin": 0.03,
+    "tooMuchZeroAtFactor": 2.5,
+    "evennessFloor": 0.4,
+    "messZeroAt": 0.5,
+    "unwantedFactor": 0.5
+  },
+  "box": {
+    "_note": "Each ordered slot holding its flavour = 1, that flavour in the wrong slot = wrongSpotCredit, minus extraPenalty per extra donut.",
+    "wrongSpotCredit": 0.5,
+    "extraPenalty": 0.25
   }
 }

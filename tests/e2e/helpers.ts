@@ -241,3 +241,23 @@ export async function dragNamedOnto(page: Page, sceneKey: string, name: string, 
   const to = await findNamed(page, sceneKey, targetName);
   await dragGame(page, from, { x: to.x + offsetX, y: to.y });
 }
+
+/**
+ * Double-tap a named object quickly, like a finger: raw touch events on touch
+ * devices (Playwright's emulated taps are too slow), two clicks on desktop.
+ */
+export async function doubleTapNamed(page: Page, sceneKey: string, name: string): Promise<void> {
+  const t = await findNamed(page, sceneKey, name);
+  const p = await toPage(page, t.x, t.y);
+  if (test.info().project.use.hasTouch) {
+    // Sent back to back: under load each awaited CDP call can take ~200 ms, which
+    // would stretch the double-tap past the game's window.
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: 'touchStart' | 'touchEnd') => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.px, y: p.py }] });
+    await Promise.all([touch('touchStart'), touch('touchEnd'), touch('touchStart'), touch('touchEnd')]);
+    await cdp.detach();
+  } else {
+    await page.mouse.click(p.px, p.py, { clickCount: 1 });
+    await page.mouse.click(p.px, p.py, { clickCount: 2 });
+  }
+}

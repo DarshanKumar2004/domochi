@@ -1,6 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, findNamed, seedTutorialDone, shot, tapGame, tapNamed, toPage, waitForScene } from './helpers';
+import { advance, doubleTapNamed, findNamed, seedTutorialDone, shot, tapGame, tapNamed, waitForScene } from './helpers';
+
+/** Glaze a donut through the session and put it in the open box (packing by hand is pack.spec's job). */
+async function packOne(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    type W = { pour(g: string, a: number, b: number, c: number, d: number): boolean };
+    const s = (window as unknown as {
+      __session: { dropDonut(): number; pullAll(): number[]; startGlazing(i: number): W | null; finishGlazing(): unknown; boxDonut(i: number): number };
+    }).__session;
+    s.dropDonut();
+    s.pullAll();
+    s.startGlazing(0)!.pour('strawberry', -0.6, -0.3, 0.6, -0.3);
+    s.finishGlazing();
+    s.boxDonut(0);
+  });
+}
 
 type SessionView = { servedCount: number; customer(id: number): { state: string }; ticket(n: number): { customerId: number; status: string } };
 const served = (page: Page) => page.evaluate(() => (window as unknown as { __session: SessionView }).__session.servedCount);
@@ -35,6 +50,7 @@ test('closing the box serves the selected ticket’s customer automatically', as
   await tapNamed(page, SceneKeys.Hud, 'ticket-2');
   await tapNamed(page, SceneKeys.Hud, 'tab-Box');
   await waitForScene(page, SceneKeys.Box);
+  await packOne(page);
   await tapNamed(page, SceneKeys.Box, 'btn-serve');
   await waitForScene(page, SceneKeys.Serve);
   expect(await ticketStatus(page, 2)).toBe('served');
@@ -45,6 +61,7 @@ test('closing the box serves the selected ticket’s customer automatically', as
 
   // #1 is selected next and serves the same way.
   await tapNamed(page, SceneKeys.Hud, 'tab-Box');
+  await packOne(page);
   await tapNamed(page, SceneKeys.Box, 'btn-serve');
   await waitForScene(page, SceneKeys.Serve);
   expect(await served(page)).toBe(2);
@@ -58,23 +75,7 @@ test('double-tap a ticket on the rail to see it big with each recipe', async ({ 
   page.on('pageerror', (e) => errors.push(e.message));
   await twoOrders(page);
 
-  // Two quick taps on the same spot (position worked out once, so the taps are as close as a finger's).
-  const t = await findNamed(page, SceneKeys.Hud, 'ticket-1');
-  const p = await toPage(page, t.x, t.y);
-  if (test.info().project.use.hasTouch) {
-    // Raw touch events: Playwright's emulated tap is slower than a real finger's double-tap.
-    // 120 ms apart, like a quick real double-tap (several frames, so the rebuilt rail is tappable).
-    const cdp = await page.context().newCDPSession(page);
-    for (let i = 0; i < 2; i++) {
-      if (i) await page.waitForTimeout(120);
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.px, y: p.py }] });
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    }
-    await cdp.detach();
-  } else {
-    await page.mouse.click(p.px, p.py);
-    await page.mouse.click(p.px, p.py);
-  }
+  await doubleTapNamed(page, SceneKeys.Hud, 'ticket-1');
   await waitForScene(page, SceneKeys.TicketView);
   await findNamed(page, SceneKeys.TicketView, 'ticket-view');
   await shot(page, 'orders-ticket-view');

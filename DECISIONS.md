@@ -179,3 +179,28 @@ Kumar's feedback after Phase 4, all in one batch.
   - **It closes only on a fresh tap.** The finger that opened it is still down, and lifting it used to close the view instantly.
   - **The rail no longer rebuilds when you select a ticket**; it just redraws the frames. Rebuilt tap targets only become tappable a frame later, which swallowed the second tap of a double-tap.
 - **Phaser 4 was not actually being served until now.** Vite's dependency cache (`node_modules/.vite`) still held Phaser 3.90 from before the upgrade, because the dev server had been running since then. The fix was to stop the server, delete the cache and restart. If a library upgrade seems to have no effect, clear that folder.
+
+## Phase 5: Toppings and Box stations, whole-rack trash, equal pour thickness (2026-10-30)
+
+- **Emptying the whole rack** (Kumar asked for either gesture, so both work). On the Fry station you can **drag the rack itself** (grab the tray or its label, not a donut on it) into the trash, or **double-tap the trash can**. The rack-full hint mentions the double-tap. The double-tap is timed with `performance.now()` at the tap, like the ticket rail, not the scene clock (which only moves once a frame). The browser test sends both taps back to back, because under load each awaited touch event took about 200 ms and stretched the "double" tap past the 500 ms window.
+- **Every cup pours the same thickness** (Kumar: the white icing looked thinner). The drizzle brush now equals the dip brush (0.16), and drizzle drops are the same size as glaze drops. Only the sugar shaker, which dusts rather than pours, keeps fine grains. To make a thick drizzle playable:
+  - **Drizzle over the hole isn't spill** (`allowedDrizzle`), because icing poured across the hole falls through, like the real thing.
+  - The ideal drizzle range moved to 25–65% of the ring. Measured with the thick stream, 3–4 stripes kept on the donut score about 95–100%, and 6–7 stripes (smothered) score about 0–10%.
+- **Toppings station** (logic: `stations/toppings.ts`, 11 unit tests):
+  - A shelf donut goes on the board. Pick a jar, then **press and drag over the donut to shake**: the jar is held upside down above your finger, and pieces fall and land after `fallMs`. The **cookie butter cookie is a single piece**: one per tap. Done puts the donut back on the shelf; Redo trashes it, the same as glazing.
+  - Pieces are scored **per wanted topping**: amount (menu `amount`; too much reaches 0 at max × 2.5) × evenness over the 8 balls (sprinkles only) × (1 − share that fell off / 0.5). Each unwanted topping halves the score. A flavour with no toppings wants none, so those donuts can skip the station.
+  - Pieces that land in the hole or off the edge **fall off**: they're animated tumbling away, counted as mess and never drawn on the donut.
+  - **New menu fields (game-only):** `style` (sprinkle or piece), `shape` (crumb, loop or biscuit), `size` and `amount` for each topping. The real flavour data is unchanged.
+  - **Shaking is frame-rate independent:** a slow frame releases the pieces it owes, up to 4, so slower phones get the same amount.
+- **Box station** (logic: `stations/box.ts`, 8 unit tests):
+  - Tap a shelf donut to drop it into the next free slot, or drag it onto a specific slot. Tap a boxed donut to take it back out, or drag it to another slot (they swap).
+  - The box has the order's box size (trio 3, flight 6, domochi box 12). The **ordered slots are numbered** in the ticket's order (flavours grouped top to bottom); slots past the order are dimmed.
+  - **Close lid & serve** needs at least one donut. A kraft lid with the logo flips down, then the box goes to the customer.
+  - **Box score:** an ordered slot holding its flavour = 1, that flavour in the wrong slot = 0.5, an empty slot or unknown donut = 0, and each extra donut −25%. A donut's flavour is **identified by its recipe**: base glaze, drizzle and the exact set of toppings.
+  - **Quality scores:** each ordered flavour is paired with a boxed donut (a right-slot donut first, then the best by glaze + toppings) to score fry, glaze and toppings, so a misplaced donut costs box points but not quality points too. This replaces the interim auto-pack.
+  - The box lives in the session, so you can switch tabs mid-pack. If you select an order with a smaller box, donuts past its end move into free slots (or back to the shelf).
+- **One shelf for finished donuts,** shared by Glaze, Toppings and Box. The donut on the toppings board keeps its shelf spot.
+- **Shared donut drawing (`ui/donutArt.ts`):** fried ring, glaze layers, toppings and the shelf/box icons are drawn by one module for every station. An icon is redrawn only when its donut changes.
+  - **Icons of gone donuts are deleted 3 s later, not at once.** Deleting immediately crashed a trash animation that was still drawing that icon (`sourceSize` of null), which the browser tests caught. Trash animations now also copy the image *before* the donut is trashed, since the shelf slot may show the next donut right after.
+- **Placeholder art:** `topping-jar` is now an empty glass jar; each topping's contents are drawn inside it in code. `donut-box` is now the closed lid (plain kraft, logo added in code), because the open box is drawn in code to fit 3, 6 or 12 slots. MANIFEST updated.
+- **Result card:** shows real Toppings and Box scores. The weighted order score and tips are still Phase 6.

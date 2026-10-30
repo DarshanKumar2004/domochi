@@ -1,6 +1,8 @@
 // Types and helpers for src/data/balance.json.
 import type { FryBalance } from '../stations/fry';
+import type { BoxBalance } from '../stations/box';
 import type { GlazeBalance } from '../stations/glaze';
+import type { ToppingsBalance } from '../stations/toppings';
 
 export interface Range {
   min: number;
@@ -22,6 +24,8 @@ export interface Balance {
   favoriteWeight: number;
   fry: FryBalance;
   glaze: GlazeBalance;
+  toppings: ToppingsBalance;
+  box: BoxBalance;
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */
@@ -77,6 +81,17 @@ export function validateBalance(b: Balance): string[] {
   if (!(g.fallMs >= 0 && Number.isInteger(g.shelfCapacity) && g.shelfCapacity >= 1)) errors.push('glaze needs fallMs >= 0 and shelfCapacity >= 1');
   if (!(g.spillZeroAt > 0 && g.wrongGlazeFactor >= 0 && g.wrongGlazeFactor < 1)) errors.push('glaze needs spillZeroAt > 0 and 0 <= wrongGlazeFactor < 1');
   if (!(g.ringRadius > 0 && g.ringRadius < 1)) errors.push('glaze.ringRadius must be between 0 and 1');
+  const t = b.toppings;
+  if (!(t.sprinkleEveryMs > 0 && t.scatter >= 0 && t.fallMs >= 0 && Number.isInteger(t.maxPieces) && t.maxPieces >= 1)) {
+    errors.push('toppings needs sprinkleEveryMs > 0, scatter >= 0, fallMs >= 0 and integer maxPieces >= 1');
+  }
+  if (!(t.tooMuchZeroAtFactor > 1)) errors.push('toppings.tooMuchZeroAtFactor must be > 1');
+  if (!(t.evennessFloor >= 0 && t.evennessFloor <= 1 && t.messZeroAt > 0 && t.unwantedFactor >= 0 && t.unwantedFactor < 1)) {
+    errors.push('toppings needs evennessFloor in [0, 1], messZeroAt > 0 and 0 <= unwantedFactor < 1');
+  }
+  if (!(b.box.wrongSpotCredit >= 0 && b.box.wrongSpotCredit <= 1 && b.box.extraPenalty >= 0)) {
+    errors.push('box needs wrongSpotCredit in [0, 1] and extraPenalty >= 0');
+  }
   if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');
   return errors;
 }

@@ -378,29 +378,28 @@ function paintSugarSifter(g: G): void {
   g.fillRoundedRect(118, 60, 34, 18, 8);
 }
 
+/** An empty glass jar with a lid. The topping inside is drawn over it in code, per topping. */
 function paintToppingJar(g: G): void {
-  g.fillStyle(COLORS.pinkDark);
-  g.fillRoundedRect(30, 0, 100, 40, 10);
-  g.fillStyle(0xdff3fa, 0.9);
+  const ink = COLORS.ink;
+  g.fillStyle(0xdff3fa, 0.55);
   g.fillRoundedRect(15, 35, 130, 180, 30);
-  const colors = [COLORS.pink, 0x7fd1ae, 0xffd166, 0x6ec6ff];
-  for (let i = 0; i < 24; i++) {
-    g.fillStyle(colors[i % colors.length] ?? COLORS.pink);
-    g.fillRect(35 + ((i * 37) % 90), 90 + ((i * 53) % 110), 16, 7);
-  }
+  g.lineStyle(6, ink);
+  g.strokeRoundedRect(15, 35, 130, 180, 30);
+  g.fillStyle(COLORS.pinkDark);
+  g.fillRoundedRect(30, 0, 100, 42, 10);
+  g.strokeRoundedRect(30, 0, 100, 42, 10);
+  g.lineStyle(8, 0xffffff, 0.5);
+  g.lineBetween(36, 70, 36, 150);
 }
 
+/** The box lid, closed: plain kraft card. The logo is placed on it in code. */
 function paintDonutBox(g: G): void {
-  g.fillStyle(0xc9a273);
-  g.fillRect(40, 0, 540, 120);
   g.fillStyle(0xd8b58a);
-  g.fillRoundedRect(0, 100, 620, 320, 24);
-  g.fillStyle(0xc09a6c);
-  for (let row = 0; row < 2; row++) {
-    for (let col = 0; col < 3; col++) {
-      g.fillRoundedRect(35 + col * 190, 130 + row * 140, 170, 120, 20);
-    }
-  }
+  g.fillRoundedRect(0, 0, 620, 420, 24);
+  g.lineStyle(8, COLORS.ink);
+  g.strokeRoundedRect(4, 4, 612, 412, 22);
+  g.lineStyle(4, 0xb48d5f);
+  g.strokeRoundedRect(26, 26, 568, 368, 16);
 }
 
 function paintIconLobby(g: G): void {

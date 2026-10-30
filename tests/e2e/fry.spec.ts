@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, dragFromNamed, dragNamedOnto, holdNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene } from './helpers';
+import { advance, doubleTapNamed, dragFromNamed, dragNamedOnto, holdNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene } from './helpers';
 
 interface SlotView {
   down: number;
@@ -103,10 +103,23 @@ test('trash: drag a donut from the oil, and one from the rack, into the bin; bur
   await expect.poll(() => rackSize(page)).toBe(2);
   expect(await trashed(page)).toBe(2);
 
+  // The whole rack: grab the tray (by its label) and slide it into the bin…
+  await dragNamedOnto(page, SceneKeys.Fry, 'fry-rack', 'fry-trash');
+  await expect.poll(() => rackSize(page)).toBe(0);
+  expect(await trashed(page)).toBe(4);
+  // …or double-tap the bin.
+  for (let i = 0; i < 2; i++) await tapNamed(page, SceneKeys.Fry, 'btn-drop');
+  await advance(page, 2000);
+  await tapNamed(page, SceneKeys.Fry, 'btn-pull-all');
+  await expect.poll(() => rackSize(page)).toBe(2);
+  await doubleTapNamed(page, SceneKeys.Fry, 'fry-trash');
+  await expect.poll(() => rackSize(page)).toBe(0);
+  expect(await trashed(page)).toBe(6);
+
   // Forgotten in the oil: burns and is thrown out automatically
   await tapNamed(page, SceneKeys.Fry, 'btn-drop');
   await advance(page, (b.secondsPerSide * b.burntAt + 4) * 1000);
-  await expect.poll(() => trashed(page)).toBe(3);
+  await expect.poll(() => trashed(page)).toBe(7);
   await page.waitForTimeout(250);
   await shot(page, 'fry-4-burnt');
 

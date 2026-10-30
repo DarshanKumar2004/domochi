@@ -179,6 +179,17 @@ describe('GameSession: frying', () => {
     expect(s.rack).toHaveLength(fb.rackCapacity);
   });
 
+  it('the whole rack can be trashed at once', () => {
+    const s = makeSession(fastSpawn);
+    for (let i = 0; i < 4; i++) s.dropDonut();
+    s.tick(500);
+    s.pullAll();
+    expect(s.trashRack()).toBe(4);
+    expect(s.rack).toHaveLength(0);
+    expect(s.trashed).toBe(4);
+    expect(s.trashRack()).toBe(0);
+  });
+
   it('one rack donut can be trashed on its own', () => {
     const s = makeSession(fastSpawn);
     for (let i = 0; i < 3; i++) s.dropDonut();
@@ -221,7 +232,8 @@ function glazeBoard(s: GameSession, base: string, drizzle?: string) {
       w.pour(base, Math.cos(a0) * radius, Math.sin(a0) * radius, Math.cos(a1) * radius, Math.sin(a1) * radius);
     }
   }
-  if (drizzle) for (let k = 0; k < 7; k++) w.pour(drizzle, -0.85, -0.8 + (1.6 * k) / 6, 0.85, -0.68 + (1.6 * k) / 6);
+  // Three stripes across, kept on the donut.
+  if (drizzle) for (const y of [-0.6, 0, 0.6]) w.pour(drizzle, -Math.sqrt(0.64 - y * y), y, Math.sqrt(0.64 - y * y), y);
 }
 
 /** Fry n good donuts onto the rack. */
@@ -279,48 +291,150 @@ describe('GameSession: glazing', () => {
   });
 });
 
-describe('GameSession: serving', () => {
-  it('closing the box packs the best-matching shelf donuts and serves the customer straight away', () => {
+/** Sprinkle a topping evenly round the ring, `n` pieces. */
+function topBoard(s: GameSession, toppingId: string, n = 40) {
+  const w = s.toppingWork!;
+  const R = baseBalance.glaze.ringRadius;
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * Math.PI * 2;
+    w.add(toppingId, Math.cos(a) * R, Math.sin(a) * R, k / n);
+  }
+}
+
+/** Make a finished donut of a flavour onto the shelf (fry → glaze → toppings). */
+function makeFlavor(s: GameSession, flavorId: string) {
+  const f = menu.flavors.find((x) => x.id === flavorId)!;
+  fryRack(s, 1);
+  s.startGlazing(s.rack.length - 1);
+  glazeBoard(s, f.glaze, f.drizzle);
+  s.finishGlazing();
+  if (f.toppings.length) {
+    s.startToppings(s.shelf.length - 1);
+    for (const t of f.toppings) topBoard(s, t, menu.toppings.find((x) => x.id === t)!.style === 'piece' ? 1 : 40);
+    s.finishToppings();
+  }
+}
+
+/** Box every ordered flavour from the shelf, in the ticket's order. */
+function packInOrder(s: GameSession, flavors: readonly string[]) {
+  flavors.forEach((id, slot) => {
+    const i = s.shelf.findIndex((d) => s.flavorOf(d) === id);
+    expect(s.boxDonut(i, slot)).toBe(slot);
+  });
+}
+
+describe('GameSession: toppings', () => {
+  it('shelf donut → toppings board → back on the shelf, with its toppings', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    fryRack(s, 1);
+    s.startGlazing(0);
+    glazeBoard(s, 'cookies-and-cream');
+    s.finishGlazing();
+    const id = s.shelf[0]!.id;
+    expect(s.flavorOf(s.shelf[0]!)).toBeNull(); // no cookies on it yet
+    expect(s.startToppings(0)?.donut.id).toBe(id);
+    expect(s.shelf).toHaveLength(0);
+    topBoard(s, 'crushed-cookies');
+    expect(s.finishToppings()?.id).toBe(id);
+    expect(s.toppingWork).toBeNull();
+    expect(s.flavorOf(s.shelf[0]!)).toBe('cookies-and-cream');
+  });
+
+  it('the donut on the board keeps its shelf spot; redo trashes it', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1], glaze: { ...baseBalance.glaze, shelfCapacity: 1 } });
+    makeFlavor(s, 'strawberry');
+    s.startToppings(0);
+    expect(s.shelfFull).toBe(true);
+    expect(s.trashToppings()).toBe(true);
+    expect(s.shelfFull).toBe(false);
+    expect(s.trashed).toBe(1);
+  });
+});
+
+describe('GameSession: box and serving', () => {
+  it('pack in the ticket order and close the lid: the customer is served with full marks', () => {
     const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11);
-    fryRack(s, 3);
-    // Glaze one of everything day 1 might ask for.
-    const recipes: [string, string?][] = [['cookies-and-cream'], ['strawberry', 'white-icing'], ['strawberry', 'white-icing']];
-    for (const [base, drizzle] of recipes) {
-      s.startGlazing(0);
-      glazeBoard(s, base, drizzle);
-      s.finishGlazing();
-    }
     s.tick(1000);
     const { customer, ticket } = orderFront(s);
+    for (const f of ticket.order.flavors) makeFlavor(s, f);
+    expect(s.boxSize).toBe(3);
+    packInOrder(s, ticket.order.flavors);
+    expect(s.boxCount).toBe(ticket.order.flavors.length);
     let served = 0;
     s.events.on('served', () => served++);
     s.tick(4000);
 
     const e = s.serveActiveTicket();
     expect(served).toBe(1);
-    expect(e.waitMs).toBe(4000);
+    expect(e.waitMs).toBeGreaterThanOrEqual(4000);
     expect(s.customer(customer.id)!.state).toBe('served');
     expect(ticket.status).toBe('served');
-    const packed = ticket.results.packed!;
-    expect(packed.map((p) => p.flavorId)).toEqual(ticket.order.flavors);
-    for (const p of packed) {
-      // Each slot got a donut glazed for that flavour.
-      expect(p.donut!.layers[0]!.glazeId).toBe(p.flavorId === 'cookies-and-cream' ? 'cookies-and-cream' : 'strawberry');
-    }
-    expect(ticket.results.missing).toBe(0);
-    expect(ticket.results.glaze!.score).toBeGreaterThan(70);
-    expect(ticket.results.fry!.score).toBeGreaterThan(80);
-    expect(s.shelf).toHaveLength(3 - ticket.order.flavors.length);
+    const r = ticket.results;
+    expect(r.box).toMatchObject({ score: 100, correct: ticket.order.flavors.length, extras: 0, empty: 0 });
+    expect(r.missing).toBe(0);
+    expect(r.glaze!.score).toBeGreaterThan(85);
+    expect(r.toppings!.score).toBeGreaterThan(85);
+    expect(r.fry!.score).toBeGreaterThan(80);
+    expect(s.box).toHaveLength(0);
+    expect(s.shelf).toHaveLength(0);
   });
 
-  it('an order with nothing on the shelf still serves, scoring zero for the empty slots', () => {
+  it('a donut can be moved between slots or taken back out', () => {
     const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11);
     s.tick(1000);
+    orderFront(s);
+    makeFlavor(s, 'strawberry');
+    makeFlavor(s, 'cookies-and-cream');
+    expect(s.boxDonut(0, 2)).toBe(2);
+    expect(s.boxDonut(0, 2)).toBe(0); // taken: goes to the first free slot
+    expect(s.moveBoxDonut(2, 0)).toBe(true); // swap
+    expect(s.flavorOf(s.box[0]!)).toBe('strawberry');
+    expect(s.unboxDonut(2)).toBe(true);
+    expect(s.boxCount).toBe(1);
+    expect(s.shelf).toHaveLength(1);
+  });
+
+  it('nothing can be boxed without an order selected', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    makeFlavor(s, 'strawberry');
+    expect(s.boxSize).toBe(0);
+    expect(s.boxDonut(0)).toBe(-1);
+  });
+
+  it('wrong slots and plain donuts cost box and toppings points; missing donuts score zero', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [3], orderSizeByDay: [{ min: 2, max: 2 }] }, 1, 3);
+    s.tick(1000);
     const { ticket } = orderFront(s);
+    const [first, second] = ticket.order.flavors as [string, string];
+    // Only the second flavour is made, and it goes in slot 1 (it belongs in slot 2).
+    makeFlavor(s, second);
+    s.boxDonut(0, 0);
     s.serveActiveTicket();
-    expect(ticket.results.missing).toBe(ticket.order.flavors.length);
-    expect(ticket.results.glaze!.score).toBe(0);
-    expect(ticket.results.fry!.score).toBe(0);
+    const r = ticket.results;
+    expect(r.missing).toBe(1);
+    expect(r.box!.correct).toBe(first === second ? 1 : 0);
+    expect(r.box!.score).toBeLessThan(100);
+    expect(r.fry!.score).toBeLessThanOrEqual(50);
+    expect(r.glaze!.score).toBeLessThanOrEqual(50);
+  });
+
+  it('picking a smaller box moves donuts past its end into free slots', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2], orderSizeByDay: [{ min: 4, max: 4 }] }, 1, 3);
+    s.tick(1000);
+    const a = orderFront(s);
+    for (let i = 0; i < 2; i++) makeFlavor(s, 'strawberry');
+    expect(s.boxSize).toBe(6);
+    s.boxDonut(0, 5);
+    s.boxDonut(0, 0);
+    // A second order arrives; give it the trio box (as a smaller order would have) and select it.
+    s.tick(5000);
+    const b = orderFront(s);
+    b.ticket.order.boxId = 'trio';
+    s.selectTicket(b.ticket.no);
+    expect(s.boxSize).toBe(3);
+    expect(s.box.filter(Boolean)).toHaveLength(2);
+    expect(s.box[1]).toBeDefined();
+    expect(a.ticket.status).toBe('open');
   });
 
   it('serving moves the selection to the next open ticket and completes the day at the end', () => {
