@@ -172,3 +172,53 @@ describe('GameSession: boxing and serving', () => {
     expect(s.activeTicket).toBeUndefined();
   });
 });
+
+describe('GameSession: frying', () => {
+  function oneWaiting() {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [3] }, 1, 11);
+    s.tick(1000);
+    const a = orderFront(s);
+    return { s, a };
+  }
+
+  it('the fryer heats up on the session clock', () => {
+    const { s } = oneWaiting();
+    const before = s.fryer.temp;
+    s.tick(2000);
+    expect(s.fryer.temp).toBeGreaterThan(before);
+  });
+
+  it('frying the active ticket stores the result on that ticket', () => {
+    const { s, a } = oneWaiting();
+    expect(s.canStartFrying).toBe(true);
+    s.startFrying();
+    expect(s.fryingTicket?.no).toBe(a.ticket.no);
+    expect(s.fryer.batch?.count).toBe(a.ticket.order.flavors.length);
+    expect(s.canStartFrying).toBe(false); // fryer busy
+    s.tick(4000);
+    const r = s.pullFry();
+    expect(s.ticket(a.ticket.no)!.results.fry).toBe(r);
+    expect(s.fryingTicket).toBeUndefined();
+    expect(s.canStartFrying).toBe(false); // already fried
+  });
+
+  it('a batch keeps belonging to its ticket even if you select another', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [3] }, 1, 11);
+    s.tick(1000);
+    s.tick(2000);
+    const a = orderFront(s);
+    const b = orderFront(s);
+    s.startFrying(); // ticket a is active
+    s.selectTicket(b.ticket.no);
+    s.tick(3000);
+    s.pullFry();
+    expect(s.ticket(a.ticket.no)!.results.fry).toBeDefined();
+    expect(s.ticket(b.ticket.no)!.results.fry).toBeUndefined();
+  });
+
+  it('cannot start frying without an active ticket', () => {
+    const s = makeSession(fastSpawn);
+    expect(s.canStartFrying).toBe(false);
+    expect(() => s.startFrying()).toThrow();
+  });
+});

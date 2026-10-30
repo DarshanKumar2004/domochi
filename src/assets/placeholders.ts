@@ -247,25 +247,47 @@ function paintDonut(g: G): void {
   }
 }
 
+/** Fryer vat seen from the front-top. The oil surface is the area donuts float in (see FRYER_SPEC). */
 function paintFryer(g: G): void {
-  g.fillStyle(0x9aa3ab);
-  g.fillRoundedRect(0, 60, 760, 400, 40);
-  // Oil vat
+  const ink = COLORS.ink;
+  g.fillStyle(0xaab2ba);
+  g.fillRoundedRect(10, 10, 740, 420, 36);
+  g.lineStyle(8, ink);
+  g.strokeRoundedRect(10, 10, 740, 420, 36);
+  // Oil
   g.fillStyle(0x6d757c);
-  g.fillRoundedRect(35, 75, 510, 330, 28);
+  g.fillRoundedRect(44, 44, 672, 352, 24);
   g.fillStyle(0xd9a441);
-  g.fillRoundedRect(50, 90, 480, 300, 24);
-  // Control panel: heat dial + oil gauge
+  g.fillRoundedRect(56, 56, 648, 328, 20);
+  g.fillStyle(0xe8bb5e, 0.6);
+  for (let i = 0; i < 5; i++) g.fillEllipse(140 + i * 120, 90 + (i % 2) * 230, 90, 18);
+  g.lineStyle(5, ink);
+  g.strokeRoundedRect(44, 44, 672, 352, 24);
+}
+
+/** Pressing grate: steel bars with a handle, laid over the oil. */
+function paintFryGrate(g: G): void {
+  const ink = COLORS.ink;
+  g.lineStyle(10, 0x9aa3ab);
+  for (let x = 40; x <= 640; x += 75) g.lineBetween(x, 30, x, 330);
+  for (let y = 30; y <= 330; y += 100) g.lineBetween(30, y, 650, y);
+  g.lineStyle(4, ink, 0.6);
+  g.strokeRoundedRect(25, 25, 630, 310, 16);
+  // Handle
   g.fillStyle(0x5a6168);
-  g.fillRoundedRect(570, 100, 160, 300, 20);
-  g.fillStyle(0xeeeeee);
-  g.fillCircle(650, 190, 55);
-  g.lineStyle(10, 0xd04040);
-  g.lineBetween(650, 190, 650 + Math.cos(-2.2) * 38, 190 + Math.sin(-2.2) * 38);
-  g.fillStyle(0x333333);
-  g.fillRoundedRect(610, 280, 80, 100, 10);
-  g.fillStyle(0xd9a441);
-  g.fillRect(618, 315, 64, 58);
+  g.fillRoundedRect(620, 150, 60, 60, 12);
+}
+
+/** Plain white pon de ring, tinted at runtime by doneness (see fryColor). */
+function paintDonutFry(g: G): void {
+  const ring = 52;
+  const r = ringBallRadius(ring, 8, 1.15);
+  for (const p of ringBallCenters(80, 80, ring)) {
+    g.fillStyle(0xffffff);
+    g.fillCircle(p.x, p.y, r);
+    g.lineStyle(4, 0x8a8a8a);
+    g.strokeCircle(p.x, p.y, r);
+  }
 }
 
 function paintGlazeBowl(g: G): void {
@@ -366,7 +388,9 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.CustomerParent]: { width: 180, height: 340, paint: paintCustomer(CUSTOMER_LOOKS.parent) },
   [TextureKeys.CustomerRegular]: { width: 180, height: 340, paint: paintCustomer(CUSTOMER_LOOKS.regular) },
   [TextureKeys.DonutPlain]: { width: 320, height: 320, paint: paintDonut },
-  [TextureKeys.Fryer]: { width: 760, height: 460, paint: paintFryer },
+  [TextureKeys.Fryer]: { width: 760, height: 440, paint: paintFryer },
+  [TextureKeys.FryGrate]: { width: 690, height: 360, paint: paintFryGrate },
+  [TextureKeys.DonutFry]: { width: 160, height: 160, paint: paintDonutFry },
   [TextureKeys.GlazeBowl]: { width: 260, height: 170, paint: paintGlazeBowl },
   [TextureKeys.ToppingJar]: { width: 160, height: 220, paint: paintToppingJar },
   [TextureKeys.DonutBox]: { width: 620, height: 420, paint: paintDonutBox },

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { menu, session } from '../systems/services';
+import { isClockPaused, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
@@ -47,7 +47,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
-    session().tick(Math.min(delta, MAX_TICK_MS));
+    if (!isClockPaused()) session().tick(Math.min(delta, MAX_TICK_MS));
   }
 
   get currentStation(): StationKey {

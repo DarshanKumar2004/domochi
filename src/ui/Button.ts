@@ -49,7 +49,8 @@ export class Button extends Phaser.GameObjects.Container {
     this.on('pointerdown', () => {
       if (!this.enabled) return;
       this.pressed = true;
-      this.setScale(0.96);
+      // Press effect scales the contents, so a layout scale on the button itself is kept.
+      this.each((child: Phaser.GameObjects.Components.Transform) => child.setScale(0.96));
     });
     this.on('pointerout', () => this.release());
     this.on('pointerup', () => {
@@ -83,6 +84,6 @@ export class Button extends Phaser.GameObjects.Container {
 
   private release(): void {
     this.pressed = false;
-    this.setScale(1);
+    this.each((child: Phaser.GameObjects.Components.Transform) => child.setScale(1));
   }
 }

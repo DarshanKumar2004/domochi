@@ -1,11 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { findNamed, seedTutorialDone, shot, tapNamed, waitForScene } from './helpers';
-
-/** Advance the game clock (customers arrive on a timer). */
-async function advance(page: Page, ms: number): Promise<void> {
-  await page.evaluate((t) => (window as unknown as { __session: { tick(ms: number): void } }).__session.tick(t), ms);
-}
+import { advance, findNamed, seedTutorialDone, shot, tapNamed, waitForScene } from './helpers';
 
 async function takeFrontOrder(page: Page, expectTicket: number): Promise<void> {
   await tapNamed(page, SceneKeys.Lobby, 'customer-front');

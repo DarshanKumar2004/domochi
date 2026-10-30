@@ -89,6 +89,14 @@ export class TicketRail extends Phaser.GameObjects.Container {
       .text({ x: 14, y: 26 + (active ? -6 : 0), text: `#${t.no}`, style: { fontFamily: FONT_FAMILY, fontSize: '34px', fontStyle: 'bold', color: CSS.ink } }, false)
       .setOrigin(0, 0.5);
     c.add(label);
+    if (t.results.fry && !held) {
+      c.add(
+        this.scene.make
+          .text({ x: TICKET_W - 12, y: 26 + (active ? -6 : 0), text: 'fried', style: { fontFamily: FONT_FAMILY, fontSize: '22px', color: CSS.ink } }, false)
+          .setOrigin(1, 0.5)
+          .setName(`ticket-${t.no}-fried`),
+      );
+    }
     if (held) {
       c.add(
         this.scene.make

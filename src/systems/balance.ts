@@ -1,4 +1,5 @@
 // Types and helpers for src/data/balance.json.
+import type { FryBalance } from '../stations/fry';
 
 export interface Range {
   min: number;
@@ -14,6 +15,7 @@ export interface Balance {
   };
   orderSizeByDay: Range[];
   favoriteWeight: number;
+  fry: FryBalance;
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */
@@ -37,5 +39,18 @@ export function validateBalance(b: Balance): string[] {
   if (b.orderSizeByDay.length === 0) errors.push('orderSizeByDay is empty');
   for (const r of b.orderSizeByDay) if (badRange(r, 1)) errors.push(`orderSizeByDay ${JSON.stringify(r)} needs 1 <= min <= max`);
   if (!(b.favoriteWeight >= 1)) errors.push('favoriteWeight must be >= 1');
+
+  const f = b.fry;
+  if (!(f.dial.minF < f.dial.maxF)) errors.push('fry.dial needs minF < maxF');
+  if (!(f.idealRangeF.min >= f.dial.minF && f.idealRangeF.max <= f.dial.maxF && f.idealRangeF.min < f.idealRangeF.max)) {
+    errors.push('fry.idealRangeF must sit inside the dial range');
+  }
+  if (!(f.cookRate.zeroAtF < f.cookRate.oneAtF && f.cookRate.max >= 1)) errors.push('fry.cookRate needs zeroAtF < oneAtF and max >= 1');
+  if (!(f.secondsPerSide > 0 && f.heatLagPerSec > 0)) errors.push('fry.secondsPerSide and heatLagPerSec must be > 0');
+  if (!(f.topFactorFloating >= 0 && f.topFactorFloating < f.topFactorGrate && f.topFactorGrate <= 1)) {
+    errors.push('fry needs 0 <= topFactorFloating < topFactorGrate <= 1');
+  }
+  if (!(f.doneness.perfectWithin < f.doneness.zeroAt)) errors.push('fry.doneness needs perfectWithin < zeroAt');
+  if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');
   return errors;
 }

@@ -24,7 +24,9 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `customer-parent` | `public/assets/customer-parent.png` | 180×340 | 1 | Placeholder (code) | Parent: purple top. Origin at the bottom centre. Picked by `sprite` in customers.json. |
 | `customer-regular` | `public/assets/customer-regular.png` | 180×340 | 1 | Placeholder (code) | Regular: black domochi tee. Origin at the bottom centre. Picked by `sprite` in customers.json. |
 | `donut-plain` | `public/assets/donut-plain.png` | 320×320 | 1 | Placeholder (code) | Plain pon de ring (8 balls), before glaze. |
-| `fryer` | `public/assets/fryer.png` | 760×460 | 1 | Placeholder (code) | Fry station: oil vat, heat dial and oil gauge. |
+| `fryer` | `public/assets/fryer.png` | 760×440 | 1 | Placeholder (code) | Fryer vat seen from the front-top. The oil surface (where donuts float) is the inner area at about (56, 56, 648, 328). Controls (dial, gauges) are separate UI, not part of this art. |
+| `fry-grate` | `public/assets/fry-grate.png` | 690×360 | 1 | Placeholder (code) | Pressing grate laid over the oil; moves down while held. Mostly transparent between the bars. |
+| `donut-fry` | `public/assets/donut-fry.png` | 160×160 | 1 | Placeholder (code) | **Must be white or greyscale:** it's tinted at runtime from raw (pale) to golden to burnt by `fryColor()`. Plain pon de ring, no glaze. |
 | `glaze-bowl` | `public/assets/glaze-bowl.png` | 260×170 | 1 | Placeholder (code) | Bowl of glaze at the Glaze station. |
 | `topping-jar` | `public/assets/topping-jar.png` | 160×220 | 1 | Placeholder (code) | Jar of toppings at the Toppings station. |
 | `donut-box` | `public/assets/donut-box.png` | 620×420 | 1 | Placeholder (code) | Open box with 6 slots at the Box station. |

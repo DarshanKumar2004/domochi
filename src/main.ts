@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config';
 import { SaveService } from './systems/SaveService';
-import { hasSession, session, setSave, setSeed } from './systems/services';
+import { hasSession, session, setClockPaused, setSave, setSeed } from './systems/services';
 import { createDefaultStorage } from './systems/storage';
 import { measureGameSize, watchContainerSize } from './ui/viewport';
 
@@ -19,8 +19,9 @@ async function start(): Promise<void> {
   watchContainerSize(game, container);
 
   // Exposed for Playwright tests.
-  const w = window as unknown as { __game: Phaser.Game; __session?: unknown };
+  const w = window as unknown as { __game: Phaser.Game; __session?: unknown; __setClockPaused: (p: boolean) => void };
   w.__game = game;
+  w.__setClockPaused = setClockPaused;
   Object.defineProperty(w, '__session', { get: () => (hasSession() ? session() : undefined) });
 }
 

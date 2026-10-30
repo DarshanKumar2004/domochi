@@ -6,7 +6,7 @@ import { CSS, FONT_FAMILY } from '../ui/theme';
 import { onLayout } from '../ui/viewport';
 import { SceneKeys } from './sceneKeys';
 
-const ROWS = ['Fry', 'Glaze', 'Toppings', 'Box'];
+const ROWS = ['Glaze', 'Toppings', 'Box'];
 const CARD_W = 860;
 const CARD_H = 900; // fits both orientations (landscape height is 1080)
 
@@ -53,11 +53,16 @@ export class ServeScene extends Phaser.Scene {
     );
 
     const rowStyle = { fontFamily: FONT_FAMILY, fontSize: '50px', color: CSS.ink };
-    const rows: [string, string][] = [...ROWS.map((r): [string, string] => [r, '—']), ['Wait time', `${Math.round(this.waitMs / 1000)}s`]];
+    const fry = ticket?.results.fry;
+    const rows: [string, string][] = [
+      ['Fry', fry ? String(fry.score) : 'not fried'],
+      ...ROWS.map((r): [string, string] => [r, '—']),
+      ['Wait time', `${Math.round(this.waitMs / 1000)}s`],
+    ];
     rows.forEach(([label, value], i) => {
       const y = -170 + i * 80;
       card.add(this.add.text(-340, y, label, rowStyle).setOrigin(0, 0.5));
-      card.add(this.add.text(340, y, value, rowStyle).setOrigin(1, 0.5).setName(label === 'Wait time' ? 'serve-wait' : ''));
+      card.add(this.add.text(340, y, value, rowStyle).setOrigin(1, 0.5).setName(`serve-${label.toLowerCase().replace(' ', '-')}`));
     });
     card.add(
       this.add

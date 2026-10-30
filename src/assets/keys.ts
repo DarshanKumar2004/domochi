@@ -12,6 +12,8 @@ export const TextureKeys = {
   CustomerRegular: 'customer-regular',
   DonutPlain: 'donut-plain',
   Fryer: 'fryer',
+  FryGrate: 'fry-grate',
+  DonutFry: 'donut-fry',
   GlazeBowl: 'glaze-bowl',
   ToppingJar: 'topping-jar',
   DonutBox: 'donut-box',

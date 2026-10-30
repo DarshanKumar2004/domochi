@@ -92,3 +92,24 @@ Kumar shared photos of the real trailer and A-frame sign, confirmed the setting 
 - **Performance: donut icons are cached textures.** Phaser Graphics re-draw every shape every frame, so tickets full of Graphics donuts would cost hundreds of shapes per frame. Each flavour's icon is now drawn once into a `donut-icon:<flavor>` texture and reused as an image. These are runtime cache textures, not art, so they're not in `keys.ts`. I checked for leaks: object, tween and texture counts stay flat over time.
 - **Playwright is capped at 3 workers.** Headless Chromium renders WebGL on the CPU, so with this machine's 16 threads Playwright defaulted to 8 parallel browsers. They starved each other and long flows timed out. One at a time, everything passed, which confirmed it was load rather than a bug.
 - **Not saved yet:** a day in progress isn't saved, so a reload starts the day fresh. Day progress and save/load are Phase 6.
+
+## Phase 3: Fry station (2026-10-30)
+
+- **The simulation is `src/stations/fry.ts` (`Fryer`).** It's pure, frame-rate independent (oil heats with an exponential lag, so 30 fps and 144 fps match) and allocation-free per tick. 17 unit tests cover it, plus session tests.
+- **The model:**
+  - Each donut has two sides. The *underside* cooks in the oil at a rate set by temperature (0 at 250°F, 1× at 350°F, capped at 1.8×).
+  - The floating *top* cooks at 5% of that, or 60% while you **hold the grate**. **Flip** swaps the sides.
+  - So there are two valid techniques: flip once (classic), or hold the grate (faster, but you have to keep a finger on it).
+  - Dropping donuts cools the oil by 5°F each, and topping up mixes in room-temperature oil.
+  - Oil soaks up 4% per donut. Below 35% the batch fries unevenly, using a fixed per-slot spread so it's reproducible.
+  - All numbers are in `balance.json` → `fry`, and `validateBalance` checks they make sense.
+- **Scoring:**
+  - **Doneness (60%):** each side is perfect within ±0.1 of golden, falling to 0 at ±0.6.
+  - **Time in the ideal 340–360°F range (25%)** and **evenness between donuts (15%)**.
+  - *Design fix found by a unit test:* temperature and evenness are now **multiplied by doneness**. Before, a fully burnt batch fried at a perfect temperature still scored 40/100. Now burnt scores ~0, and a perfect fry still scores 100.
+- **The fryer lives in the `GameSession`,** ticked by the session clock, so oil heats and donuts keep cooking or burning while you're at another station (Papa's style). Leaving the station releases the grate. A batch belongs to the ticket it was dropped for, even if you select a different ticket mid-fry. Results are stored on `ticket.results.fry`, shown as "fried" on the rail ticket and as the real score on the result card.
+- **Rendering:** a white `donut-fry` texture is tinted every frame by `fryColor()` (raw → golden → burnt) for the side facing up. Two meters show underside and top against the golden band. The dial is draggable (±135°, snapping to 5°F) with the ideal arc marked, alongside a thermometer, an oil gauge, and context hints ("oil is cool: turn up the heat"). Text only updates when its value changes.
+- **Fry-station header goes over the control panel in landscape** (`StationScene.headerPosition` can be overridden), so it doesn't overlap the vat.
+- **Bug fixed: Button press effect.** It used to scale the whole button to 0.96 and back to 1, which wiped out any layout scale, such as the landscape Settings button. It now scales the button's contents.
+- **Tests can pause the real-time clock** (`__setClockPaused`) and drive time with `advance()`. Without it, slow software-rendered screenshots let real time pass and the donuts genuinely burned in the test.
+- **New `HoldButton`** for press-and-hold controls. It releases on pointer-up anywhere, on sliding off, or when disabled.

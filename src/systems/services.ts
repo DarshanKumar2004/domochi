@@ -17,6 +17,16 @@ export const balance = balanceJson as Balance;
 let saveService: SaveService | null = null;
 let currentSession: GameSession | null = null;
 let seedOverride: number | null = null;
+let clockPaused = false;
+
+/** Tests pause the real-time clock and drive time with session().tick() instead. */
+export function setClockPaused(paused: boolean): void {
+  clockPaused = paused;
+}
+
+export function isClockPaused(): boolean {
+  return clockPaused;
+}
 
 export function setSave(s: SaveService): void {
   saveService = s;

@@ -94,14 +94,54 @@ export async function findNamed(page: Page, sceneKey: string, name: string): Pro
   return (await handle.jsonValue()) as { x: number; y: number };
 }
 
-/** Tap (touch devices) or click (desktop) a point given in game coordinates. */
-export async function tapGame(page: Page, x: number, y: number): Promise<void> {
+/** Convert game coordinates to page (CSS pixel) coordinates. */
+export async function toPage(page: Page, x: number, y: number): Promise<{ px: number; py: number }> {
   const box = await page.locator('#game canvas').boundingBox();
   expect(box).not.toBeNull();
   const { width } = await gameSize(page);
   const scale = box!.width / width;
-  const px = box!.x + x * scale;
-  const py = box!.y + y * scale;
+  return { px: box!.x + x * scale, py: box!.y + y * scale };
+}
+
+/** Press and hold the pointer on a named object; returns a release function. */
+export async function holdNamed(page: Page, sceneKey: string, name: string): Promise<() => Promise<void>> {
+  const p = await findNamed(page, sceneKey, name);
+  const { px, py } = await toPage(page, p.x, p.y);
+  await page.mouse.move(px, py);
+  await page.mouse.down();
+  return () => page.mouse.up();
+}
+
+/** Drag from a named object's centre by (dx, dy) game pixels. */
+export async function dragFromNamed(page: Page, sceneKey: string, name: string, dx: number, dy: number): Promise<void> {
+  const p = await findNamed(page, sceneKey, name);
+  const from = await toPage(page, p.x, p.y);
+  const to = await toPage(page, p.x + dx, p.y + dy);
+  await page.mouse.move(from.px, from.py);
+  await page.mouse.down();
+  await page.mouse.move(to.px, to.py, { steps: 8 });
+  await page.mouse.up();
+}
+
+/** Stop the real-time game clock so a test controls time exactly with advance(). */
+export async function pauseClock(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __setClockPaused(p: boolean): void }).__setClockPaused(true));
+}
+
+/** Advance the game clock in small steps, like real frames (customers, fryer…). */
+export async function advance(page: Page, ms: number, stepMs = 100): Promise<void> {
+  await page.evaluate(
+    ([total, step]) => {
+      const s = (window as unknown as { __session: { tick(ms: number): void } }).__session;
+      for (let t = 0; t < total; t += step) s.tick(Math.min(step, total - t));
+    },
+    [ms, stepMs] as const,
+  );
+}
+
+/** Tap (touch devices) or click (desktop) a point given in game coordinates. */
+export async function tapGame(page: Page, x: number, y: number): Promise<void> {
+  const { px, py } = await toPage(page, x, y);
   // Tapped points must be on screen, or the layout put something out of reach.
   const vp = page.viewportSize()!;
   expect(px).toBeGreaterThanOrEqual(0);

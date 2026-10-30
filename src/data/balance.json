@@ -14,5 +14,24 @@
     { "min": 2, "max": 6 },
     { "min": 3, "max": 6 }
   ],
-  "favoriteWeight": 3
+  "favoriteWeight": 3,
+  "fry": {
+    "_note": "Temperatures in °F. Doneness: 0 = raw dough, 1 = golden, ~1.5+ = dark.",
+    "roomTempF": 75,
+    "startTempF": 300,
+    "startTargetF": 350,
+    "dial": { "minF": 250, "maxF": 425 },
+    "heatLagPerSec": 0.35,
+    "idealRangeF": { "min": 340, "max": 360 },
+    "cookRate": { "zeroAtF": 250, "oneAtF": 350, "max": 1.8 },
+    "secondsPerSide": 6,
+    "topFactorFloating": 0.05,
+    "topFactorGrate": 0.6,
+    "dropCoolPerDonutF": 5,
+    "oil": { "start": 1, "perDonut": 0.04, "topUp": 0.25, "lowThreshold": 0.35, "minToFry": 0.05 },
+    "unevenAtEmpty": 0.5,
+    "doneness": { "perfectWithin": 0.1, "zeroAt": 0.6 },
+    "evennessZeroAtStdDev": 0.25,
+    "scoreWeights": { "doneness": 0.6, "temperature": 0.25, "evenness": 0.15 }
+  }
 }

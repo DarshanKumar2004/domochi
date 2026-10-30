@@ -1,5 +1,6 @@
 // One day at the trailer: customers arriving, orders, tickets and serving.
 // Pure logic driven by tick(dtMs); scenes render from it and call its actions.
+import { Fryer, type FryResult } from '../stations/fry';
 import { forDay, type Balance } from './balance';
 import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
 import { Emitter } from './events';
@@ -30,6 +31,8 @@ export interface Ticket {
   status: TicketStatus;
   takenAtMs: number;
   servedAtMs?: number;
+  /** Per-station results, filled in as the order moves through the kitchen. */
+  results: { fry?: FryResult };
 }
 
 export interface ServedEvent {
@@ -62,6 +65,8 @@ export class GameSession {
   readonly events = new Emitter<SessionEvents>();
   readonly day: number;
   readonly customersToday: number;
+  /** The fryer keeps running (heating, cooking) whichever station you're at. */
+  readonly fryer: Fryer;
 
   private now = 0;
   private nextSpawnAtMs: number;
@@ -77,6 +82,7 @@ export class GameSession {
     this.day = deps.day;
     this.customersToday = forDay(deps.balance.customersPerDay, deps.day);
     this.nextSpawnAtMs = deps.balance.spawn.firstDelaySec * 1000;
+    this.fryer = new Fryer(deps.balance.fry);
   }
 
   // ---- Queries ---------------------------------------------------------------
@@ -140,6 +146,7 @@ export class GameSession {
 
   tick(dtMs: number): void {
     this.now += dtMs;
+    this.fryer.tick(dtMs / 1000);
     const { spawn } = this.deps.balance;
     // If the line is full, the next customer arrives as soon as there's room.
     if (this.spawned < this.customersToday && this.now >= this.nextSpawnAtMs && this.line.length < spawn.maxInLine) {
@@ -174,6 +181,7 @@ export class GameSession {
       line: pickLine(type.lines.order, rng, { order: describeOrder(menu, order) }),
       status: 'open',
       takenAtMs: this.now,
+      results: {},
     };
     this.allTickets.push(ticket);
     front.state = 'ordering';
@@ -198,6 +206,36 @@ export class GameSession {
     this.activeNo = no;
     this.events.emit('changed', undefined);
     return true;
+  }
+
+  /** Ticket whose donuts are in the fryer right now. */
+  get fryingTicket(): Ticket | undefined {
+    const b = this.fryer.batch;
+    return b ? this.ticket(b.ticketNo) : undefined;
+  }
+
+  /** Can the active ticket's donuts go in the fryer? */
+  get canStartFrying(): boolean {
+    const t = this.activeTicket;
+    return !!t && t.status === 'open' && !t.results.fry && this.fryer.canDrop;
+  }
+
+  /** Drop the active ticket's donuts into the fryer. */
+  startFrying(): Ticket {
+    const t = this.activeTicket;
+    if (!t || !this.canStartFrying) throw new Error('cannot start frying now');
+    this.fryer.drop(t.no, t.order.flavors.length);
+    this.events.emit('changed', undefined);
+    return t;
+  }
+
+  /** Lift the batch out; its score is stored on that ticket. */
+  pullFry(): FryResult {
+    const result = this.fryer.pull();
+    const t = this.ticket(result.ticketNo);
+    if (t) t.results.fry = result;
+    this.events.emit('changed', undefined);
+    return result;
   }
 
   /** Close the box on the active ticket and pick it up. */
