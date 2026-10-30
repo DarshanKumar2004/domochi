@@ -1,30 +1,60 @@
 {
-  "_source": "Real domochi menu from domochitreats.com (Square Online store), fetched 2026-10-30. Names and prices are exact. Game fields (glaze style, colors, unlockDay) are game design, not from the shop. Drizzles and the cookie on cookie butter are from the A-frame sign photo Kumar shared (2026-10-30).",
+  "_source": "Real domochi menu from domochitreats.com (Square Online store), fetched 2026-10-30. Names and prices are exact. Game fields (glaze style, colors, unlockDay) are game design, not from the shop. Drizzles and the cookie on cookie butter are from the A-frame sign photo Kumar shared (2026-10-30). Glaze speckles (strawberry seeds, cookie crumbs, nut bits) are game art detail.",
   "currency": "USD",
   "glazes": [
     {
       "id": "strawberry",
       "name": "strawberry glaze",
       "style": "dip",
-      "color": "#f4a6c0"
+      "color": "#f4a6c0",
+      "speckles": {
+        "colors": [
+          "#d9506f",
+          "#ff7aa2",
+          "#c23b5c"
+        ],
+        "density": 0.55
+      }
     },
     {
       "id": "chocolate-hazelnut",
       "name": "chocolate hazelnut glaze",
       "style": "dip",
-      "color": "#6b3f2a"
+      "color": "#6b3f2a",
+      "speckles": {
+        "colors": [
+          "#9c6b4a",
+          "#4a2a1a"
+        ],
+        "density": 0.35
+      }
     },
     {
       "id": "cookie-butter",
       "name": "cookie butter glaze",
       "style": "dip",
-      "color": "#c68a4e"
+      "color": "#c68a4e",
+      "speckles": {
+        "colors": [
+          "#8f5a2b",
+          "#e0a96d"
+        ],
+        "density": 0.45
+      }
     },
     {
       "id": "cookies-and-cream",
       "name": "cookies & cream glaze",
       "style": "dip",
-      "color": "#f1ece4"
+      "color": "#f1ece4",
+      "speckles": {
+        "colors": [
+          "#2b2420",
+          "#4a3f39",
+          "#1f1a17"
+        ],
+        "density": 0.75
+      }
     },
     {
       "id": "sweet",

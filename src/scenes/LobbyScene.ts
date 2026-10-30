@@ -37,7 +37,6 @@ const LAYOUT = {
         [350, 1440],
       ],
     },
-    bannerY: 50,
   },
   landscape: {
     groundY: 380,
@@ -58,7 +57,6 @@ const LAYOUT = {
         [1810, 715],
       ],
     },
-    bannerY: 40,
   },
 } as const;
 
@@ -75,7 +73,6 @@ interface CustomerView {
 export class LobbyScene extends Phaser.Scene {
   private views = new Map<number, CustomerView>();
   private frontTag!: Phaser.GameObjects.Text;
-  private banner!: Phaser.GameObjects.Text;
   private doneText!: Phaser.GameObjects.Text;
   private bubble: SpeechBubble | null = null;
 
@@ -108,18 +105,6 @@ export class LobbyScene extends Phaser.Scene {
       .setDepth(10);
     this.tweens.add({ targets: this.frontTag, scale: 1.1, duration: 500, yoyo: true, repeat: -1 });
 
-    this.banner = this.add
-      .text(0, 0, '', {
-        fontFamily: FONT_FAMILY,
-        fontSize: '44px',
-        fontStyle: 'bold',
-        color: CSS.ink,
-        backgroundColor: CSS.pink,
-        padding: { x: 28, y: 14 },
-      })
-      .setOrigin(0.5)
-      .setDepth(20)
-      .setName('banner-carry');
     this.doneText = this.add
       .text(0, 0, "that's everyone for today!\n(the end-of-day summary arrives in Phase 6)", {
         fontFamily: FONT_FAMILY,
@@ -150,7 +135,6 @@ export class LobbyScene extends Phaser.Scene {
       sign.setPosition(c.x + L.sign.x, c.y + L.sign.feetY).setScale(L.sign.scale);
       waiting.setPosition(c.x + L.waiting.x, c.y + L.waiting.y).setSize(L.waiting.w, L.waiting.h);
       waitingLabel.setPosition(c.x + L.waiting.x, c.y + L.waiting.labelY);
-      this.banner.setPosition(v.width / 2, c.y + L.bannerY);
       this.doneText.setPosition(c.x + c.width / 2, c.y + (v.orientation === 'landscape' ? 160 : 230));
       this.sync(true);
     });
@@ -192,8 +176,6 @@ export class LobbyScene extends Phaser.Scene {
       this.frontTag.setPosition(frontView.image.x, frontView.image.y - CUSTOMER_H * frontView.image.scale - 50);
     }
 
-    const held = s.heldTicket;
-    this.banner.setVisible(!!held).setText(held ? `hand box #${held.no} to its customer` : '');
     this.doneText.setVisible(s.isDayComplete);
   }
 
@@ -301,14 +283,8 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     if (cust.state === 'waiting') {
-      const r = s.handTo(id);
-      if (r.ok) {
-        this.scene.launch(SceneKeys.Serve, { ticketNo: r.ticket.no, waitMs: r.waitMs });
-      } else if (r.reason === 'notMine') {
-        this.say(view, r.line);
-      } else if (r.reason === 'noBox') {
-        this.say(view, `#${cust.ticketNo} isn't boxed yet. finish it at the Box station!`);
-      }
+      // Orders are handed over automatically when their box is closed.
+      this.say(view, `#${cust.ticketNo}: can't wait! (close my box at the Box station)`);
     }
   }
 

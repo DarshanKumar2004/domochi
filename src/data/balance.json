@@ -38,19 +38,25 @@
     "burntAt": 1.75,
     "evennessZeroAtStdDev": 0.25,
     "slots": 6,
-    "rackCapacity": 12,
+    "rackCapacity": 6,
     "scoreWeights": { "doneness": 0.6, "temperature": 0.25, "evenness": 0.15 }
   },
   "glaze": {
-    "_note": "Coordinates are normalised to the donut (centre 0,0, edges ±1). Scores: coverage/goodCoverage × (1 − spill/spillZeroAt), × wrongGlazeFactor for the wrong glaze.",
+    "_note": "Coordinates are normalised to the donut (centre 0,0, edges ±1). Base coat: coverage/goodCoverage × (1 − spill/spillZeroAt). Drizzle: right amount × spread over the 8 balls × (1 − spill/spillZeroAt). Wrong glaze × wrongGlazeFactor.",
     "gridSize": 48,
     "ringRadius": 0.65,
     "ballOverlap": 1.15,
     "edgeMargin": 0.08,
-    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.07 },
-    "goodCoverage": { "dip": 0.9, "dust": 0.85, "drizzle": 0.75 },
+    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.045 },
+    "goodCoverage": { "dip": 0.9, "dust": 0.85 },
+    "drizzleAmount": { "idealMin": 0.18, "idealMax": 0.5, "zeroAt": 0.9 },
+    "drizzleBallTouched": 0.06,
     "spillZeroAt": 0.6,
     "wrongGlazeFactor": 0.3,
-    "stripes": { "count": 3, "spacing": 0.42, "width": 0.12, "angleDeg": 20, "margin": 0.08 }
+    "missingDrizzleScore": 0,
+    "unwantedDrizzleFactor": 0.6,
+    "drizzleWeight": 0.35,
+    "fallMs": 140,
+    "shelfCapacity": 6
   }
 }

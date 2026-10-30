@@ -206,7 +206,7 @@ describe('order results from rack donuts', () => {
   });
 
   it('an overdone set scores near zero even fried at a perfect temperature', () => {
-    const r = fryResultFromDonuts(1, [{ a: 1.7, b: 1.7, temperature: 1, score: 0 }], B);
+    const r = fryResultFromDonuts(1, [{ id: 1, a: 1.7, b: 1.7, temperature: 1, score: 0 }], B);
     expect(r.score).toBeLessThan(5);
   });
 });

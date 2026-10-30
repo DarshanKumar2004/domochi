@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
-import { fryColor, fryVerdict, type FryResult } from '../stations/fry';
+import { fryColor } from '../stations/fry';
 import { session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { HoldButton } from '../ui/HoldButton';
@@ -11,7 +11,7 @@ import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
 
 /** Doneness shown on the per-donut meters goes 0 → METER_MAX (golden = 1). */
-const METER_MAX = 1.8;
+const METER_MAX = 1.5;
 const RACK_SHOWN = 6;
 const DIAL_R = 120;
 /** Dial sweep either side of 12 o'clock, in degrees. */
@@ -41,6 +41,8 @@ interface Meter {
 interface SlotView {
   img: Phaser.GameObjects.Image;
   meterBg: Phaser.GameObjects.Rectangle;
+  /** Gold zone on the meter: when a bar ends inside it, that side is golden. */
+  band: Phaser.GameObjects.Rectangle;
   under: Phaser.GameObjects.Rectangle;
   top: Phaser.GameObjects.Rectangle;
   /** Tweened animation offsets layered on the slot position. */
@@ -70,7 +72,6 @@ const LAYOUT = {
     dispenser: { x: 130, y: 205, scale: 0.8 },
     rack: { x: 40, y: 790, w: 760, h: 120, minisX: 190, step: 74, size: 64 },
     trash: { x: 940, y: 850, size: 140 },
-    useRack: { x: 920, y: 1000, scale: 1 },
     dial: { x: 190, y: 1075 },
     temp: { x: 400, y: 1000, barY: 1092, barW: 620 },
     oil: { labelX: 400, barX: 480, barW: 320, y: 1185, buttonX: 930 },
@@ -82,7 +83,6 @@ const LAYOUT = {
     dispenser: { x: 140, y: 100, scale: 0.65 },
     rack: { x: 40, y: 522, w: 650, h: 100, minisX: 190, step: 64, size: 56 },
     trash: { x: 800, y: 572, size: 110 },
-    useRack: { x: 160, y: 712, scale: 0.8 },
     dial: { x: 1180, y: 330 },
     temp: { x: 1350, y: 250, barY: 335, barW: 500 },
     oil: { labelX: 1350, barX: 1430, barW: 260, y: 425, buttonX: 1800 },
@@ -110,11 +110,12 @@ export class FryScene extends StationScene {
   private rackMore!: Phaser.GameObjects.Text;
   private dial!: Phaser.GameObjects.Container;
   private needle!: Phaser.GameObjects.Container;
+  private idealArc!: Phaser.GameObjects.Graphics;
+  private shownDrift = 0;
   private grateButton!: HoldButton;
   private dropButton!: Button;
   private pullAllButton!: Button;
   private oilButton!: Button;
-  private rackButton!: Button;
 
   private draggingDial = false;
   // Last-shown values, so update() only touches text when something changed.
@@ -143,6 +144,7 @@ export class FryScene extends StationScene {
     this.slotViews = [];
     this.rackMinis = [];
     this.shownTemp = this.shownTarget = NaN;
+    this.shownDrift = 0;
     this.shownHint = null;
     const fb = session().fryer.balance;
     // A small movement threshold, so a tap flips instead of starting a drag.
@@ -174,7 +176,7 @@ export class FryScene extends StationScene {
       .setName('fry-result');
 
     this.rackLabel = text(36, CSS.cream, true).setOrigin(0, 0.5).setText('rack').setName('fry-rack');
-    for (let i = 0; i < RACK_SHOWN; i++) this.rackMinis.push(this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false));
+    for (let i = 0; i < RACK_SHOWN; i++) this.rackMinis.push(this.makeRackMini(i));
     this.rackMore = text(34).setOrigin(0, 0.5);
 
     this.buildDial();
@@ -189,14 +191,6 @@ export class FryScene extends StationScene {
       fill: COLORS.dough,
       name: 'btn-add-oil',
     });
-    this.rackButton = new Button(this, 0, 0, 'use rack', () => this.useRack(), {
-      width: 210,
-      height: 120,
-      fontSize: 36,
-      fill: COLORS.pink,
-      name: 'btn-use-rack',
-    });
-
     // Leaving the station lets go of the grate and any donut being dragged.
     this.events.on(Phaser.Scenes.Events.SLEEP, this.onSleep, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.SLEEP, this.onSleep, this));
@@ -215,6 +209,7 @@ export class FryScene extends StationScene {
     const view: SlotView = {
       img,
       meterBg: this.add.rectangle(0, 0, 1, 30, 0x1f1a17, 0.85).setDepth(4).setVisible(false),
+      band: this.add.rectangle(0, 0, 1, 30, GOLD, 0.55).setOrigin(0, 0.5).setDepth(4).setVisible(false),
       under: this.add.rectangle(0, 0, 1, 10, 0xffffff).setOrigin(0, 0.5).setDepth(4).setVisible(false),
       top: this.add.rectangle(0, 0, 1, 10, 0xffffff).setOrigin(0, 0.5).setDepth(4).setVisible(false),
       dx: 0,
@@ -248,6 +243,29 @@ export class FryScene extends StationScene {
     return view;
   }
 
+/** A rack donut: drag it into the trash to throw just that one away. */
+  private makeRackMini(i: number): Phaser.GameObjects.Image {
+    const img = this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false).setName(`fry-rack-${i}`).setDepth(5);
+    img.setInteractive({ draggable: true, useHandCursor: true });
+    img.on(Phaser.Input.Events.DRAG_START, () => img.setDepth(12));
+    img.on(Phaser.Input.Events.DRAG, (_p: Phaser.Input.Pointer, x: number, y: number) => img.setPosition(x, y));
+    img.on(Phaser.Input.Events.DRAG_END, (p: Phaser.Input.Pointer) => {
+      img.setDepth(5);
+      if (this.overTrash(p.worldX, p.worldY) && session().trashRackDonut(i)) {
+        this.ghost(p.worldX, p.worldY, img.tintTopLeft, img.displayWidth, { x: this.trashBin.x, y: this.trashBin.y - 10, size: 20 });
+      }
+      const home = this.rackSpot(i);
+      img.setPosition(home.x, home.y);
+    });
+    return img;
+  }
+
+  /** Is (x, y) over the trash can? Generous, so a quick fling still lands. */
+  private overTrash(x: number, y: number): boolean {
+    const bin = this.trashBin;
+    return Phaser.Math.Distance.Between(x, y, bin.x, bin.y) < Math.max(bin.displayWidth, 150);
+  }
+
   private makeMeter(label: string, band: [number, number], bandColor: number, bandAlpha = 0.9): Meter {
     return {
       label: this.add.text(0, 0, label, { fontFamily: FONT_FAMILY, fontSize: '36px', color: CSS.cream }).setOrigin(0, 0.5),
@@ -272,7 +290,6 @@ export class FryScene extends StationScene {
   }
 
   private buildDial(): void {
-    const fb = session().fryer.balance;
     const face = this.make.graphics({}, false);
     face.fillStyle(0x000000, 0.25);
     face.fillCircle(0, 8, DIAL_R);
@@ -281,11 +298,6 @@ export class FryScene extends StationScene {
     face.lineStyle(6, COLORS.ink);
     face.strokeCircle(0, 0, DIAL_R);
     // Ideal range arc. Phaser angles: 0 = 3 o'clock, clockwise; our dial angle 0 = 12 o'clock.
-    const toRad = (f: number) => Phaser.Math.DegToRad(this.dialAngleFor(f, fb.dial.minF, fb.dial.maxF) - 90);
-    face.lineStyle(16, GOOD);
-    face.beginPath();
-    face.arc(0, 0, DIAL_R - 18, toRad(fb.idealRangeF.min), toRad(fb.idealRangeF.max));
-    face.strokePath();
     face.lineStyle(4, COLORS.ink);
     for (let a = -DIAL_SWEEP; a <= DIAL_SWEEP; a += 27) {
       const r = Phaser.Math.DegToRad(a - 90);
@@ -300,7 +312,9 @@ export class FryScene extends StationScene {
     this.needle = this.add.container(0, 0, [needleBar]);
     const hit = this.add.zone(0, 0, DIAL_R * 2.4, DIAL_R * 2.4).setName('fry-dial');
     hit.setInteractive(new Phaser.Geom.Circle(DIAL_R * 1.2, DIAL_R * 1.2, DIAL_R * 1.2), Phaser.Geom.Circle.Contains);
-    this.dial = this.add.container(0, 0, [face, cold, hot, this.needle, hub, hit]);
+    this.idealArc = this.make.graphics({}, false);
+    this.dial = this.add.container(0, 0, [face, this.idealArc, cold, hot, this.needle, hub, hit]);
+    this.drawIdealArc(0);
 
     hit.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.draggingDial = true;
@@ -310,6 +324,25 @@ export class FryScene extends StationScene {
       if (this.draggingDial && p.isDown) this.setDialFromPointer(p);
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, () => (this.draggingDial = false));
+  }
+
+  /**
+   * The green arc marks dial settings that give ideal oil. Low oil runs hotter
+   * (settleTemp = dial + drift), so the arc slides down by the drift: pointing
+   * the needle at green always means the oil will settle in the ideal range.
+   */
+  private drawIdealArc(drift: number): void {
+    const fb = session().fryer.balance;
+    const lo = Phaser.Math.Clamp(fb.idealRangeF.min - drift, fb.dial.minF, fb.dial.maxF);
+    const hi = Phaser.Math.Clamp(fb.idealRangeF.max - drift, fb.dial.minF, fb.dial.maxF);
+    // Phaser angles: 0 = 3 o'clock, clockwise; our dial angle 0 = 12 o'clock.
+    const toRad = (f: number) => Phaser.Math.DegToRad(this.dialAngleFor(f, fb.dial.minF, fb.dial.maxF) - 90);
+    this.idealArc.clear();
+    if (hi <= lo) return;
+    this.idealArc.lineStyle(16, GOOD);
+    this.idealArc.beginPath();
+    this.idealArc.arc(0, 0, DIAL_R - 18, toRad(lo), toRad(hi));
+    this.idealArc.strokePath();
   }
 
   private dialAngleFor(f: number, min: number, max: number): number {
@@ -347,7 +380,6 @@ export class FryScene extends StationScene {
     this.rackMinis.forEach((m, i) => m.setPosition(this.rackMini.x + i * L.rack.step, midY).setDisplaySize(L.rack.size, L.rack.size));
     this.rackMore.setPosition(this.rackMini.x + RACK_SHOWN * L.rack.step - L.rack.size / 2 + 4, midY);
     this.trashBin.setPosition(c.x + L.trash.x, c.y + L.trash.y).setDisplaySize(L.trash.size, L.trash.size);
-    this.rackButton.setPosition(c.x + L.useRack.x, c.y + L.useRack.y).setScale(L.useRack.scale);
 
     this.dial.setPosition(c.x + L.dial.x, c.y + L.dial.y);
     this.tempText.setPosition(c.x + L.temp.x, c.y + L.temp.y);
@@ -394,6 +426,12 @@ export class FryScene extends StationScene {
       this.targetText.setText(`dial: ${f.target}°F`);
       this.needle.angle = this.dialAngleFor(f.target, fb.dial.minF, fb.dial.maxF);
     }
+    // Redraw the green arc when the drift moves by 5°F or more.
+    const drift = Math.round((f.settleTemp - f.target) / 5) * 5;
+    if (drift !== this.shownDrift) {
+      this.shownDrift = drift;
+      this.drawIdealArc(drift);
+    }
     const tempColor = f.temp < fb.idealRangeF.min ? COOL : f.temp > fb.idealRangeF.max ? HOT : GOOD;
     this.setMeter(this.tempMeter, (f.temp - fb.dial.minF) / (fb.dial.maxF - fb.dial.minF), tempColor);
     this.tempText.setColor(f.inIdealRange ? CSS.cream : f.temp < fb.idealRangeF.min ? '#9fd8ff' : '#ff9a8a');
@@ -407,6 +445,7 @@ export class FryScene extends StationScene {
       if (!d) {
         v.img.setVisible(false);
         v.meterBg.setVisible(false);
+        v.band.setVisible(false);
         v.under.setVisible(false);
         v.top.setVisible(false);
         continue;
@@ -422,10 +461,15 @@ export class FryScene extends StationScene {
         .setTint(fryColor(d.up))
         .setAlpha(f.grateHeld && !v.dragging ? 0.85 : 1);
 
-      const mw = slot.size * 0.78;
+      const mw = slot.size * 0.95;
       const my = slot.y + slot.size * 0.5 + 2;
       const showMeter = !v.dragging && v.scale > 0.95;
       v.meterBg.setVisible(showMeter).setPosition(slot.x, my).setSize(mw + 10, 30);
+      const pw = fb.doneness.perfectWithin;
+      v.band
+        .setVisible(showMeter)
+        .setPosition(slot.x - mw / 2 + (mw * (1 - pw)) / METER_MAX, my)
+        .setSize((mw * 2 * pw) / METER_MAX, 30);
       v.under
         .setVisible(showMeter)
         .setPosition(slot.x - mw / 2, my - 7)
@@ -465,7 +509,7 @@ export class FryScene extends StationScene {
     const HINTS: Record<HintKey, string> = {
       empty: 'drop donuts in one at a time',
       noOil: 'the vat is nearly empty: add oil',
-      rackFull: 'the rack is full: use or trash some donuts',
+      rackFull: 'the rack is full: glaze or trash some',
       oilLow: 'oil is low: frying unevenly!',
       drift: 'less oil runs hotter: dial it back down',
       cool: 'oil is cool: turn up the heat',
@@ -478,15 +522,7 @@ export class FryScene extends StationScene {
   /** Subtitle, rack row and rack button: on session changes only. */
   private refresh(): void {
     const s = session();
-    const active = s.activeTicket;
-    if (!active) {
-      this.setSubtitle(`frying ahead · ${s.rack.length} on the rack`);
-    } else if (active.results.fry) {
-      this.setSubtitle(`#${active.no} fried · score ${active.results.fry.score}`);
-    } else {
-      const n = active.order.flavors.length;
-      this.setSubtitle(`#${active.no} needs ${n} donut${n === 1 ? '' : 's'} · rack has ${s.rack.length}`);
-    }
+    this.setSubtitle(`${s.rack.length} of ${s.fryer.balance.rackCapacity} on the rack · ${s.fryer.count} in the oil`);
 
     const rack = s.rack;
     this.rackMinis.forEach((m, i) => {
@@ -495,8 +531,6 @@ export class FryScene extends StationScene {
       if (d) m.setTint(fryColor((d.a + d.b) / 2));
     });
     this.rackMore.setText(rack.length > RACK_SHOWN ? `+${rack.length - RACK_SHOWN}` : '');
-    this.rackButton.setVisible(s.canUseRack);
-    if (active && !active.results.fry) this.rackButton.setLabel(`use rack (${active.order.flavors.length})`);
   }
 
   // ---- Actions ---------------------------------------------------------------
@@ -521,7 +555,7 @@ export class FryScene extends StationScene {
     const pad = 30;
     const overRack = x >= ra.x - pad && x <= ra.x + ra.w + pad && y >= ra.y - pad && y <= ra.y + ra.h + pad;
     const bin = this.trashBin;
-    const overTrash = Phaser.Math.Distance.Between(x, y, bin.x, bin.y) < bin.displayWidth * 0.75;
+    const overTrash = this.overTrash(x, y);
     const s = session();
     const tint = fryColor(s.fryer.slots[slot]?.up ?? 0);
 
@@ -554,12 +588,6 @@ export class FryScene extends StationScene {
       const from = this.slotPosition(slot);
       this.ghost(from.x, from.y, tints[slot]!, v.img.displayWidth, this.rackSpot(Math.min(before + k, RACK_SHOWN - 1)), k * 70);
     });
-  }
-
-  private useRack(): void {
-    const s = session();
-    if (!s.canUseRack) return;
-    this.showResult(s.useRack());
   }
 
   private rackSpot(index: number): { x: number; y: number; size: number } {
@@ -638,17 +666,5 @@ export class FryScene extends StationScene {
     this.tweens.killTweensOf(this.resultText);
     this.resultText.setText(text).setVisible(true).setAlpha(1);
     this.tweens.add({ targets: this.resultText, alpha: 0, delay: 1200, duration: 400, onComplete: () => this.resultText.setVisible(false) });
-  }
-
-  private showResult(r: FryResult): void {
-    this.tweens.killTweensOf(this.resultText);
-    this.resultText.setText(`#${r.ticketNo}  fry ${r.score}\n${fryVerdict(r.score)}`).setVisible(true).setAlpha(1);
-    this.tweens.add({
-      targets: this.resultText,
-      alpha: 0,
-      delay: 1800,
-      duration: 500,
-      onComplete: () => this.resultText.setVisible(false),
-    });
   }
 }

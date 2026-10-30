@@ -65,9 +65,16 @@ export function validateBalance(b: Balance): string[] {
   if (!(f.oilDriftF >= 0)) errors.push('fry.oilDriftF must be >= 0');
   const g = b.glaze;
   if (!(Number.isInteger(g.gridSize) && g.gridSize >= 16)) errors.push('glaze.gridSize must be an integer >= 16');
-  for (const s of ['dip', 'dust', 'drizzle'] as const) {
-    if (!(g.brushRadius[s] > 0 && g.goodCoverage[s] > 0 && g.goodCoverage[s] <= 1)) errors.push(`glaze.${s} needs brushRadius > 0 and 0 < goodCoverage <= 1`);
+  for (const s of ['dip', 'dust', 'drizzle'] as const) if (!(g.brushRadius[s] > 0)) errors.push(`glaze.brushRadius.${s} must be > 0`);
+  for (const s of ['dip', 'dust'] as const) {
+    if (!(g.goodCoverage[s] > 0 && g.goodCoverage[s] <= 1)) errors.push(`glaze.goodCoverage.${s} must be in (0, 1]`);
   }
+  const da = g.drizzleAmount;
+  if (!(da.idealMin > 0 && da.idealMin <= da.idealMax && da.idealMax < da.zeroAt && da.zeroAt <= 1)) {
+    errors.push('glaze.drizzleAmount needs 0 < idealMin <= idealMax < zeroAt <= 1');
+  }
+  if (!(g.drizzleWeight >= 0 && g.drizzleWeight <= 1)) errors.push('glaze.drizzleWeight must be in [0, 1]');
+  if (!(g.fallMs >= 0 && Number.isInteger(g.shelfCapacity) && g.shelfCapacity >= 1)) errors.push('glaze needs fallMs >= 0 and shelfCapacity >= 1');
   if (!(g.spillZeroAt > 0 && g.wrongGlazeFactor >= 0 && g.wrongGlazeFactor < 1)) errors.push('glaze needs spillZeroAt > 0 and 0 <= wrongGlazeFactor < 1');
   if (!(g.ringRadius > 0 && g.ringRadius < 1)) errors.push('glaze.ringRadius must be between 0 and 1');
   if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');

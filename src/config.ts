@@ -10,6 +10,7 @@ import { PreloadScene } from './scenes/PreloadScene';
 import { ServeScene } from './scenes/ServeScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { ToppingsScene } from './scenes/ToppingsScene';
+import { TicketViewScene } from './scenes/TicketViewScene';
 import { TutorialScene } from './scenes/TutorialScene';
 import { COLORS } from './ui/theme';
 
@@ -44,6 +45,7 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       OrderScene,
       ServeScene,
       SettingsScene,
+      TicketViewScene,
     ],
   };
 }

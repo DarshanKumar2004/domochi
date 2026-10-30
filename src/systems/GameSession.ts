@@ -1,7 +1,12 @@
 // One day at the trailer: customers arriving, orders, tickets and serving.
 // Pure logic driven by tick(dtMs); scenes render from it and call its actions.
+//
+// The kitchen is a production line: fried donuts go to the rack, rack donuts
+// are glazed one at a time on the glazing board and go to the glazed shelf,
+// and closing the box for an order packs the best-matching shelf donuts and
+// hands them straight to that customer.
 import { Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../stations/fry';
-import { GlazeJob, type GlazeLayer, type GlazeResult } from '../stations/glaze';
+import { GlazeWork, glazeScoreFor, ringMask, type GlazedDonut, type MaskTemplate } from '../stations/glaze';
 import { forDay, type Balance } from './balance';
 import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
 import { Emitter } from './events';
@@ -20,8 +25,15 @@ export interface Customer {
   ticketNo?: number;
 }
 
-/** open: being made · boxed: in the player's hands · served: handed over. */
-export type TicketStatus = 'open' | 'boxed' | 'served';
+export type TicketStatus = 'open' | 'served';
+
+/** One donut slot in a served order: what was asked for and what went in the box. */
+export interface PackedDonut {
+  flavorId: string;
+  donut?: GlazedDonut;
+  /** 0–1 glaze match for this flavour (0 if the slot was empty). */
+  glazeScore: number;
+}
 
 export interface Ticket {
   no: number;
@@ -32,8 +44,8 @@ export interface Ticket {
   status: TicketStatus;
   takenAtMs: number;
   servedAtMs?: number;
-  /** Per-station results, filled in as the order moves through the kitchen. */
-  results: { fry?: FryResult; glaze?: GlazeResult };
+  /** Filled in when the box is closed and served. */
+  results: { fry?: FryResult; glaze?: { score: number }; packed?: PackedDonut[]; missing?: number };
 }
 
 export interface ServedEvent {
@@ -42,13 +54,8 @@ export interface ServedEvent {
   waitMs: number;
 }
 
-export type HandResult =
-  | { ok: true; ticket: Ticket; waitMs: number }
-  | { ok: false; reason: 'noBox' | 'notWaiting' }
-  | { ok: false; reason: 'notMine'; line: string };
-
 export interface SessionEvents extends Record<string, unknown> {
-  /** Anything visible changed (customers, tickets, selection, box in hand). */
+  /** Anything visible changed (customers, tickets, selection, rack, shelf). */
   changed: undefined;
   served: ServedEvent;
   /** Donuts that burnt and were thrown out automatically. */
@@ -79,9 +86,10 @@ export class GameSession {
   private readonly allCustomers: Customer[] = [];
   private readonly allTickets: Ticket[] = [];
   private activeNo: number | null = null;
-  private heldNo: number | null = null;
   private readonly rackDonuts: FriedDonut[] = [];
-  private readonly glazeJobs = new Map<number, GlazeJob>();
+  private readonly shelfDonuts: GlazedDonut[] = [];
+  private work: GlazeWork | null = null;
+  private readonly glazeMask: MaskTemplate;
   /** Donuts thrown away today (burnt or trashed), for the day summary. */
   private trashedCount = 0;
 
@@ -90,6 +98,7 @@ export class GameSession {
     this.customersToday = forDay(deps.balance.customersPerDay, deps.day);
     this.nextSpawnAtMs = deps.balance.spawn.firstDelaySec * 1000;
     this.fryer = new Fryer(deps.balance.fry);
+    this.glazeMask = ringMask(deps.balance.glaze);
   }
 
   // ---- Queries ---------------------------------------------------------------
@@ -113,14 +122,9 @@ export class GameSession {
     return this.allTickets.filter((t) => t.status !== 'served');
   }
 
-  /** The ticket the stations are working on. */
+  /** The ticket the Box station will serve. */
   get activeTicket(): Ticket | undefined {
     return this.activeNo === null ? undefined : this.ticket(this.activeNo);
-  }
-
-  /** The boxed order in the player's hands, if any. */
-  get heldTicket(): Ticket | undefined {
-    return this.heldNo === null ? undefined : this.ticket(this.heldNo);
   }
 
   get trashed(): number {
@@ -199,7 +203,7 @@ export class GameSession {
     this.events.emit('changed', undefined);
   }
 
-  // ---- Actions ---------------------------------------------------------------
+  // ---- Orders ----------------------------------------------------------------
 
   /** Take the front customer's order. They stay at the counter until finishOrdering(). */
   takeOrder(customerId: number): Ticket {
@@ -236,7 +240,7 @@ export class GameSession {
     this.events.emit('changed', undefined);
   }
 
-  /** Choose which open ticket the stations work on. Returns false if it can't be selected. */
+  /** Choose which open ticket the Box station serves. Returns false if it can't be selected. */
   selectTicket(no: number): boolean {
     const t = this.ticket(no);
     if (!t || t.status !== 'open') return false;
@@ -247,7 +251,7 @@ export class GameSession {
 
   // ---- Frying -----------------------------------------------------------------
 
-  /** Fried donuts on the cooling rack, oldest first. Orders take theirs from here. */
+  /** Fried donuts on the cooling rack, oldest first. The Glaze station works from here. */
   get rack(): readonly FriedDonut[] {
     return this.rackDonuts;
   }
@@ -293,102 +297,127 @@ export class GameSession {
   /** Throw a donut in the oil away (to fry a fresh one). */
   trashDonut(slot: number): boolean {
     const ok = this.fryer.trash(slot);
-    if (ok) {
-      this.trashedCount++;
-      this.events.emit('changed', undefined);
-    }
+    if (ok) this.trashed1();
     return ok;
   }
 
-  /** The active ticket, if it still needs fried donuts. */
-  private get ticketToFry(): Ticket | undefined {
-    const t = this.activeTicket;
-    return t && t.status === 'open' && !t.results.fry ? t : undefined;
-  }
-
-  /** Can the active ticket take its donuts from the rack? */
-  get canUseRack(): boolean {
-    const t = this.ticketToFry;
-    return !!t && this.rackDonuts.length >= t.order.flavors.length;
-  }
-
-  /** Give the active ticket the oldest donuts from the rack. */
-  useRack(): FryResult {
-    const t = this.ticketToFry;
-    if (!t || !this.canUseRack) throw new Error('cannot use the rack now');
-    const donuts = this.rackDonuts.splice(0, t.order.flavors.length);
-    t.results.fry = fryResultFromDonuts(t.no, donuts, this.deps.balance.fry);
-    this.events.emit('changed', undefined);
-    return t.results.fry;
+  /** Throw one donut on the rack away. */
+  trashRackDonut(index: number): boolean {
+    if (!this.rackDonuts[index]) return false;
+    this.rackDonuts.splice(index, 1);
+    this.trashed1();
+    return true;
   }
 
   // ---- Glazing ----------------------------------------------------------------
 
-  /** The active ticket, if it's fried and still needs glazing. */
-  get ticketToGlaze(): Ticket | undefined {
-    const t = this.activeTicket;
-    return t && t.status === 'open' && t.results.fry && !t.results.glaze ? t : undefined;
+  /** The donut on the glazing board, if any. */
+  get glazeWork(): GlazeWork | null {
+    return this.work;
   }
 
-  /** The glaze job for the active ticket (created on first use, kept if you leave). */
-  get activeGlazeJob(): GlazeJob | undefined {
-    const t = this.ticketToGlaze;
-    if (!t) return undefined;
-    let job = this.glazeJobs.get(t.no);
-    if (!job) {
-      job = new GlazeJob(t.no, t.order.flavors, this.deps.menu, this.deps.balance.glaze);
-      this.glazeJobs.set(t.no, job);
-    }
-    return job;
+  /** Glazed donuts on the shelf, oldest first, waiting to be boxed. */
+  get shelf(): readonly GlazedDonut[] {
+    return this.shelfDonuts;
   }
 
-  glazeJob(ticketNo: number): GlazeJob | undefined {
-    return this.glazeJobs.get(ticketNo);
+  get shelfFull(): boolean {
+    return this.shelfDonuts.length >= this.deps.balance.glaze.shelfCapacity;
   }
 
-  /** Finish the current glaze layer; when the last one is done the ticket gets its glaze result. */
-  finishGlazeLayer(): GlazeLayer {
-    const t = this.ticketToGlaze;
-    const job = this.activeGlazeJob;
-    if (!t || !job) throw new Error('nothing to glaze');
-    const layer = job.finish();
-    if (job.done) t.results.glaze = job.result();
+  /** Move a rack donut onto the glazing board (one at a time). */
+  startGlazing(rackIndex: number): GlazeWork | null {
+    if (this.work) return null;
+    const d = this.rackDonuts[rackIndex];
+    if (!d) return null;
+    this.rackDonuts.splice(rackIndex, 1);
+    this.work = new GlazeWork(d.id, d, this.deps.menu, this.deps.balance.glaze, this.glazeMask);
     this.events.emit('changed', undefined);
-    return layer;
+    return this.work;
   }
 
-  /** Close the box on the active ticket and pick it up. */
-  boxActiveTicket(): Ticket {
-    if (this.heldNo !== null) throw new Error('already holding a box');
-    const t = this.activeTicket;
-    if (!t) throw new Error('no active ticket');
-    t.status = 'boxed';
-    this.heldNo = t.no;
-    this.activeNo = this.allTickets.find((x) => x.status === 'open')?.no ?? null;
+  /** Done glazing: the donut goes to the shelf. Null if there's nothing to finish or the shelf is full. */
+  finishGlazing(): GlazedDonut | null {
+    if (!this.work || !this.work.hasGlaze || this.shelfFull) return null;
+    const d = this.work.finish();
+    this.shelfDonuts.push(d);
+    this.work = null;
     this.events.emit('changed', undefined);
-    return t;
+    return d;
   }
 
-  /** Hand the box in your hands to a waiting customer. */
-  handTo(customerId: number): HandResult {
-    const c = this.customer(customerId);
-    if (!c || c.state !== 'waiting') return { ok: false, reason: 'notWaiting' };
-    const held = this.heldTicket;
-    if (!held) return { ok: false, reason: 'noBox' };
-    if (held.customerId !== c.id) {
-      return { ok: false, reason: 'notMine', line: pickLine(this.typeOf(c).lines.notMine, this.deps.rng, { ticket: c.ticketNo ?? '?' }) };
-    }
+  /** Redo: throw away the donut on the board (you'll glaze another one). */
+  trashGlazing(): boolean {
+    if (!this.work) return false;
+    this.work = null;
+    this.trashed1();
+    return true;
+  }
 
-    const { afterServeSec } = this.deps.balance;
+  trashShelfDonut(index: number): boolean {
+    if (!this.shelfDonuts[index]) return false;
+    this.shelfDonuts.splice(index, 1);
+    this.trashed1();
+    return true;
+  }
+
+  // ---- Serving ----------------------------------------------------------------
+
+  /**
+   * Close the box on the active ticket and hand it straight to that customer.
+   * Packs the best-matching glazed donut from the shelf for each flavour; any
+   * flavour with nothing left on the shelf goes in empty and scores 0.
+   */
+  serveActiveTicket(): ServedEvent {
+    const t = this.activeTicket;
+    if (!t || t.status !== 'open') throw new Error('no order to serve');
+    const c = this.customer(t.customerId);
+    if (!c || (c.state !== 'waiting' && c.state !== 'ordering')) throw new Error('customer is not here');
+
+    const { menu, balance } = this.deps;
+    const packed: PackedDonut[] = t.order.flavors.map((flavorId) => {
+      const flavor = menu.flavors.find((f) => f.id === flavorId)!;
+      let best = -1;
+      let bestScore = -1;
+      this.shelfDonuts.forEach((d, i) => {
+        const s = glazeScoreFor(d, flavor, balance.glaze);
+        if (s > bestScore) {
+          bestScore = s;
+          best = i;
+        }
+      });
+      if (best < 0) return { flavorId, glazeScore: 0 };
+      const donut = this.shelfDonuts.splice(best, 1)[0]!;
+      return { flavorId, donut, glazeScore: bestScore };
+    });
+
+    const needed = t.order.flavors.length;
+    const donuts = packed.flatMap((p) => (p.donut ? [p.donut.fry] : []));
+    const fry = fryResultFromDonuts(t.no, donuts, balance.fry);
+    // Empty slots count as zero.
+    fry.score = Math.round((fry.score * donuts.length) / needed);
+    t.results = {
+      fry,
+      glaze: { score: Math.round((packed.reduce((s, p) => s + p.glazeScore, 0) / needed) * 100) },
+      packed,
+      missing: needed - donuts.length,
+    };
+
+    const { afterServeSec } = balance;
     this.nextSpawnAtMs = Math.max(this.nextSpawnAtMs, this.now + this.deps.rng.int(afterServeSec.min * 1000, afterServeSec.max * 1000));
-    held.status = 'served';
-    held.servedAtMs = this.now;
+    t.status = 'served';
+    t.servedAtMs = this.now;
     c.state = 'served';
-    this.heldNo = null;
-    const waitMs = this.now - held.takenAtMs;
-    this.events.emit('served', { customer: c, ticket: held, waitMs });
+    this.activeNo = this.allTickets.find((x) => x.status === 'open')?.no ?? null;
+    const event: ServedEvent = { customer: c, ticket: t, waitMs: this.now - t.takenAtMs };
+    this.events.emit('served', event);
     this.events.emit('changed', undefined);
     if (this.isDayComplete) this.events.emit('dayComplete', undefined);
-    return { ok: true, ticket: held, waitMs };
+    return event;
+  }
+
+  private trashed1(): void {
+    this.trashedCount++;
+    this.events.emit('changed', undefined);
   }
 }

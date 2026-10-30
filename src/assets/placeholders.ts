@@ -330,15 +330,52 @@ function paintDonutFry(g: G): void {
   }
 }
 
-function paintGlazeBowl(g: G): void {
+/**
+ * Pouring cup, drawn white/light grey so it can be tinted with each glaze's
+ * colour at runtime (one texture, many coloured cups). Spout at the top left.
+ */
+function paintGlazeCup(g: G): void {
+  const ink = COLORS.ink;
+  const body = [
+    new Phaser.Math.Vector2(22, 40),
+    new Phaser.Math.Vector2(118, 40),
+    new Phaser.Math.Vector2(106, 146),
+    new Phaser.Math.Vector2(34, 146),
+  ];
   g.fillStyle(0xffffff);
+  g.fillPoints(body, true);
+  // Liquid line and a little shine
+  g.fillStyle(0xe6e6e6);
+  g.fillEllipse(70, 44, 96, 18);
+  g.fillStyle(0xffffff, 0.9);
+  g.fillRect(44, 60, 10, 70);
+  // Spout
+  g.fillStyle(0xffffff);
+  g.fillTriangle(22, 40, 6, 26, 36, 40);
+  g.lineStyle(6, ink);
+  g.strokePoints(body, true);
+  g.lineBetween(22, 40, 6, 26);
+  g.lineBetween(6, 26, 36, 40);
+  // Handle
+  g.lineStyle(8, ink);
   g.beginPath();
-  g.arc(130, 50, 120, 0, Math.PI, false);
-  g.closePath();
-  g.fillPath();
-  g.fillEllipse(130, 50, 240, 70);
+  g.arc(120, 92, 22, -Math.PI / 2, Math.PI / 2);
+  g.strokePath();
+}
+
+/** Powdered-sugar sifter: a mesh cup with a handle. */
+function paintSugarSifter(g: G): void {
+  const ink = COLORS.ink;
+  g.fillStyle(0xc9ced3);
+  g.fillRoundedRect(20, 30, 100, 90, 18);
+  g.fillStyle(0xffffff);
+  g.fillEllipse(70, 40, 92, 22);
+  g.lineStyle(3, 0x8a9097);
+  for (let x = 30; x <= 110; x += 10) g.lineBetween(x, 104, x, 120);
+  g.lineStyle(6, ink);
+  g.strokeRoundedRect(20, 30, 100, 90, 18);
   g.fillStyle(COLORS.pink);
-  g.fillEllipse(130, 50, 210, 50);
+  g.fillRoundedRect(118, 60, 34, 18, 8);
 }
 
 function paintToppingJar(g: G): void {
@@ -433,7 +470,8 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.TrashBin]: { width: 160, height: 160, paint: paintTrashBin },
   [TextureKeys.FryDispenser]: { width: 215, height: 175, paint: paintFryDispenser },
   [TextureKeys.DonutFry]: { width: 160, height: 160, paint: paintDonutFry },
-  [TextureKeys.GlazeBowl]: { width: 260, height: 170, paint: paintGlazeBowl },
+  [TextureKeys.GlazeCup]: { width: 150, height: 160, paint: paintGlazeCup },
+  [TextureKeys.SugarSifter]: { width: 160, height: 140, paint: paintSugarSifter },
   [TextureKeys.ToppingJar]: { width: 160, height: 220, paint: paintToppingJar },
   [TextureKeys.DonutBox]: { width: 620, height: 420, paint: paintDonutBox },
   [TextureKeys.IconLobby]: { width: 96, height: 96, paint: paintIconLobby },

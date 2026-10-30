@@ -112,149 +112,13 @@ describe('GameSession: taking orders', () => {
   });
 });
 
-describe('GameSession: boxing and serving', () => {
-  function twoWaiting() {
-    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 5);
-    s.tick(1000);
-    s.tick(2000);
-    const a = orderFront(s);
-    const b = orderFront(s);
-    return { s, a, b };
-  }
-
-  it('boxing picks up the active ticket and moves selection to the next open one', () => {
-    const { s } = twoWaiting();
-    const boxed = s.boxActiveTicket();
-    expect(boxed.no).toBe(1);
-    expect(boxed.status).toBe('boxed');
-    expect(s.heldTicket?.no).toBe(1);
-    expect(s.activeTicket?.no).toBe(2);
-    expect(() => s.boxActiveTicket()).toThrow(); // hands are full
-    expect(s.selectTicket(1)).toBe(false); // can't select a boxed ticket
-  });
-
-  it('handing the box to the wrong customer is refused with their line', () => {
-    const { s, b } = twoWaiting();
-    s.boxActiveTicket(); // ticket 1
-    const r = s.handTo(b.customer.id);
-    expect(r.ok).toBe(false);
-    if (!r.ok && r.reason === 'notMine') expect(r.line).toContain('#2');
-    else throw new Error('expected notMine');
-    expect(s.heldTicket?.no).toBe(1);
-  });
-
-  it('handing over without a box is refused', () => {
-    const { s, a } = twoWaiting();
-    expect(s.handTo(a.customer.id)).toEqual({ ok: false, reason: 'noBox' });
-  });
-
-  it('serving the right customer reports wait time and completes the day at the end', () => {
-    const { s, a, b } = twoWaiting();
-    let served = 0;
-    let dayDone = 0;
-    s.events.on('served', () => served++);
-    s.events.on('dayComplete', () => dayDone++);
-
-    s.tick(5000);
-    s.boxActiveTicket();
-    const r1 = s.handTo(a.customer.id);
-    expect(r1.ok).toBe(true);
-    if (r1.ok) expect(r1.waitMs).toBe(s.timeMs - a.ticket.takenAtMs);
-    expect(s.customer(a.customer.id)!.state).toBe('served');
-    expect(s.heldTicket).toBeUndefined();
-    expect(s.isDayComplete).toBe(false);
-
-    s.boxActiveTicket();
-    expect(s.handTo(b.customer.id).ok).toBe(true);
-    expect(served).toBe(2);
-    expect(dayDone).toBe(1);
-    expect(s.isDayComplete).toBe(true);
-    expect(s.openTickets).toHaveLength(0);
-    expect(s.activeTicket).toBeUndefined();
-  });
-});
-
-describe('GameSession: frying', () => {
-  const fb = baseBalance.fry;
-
-  it('the fryer heats up on the session clock', () => {
-    const s = makeSession(fastSpawn);
-    const before = s.fryer.temp;
-    s.tick(2000);
-    expect(s.fryer.temp).toBeGreaterThan(before);
-  });
-
-  it('drop, pull to the rack, and the rack feeds an order', () => {
-    const s = makeSession({ ...fastSpawn, customersPerDay: [3] }, 1, 11);
-    for (let i = 0; i < 3; i++) expect(s.dropDonut()).toBe(i);
-    s.tick(6000);
-    expect(s.pullDonut(1)).not.toBeNull();
-    expect(s.pullAll()).toEqual([0, 2]);
-    expect(s.rack).toHaveLength(3);
-
-    const { ticket } = orderFront(s);
-    const n = ticket.order.flavors.length;
-    const oldest = s.rack.slice(0, n);
-    expect(s.canUseRack).toBe(true);
-    const r = s.useRack();
-    expect(s.ticket(ticket.no)!.results.fry).toBe(r);
-    expect(r.donuts.map((d) => d.score)).toEqual(oldest.map((d) => d.score));
-    expect(s.rack).toHaveLength(3 - n);
-    expect(s.canUseRack).toBe(false); // already fried
-  });
-
-  it('cannot use the rack with too few donuts on it', () => {
-    const s = makeSession({ ...fastSpawn, customersPerDay: [3] }, 1, 11);
-    s.tick(1000);
-    orderFront(s);
-    expect(s.canUseRack).toBe(false);
-    expect(() => s.useRack()).toThrow();
-  });
-
-  it('a full rack refuses more donuts', () => {
-    const s = makeSession(fastSpawn);
-    while (!s.rackFull) {
-      s.fryer.oil = 1;
-      s.dropDonut();
-      s.tick(500);
-      s.pullAll();
-    }
-    s.dropDonut();
-    expect(s.pullDonut(0)).toBeNull();
-    expect(s.pullAll()).toEqual([]);
-    expect(s.rack).toHaveLength(fb.rackCapacity);
-  });
-
-  it('burnt donuts are thrown out with a burnt event and counted', () => {
-    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
-    s.fryer.temp = 350;
-    const burnt: number[][] = [];
-    s.events.on('burnt', (e) => burnt.push(e.slots));
-    s.dropDonut();
-    for (let t = 0; t < (fb.secondsPerSide * fb.burntAt + 3) * 1000; t += 100) s.tick(100);
-    expect(burnt).toEqual([[0]]);
-    expect(s.fryer.slots[0]).toBeNull();
-    expect(s.trashed).toBe(1);
-  });
-
-  it('trashing a donut frees its slot and counts it', () => {
-    const s = makeSession(fastSpawn);
-    s.dropDonut();
-    expect(s.trashDonut(0)).toBe(true);
-    expect(s.fryer.count).toBe(0);
-    expect(s.trashed).toBe(1);
-    expect(s.trashDonut(0)).toBe(false);
-  });
-});
-
 describe('GameSession: customer pacing', () => {
   const paced = { ...fastSpawn, customersPerDay: [5], maxActiveByDay: [2], afterServeSec: { min: 3, max: 3 } };
 
   function serveFirstWaiting(s: GameSession) {
     const c = s.waiting[0]!;
     s.selectTicket(c.ticketNo!);
-    s.boxActiveTicket();
-    expect(s.handTo(c.id).ok).toBe(true);
+    s.serveActiveTicket();
   }
 
   it('only maxActive customers are here at once: customer 3 waits until someone is served', () => {
@@ -282,40 +146,198 @@ describe('GameSession: customer pacing', () => {
   });
 });
 
-describe('GameSession: glazing', () => {
-  function friedTicket() {
-    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11);
-    s.fryer.temp = 350;
-    for (let i = 0; i < 3; i++) s.dropDonut();
-    s.tick(1000);
-    s.pullAll();
-    const { ticket } = orderFront(s);
-    return { s, ticket };
-  }
+describe('GameSession: frying', () => {
+  const fb = baseBalance.fry;
 
-  it('there is nothing to glaze until the ticket is fried', () => {
-    const { s, ticket } = friedTicket();
-    expect(s.ticketToGlaze).toBeUndefined();
-    expect(s.activeGlazeJob).toBeUndefined();
-    s.useRack();
-    expect(s.ticketToGlaze?.no).toBe(ticket.no);
-    expect(s.activeGlazeJob?.ticketNo).toBe(ticket.no);
+  it('the fryer heats up on the session clock', () => {
+    const s = makeSession(fastSpawn);
+    const before = s.fryer.temp;
+    s.tick(2000);
+    expect(s.fryer.temp).toBeGreaterThan(before);
   });
 
-  it('the job is kept between visits and finishing every layer stores the result', () => {
-    const { s, ticket } = friedTicket();
-    s.useRack();
-    const job = s.activeGlazeJob!;
-    expect(s.activeGlazeJob).toBe(job); // same job each time
-    let changes = 0;
-    s.events.on('changed', () => changes++);
-    while (!job.done) {
-      job.choose(job.step!.glazeId);
-      job.paint(-0.6, -0.6, 0.6, 0.6);
-      s.finishGlazeLayer();
+  it('drop, pull one, pull all: donuts land on the rack', () => {
+    const s = makeSession(fastSpawn);
+    for (let i = 0; i < 3; i++) expect(s.dropDonut()).toBe(i);
+    s.tick(6000);
+    expect(s.pullDonut(1)).not.toBeNull();
+    expect(s.pullAll()).toEqual([0, 2]);
+    expect(s.rack).toHaveLength(3);
+  });
+
+  it('the rack holds rackCapacity (6) and refuses more', () => {
+    expect(fb.rackCapacity).toBe(6);
+    const s = makeSession(fastSpawn);
+    while (!s.rackFull) {
+      s.fryer.oil = 1;
+      s.dropDonut();
+      s.tick(500);
+      s.pullAll();
     }
-    expect(s.ticket(ticket.no)!.results.glaze).toEqual(job.result());
-    expect(s.ticketToGlaze).toBeUndefined();
-    expect(changes).toBe(job.layers.length);
+    s.dropDonut();
+    expect(s.pullDonut(0)).toBeNull();
+    expect(s.rack).toHaveLength(fb.rackCapacity);
+  });
+
+  it('one rack donut can be trashed on its own', () => {
+    const s = makeSession(fastSpawn);
+    for (let i = 0; i < 3; i++) s.dropDonut();
+    s.tick(500);
+    s.pullAll();
+    const keep = [s.rack[0]!.id, s.rack[2]!.id];
+    expect(s.trashRackDonut(1)).toBe(true);
+    expect(s.rack.map((d) => d.id)).toEqual(keep);
+    expect(s.trashed).toBe(1);
+  });
+
+  it('burnt donuts are thrown out with a burnt event and counted', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    s.fryer.temp = 350;
+    const burnt: number[][] = [];
+    s.events.on('burnt', (e) => burnt.push(e.slots));
+    s.dropDonut();
+    for (let t = 0; t < (fb.secondsPerSide * fb.burntAt + 3) * 1000; t += 100) s.tick(100);
+    expect(burnt).toEqual([[0]]);
+    expect(s.trashed).toBe(1);
+  });
+
+  it('trashing a donut in the oil frees its slot', () => {
+    const s = makeSession(fastSpawn);
+    s.dropDonut();
+    expect(s.trashDonut(0)).toBe(true);
+    expect(s.fryer.count).toBe(0);
+    expect(s.trashDonut(0)).toBe(false);
+  });
+});
+
+/** Pour a careful ring of glaze (and optionally a zig-zag drizzle) on the board's donut. */
+function glazeBoard(s: GameSession, base: string, drizzle?: string) {
+  const w = s.glazeWork!;
+  const R = baseBalance.glaze.ringRadius;
+  for (const radius of [R - 0.14, R, R + 0.14]) {
+    for (let k = 0; k < 48; k++) {
+      const a0 = (k / 48) * Math.PI * 2;
+      const a1 = ((k + 1) / 48) * Math.PI * 2;
+      w.pour(base, Math.cos(a0) * radius, Math.sin(a0) * radius, Math.cos(a1) * radius, Math.sin(a1) * radius);
+    }
+  }
+  if (drizzle) for (let k = 0; k < 7; k++) w.pour(drizzle, -0.85, -0.8 + (1.6 * k) / 6, 0.85, -0.68 + (1.6 * k) / 6);
+}
+
+/** Fry n good donuts onto the rack. */
+function fryRack(s: GameSession, n: number) {
+  s.fryer.temp = 350;
+  for (let i = 0; i < n; i++) s.dropDonut();
+  for (let t = 0; t < baseBalance.fry.secondsPerSide * 1000; t += 100) s.tick(100);
+  s.fryer.flipAll();
+  for (let t = 0; t < baseBalance.fry.secondsPerSide * (1 - baseBalance.fry.topFactorFloating) * 1000; t += 100) s.tick(100);
+  s.pullAll();
+}
+
+describe('GameSession: glazing', () => {
+  it('rack donut → board → shelf, without needing an order', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    fryRack(s, 2);
+    const id = s.rack[1]!.id;
+    expect(s.startGlazing(1)?.id).toBe(id);
+    expect(s.rack).toHaveLength(1);
+    expect(s.startGlazing(0)).toBeNull(); // one at a time
+    expect(s.finishGlazing()).toBeNull(); // nothing poured yet
+    glazeBoard(s, 'strawberry');
+    expect(s.finishGlazing()?.id).toBe(id);
+    expect(s.glazeWork).toBeNull();
+    expect(s.shelf.map((d) => d.id)).toEqual([id]);
+  });
+
+  it('redo trashes the donut on the board; shelf donuts can be trashed one by one', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    fryRack(s, 3);
+    s.startGlazing(0);
+    expect(s.trashGlazing()).toBe(true);
+    expect(s.glazeWork).toBeNull();
+    s.startGlazing(0);
+    glazeBoard(s, 'strawberry');
+    s.finishGlazing();
+    s.startGlazing(0);
+    glazeBoard(s, 'cookies-and-cream');
+    s.finishGlazing();
+    expect(s.trashShelfDonut(0)).toBe(true);
+    expect(s.shelf).toHaveLength(1);
+    expect(s.trashed).toBe(2);
+  });
+
+  it('the shelf has a capacity', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1], glaze: { ...baseBalance.glaze, shelfCapacity: 1 } });
+    fryRack(s, 2);
+    s.startGlazing(0);
+    glazeBoard(s, 'strawberry');
+    s.finishGlazing();
+    expect(s.shelfFull).toBe(true);
+    s.startGlazing(0);
+    glazeBoard(s, 'strawberry');
+    expect(s.finishGlazing()).toBeNull();
+  });
+});
+
+describe('GameSession: serving', () => {
+  it('closing the box packs the best-matching shelf donuts and serves the customer straight away', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11);
+    fryRack(s, 3);
+    // Glaze one of everything day 1 might ask for.
+    const recipes: [string, string?][] = [['cookies-and-cream'], ['strawberry', 'white-icing'], ['strawberry', 'white-icing']];
+    for (const [base, drizzle] of recipes) {
+      s.startGlazing(0);
+      glazeBoard(s, base, drizzle);
+      s.finishGlazing();
+    }
+    s.tick(1000);
+    const { customer, ticket } = orderFront(s);
+    let served = 0;
+    s.events.on('served', () => served++);
+    s.tick(4000);
+
+    const e = s.serveActiveTicket();
+    expect(served).toBe(1);
+    expect(e.waitMs).toBe(4000);
+    expect(s.customer(customer.id)!.state).toBe('served');
+    expect(ticket.status).toBe('served');
+    const packed = ticket.results.packed!;
+    expect(packed.map((p) => p.flavorId)).toEqual(ticket.order.flavors);
+    for (const p of packed) {
+      // Each slot got a donut glazed for that flavour.
+      expect(p.donut!.layers[0]!.glazeId).toBe(p.flavorId === 'cookies-and-cream' ? 'cookies-and-cream' : 'strawberry');
+    }
+    expect(ticket.results.missing).toBe(0);
+    expect(ticket.results.glaze!.score).toBeGreaterThan(70);
+    expect(ticket.results.fry!.score).toBeGreaterThan(80);
+    expect(s.shelf).toHaveLength(3 - ticket.order.flavors.length);
+  });
+
+  it('an order with nothing on the shelf still serves, scoring zero for the empty slots', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11);
+    s.tick(1000);
+    const { ticket } = orderFront(s);
+    s.serveActiveTicket();
+    expect(ticket.results.missing).toBe(ticket.order.flavors.length);
+    expect(ticket.results.glaze!.score).toBe(0);
+    expect(ticket.results.fry!.score).toBe(0);
+  });
+
+  it('serving moves the selection to the next open ticket and completes the day at the end', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 5);
+    s.tick(1000);
+    s.tick(2000);
+    const a = orderFront(s);
+    const b = orderFront(s);
+    let dayDone = 0;
+    s.events.on('dayComplete', () => dayDone++);
+    expect(s.activeTicket?.no).toBe(a.ticket.no);
+    s.serveActiveTicket();
+    expect(s.activeTicket?.no).toBe(b.ticket.no);
+    s.serveActiveTicket();
+    expect(s.activeTicket).toBeUndefined();
+    expect(dayDone).toBe(1);
+    expect(s.isDayComplete).toBe(true);
+    expect(() => s.serveActiveTicket()).toThrow();
   });
 });

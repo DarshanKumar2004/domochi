@@ -30,7 +30,14 @@ export class HudScene extends Phaser.Scene {
     this.current = SceneKeys.Lobby;
     this.tabBar = new TabBar(this, STATION_TABS, (key) => this.goTo(key));
     this.tabBar.selectTab(this.current);
-    this.rail = new TicketRail(this, menu, (no) => session().selectTicket(no));
+    this.rail = new TicketRail(
+      this,
+      menu,
+      (no) => session().selectTicket(no),
+      (no) => {
+        if (!this.scene.isActive(SceneKeys.TicketView)) this.scene.launch(SceneKeys.TicketView, { ticketNo: no });
+      },
+    );
     const settings = new Button(this, 0, 0, 'Settings', () => this.openSettings(), {
       width: 240,
       height: 120,

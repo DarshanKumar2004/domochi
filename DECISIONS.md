@@ -156,3 +156,26 @@ Kumar shared photos of the real trailer and A-frame sign, confirmed the setting 
   - The base donut is tinted with that donut's actual fry colour.
 - **Rail and result card:** the rail shows "glazed", and the result card shows the glaze score.
 - **Test speed:** `drawPath` looks up the canvas once per path, not once per point. Per-point lookups made a careful three-circle paint take over two minutes in software rendering.
+
+## Kitchen production line, glaze cups, ticket view (2026-10-30)
+
+Kumar's feedback after Phase 4, all in one batch.
+
+- **The kitchen is now a production line, not ticket-bound.** Fry → rack (max 6) → glaze → glazed shelf (max 6) → box. Nothing needs a customer first, so you can make donuts ahead of time. "Use rack" and the per-ticket glaze jobs are gone. The superseded parts of the Phase 4 entry above (`GlazeJob` per ticket, "grab from rack", wipe-on-switch) no longer apply.
+- **Close lid & serve hands the box over automatically.** `serveActiveTicket()` packs, for each donut on the selected ticket, the best-matching donut on the glazed shelf (by `glazeScoreFor`). It scores fry and glaze from the donuts it packed, scales by found/needed if the shelf was short, and serves the waiting customer. **This auto-pack is temporary.** Phase 5 replaces it with dragging donuts into box slots.
+- **Fry station:**
+  - The **gold band** is back on each donut's meter, at `1 ± perfectWithin`. Pull when both bars sit in it.
+  - The **dial's green arc follows oil drift.** It shows `idealRange − drift`, so when low oil runs hot, the green spot moves to where the dial now needs to be. It is redrawn only when the rounded drift changes.
+  - **Single rack donuts can be trashed** by dragging a rack mini to the trash.
+  - **The trash can drop target is more generous**: a radius of at least 150 px around the can. It is tested with real CDP touch events, not just the mouse.
+  - Rack capacity is 6. The "use rack" button is gone (its text was also too tight to its edges).
+- **Glaze station:**
+  - The **rack donuts sit on a tray.** Tap one to put it on the board, or drag one to the trash.
+  - **Your finger is the glaze cup** (Freezeria-style). The cup follows your finger and tilts while pouring; the sugar sifter wobbles instead. **Drops fall under gravity** and land `fallMs` (140 ms) later, which is when the paint is applied. Drops use a fixed-size ring buffer, so nothing is allocated per frame.
+  - **Each glaze has its own cup colour,** and the more detailed glazes have **speckles** (`menu.json` `glazes[].speckles`): cookie bits in cookies & cream, strawberry seeds and pink flecks in strawberry, and so on. Speckles are deterministic, so redraws match.
+  - **One base coat, then one optional drizzle.** The base coat comes first; switching back to a layer you started resumes it.
+  - **Done** moves the donut to the glazed shelf. **Redo throws the donut away** (Kumar: "redo means I am trashing it"), so you take the next one from the tray. **Shelf donuts can be trashed one at a time.**
+- **Ticket view:** double-tap a ticket on the rail (within 500 ms) to open a big ticket that shows each flavour's recipe (glaze + drizzle + toppings) and the box.
+  - **It closes only on a fresh tap.** The finger that opened it is still down, and lifting it used to close the view instantly.
+  - **The rail no longer rebuilds when you select a ticket**; it just redraws the frames. Rebuilt tap targets only become tappable a frame later, which swallowed the second tap of a double-tap.
+- **Phaser 4 was not actually being served until now.** Vite's dependency cache (`node_modules/.vite`) still held Phaser 3.90 from before the upgrade, because the dev server had been running since then. The fix was to stop the server, delete the cache and restart. If a library upgrade seems to have no effect, clear that folder.

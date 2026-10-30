@@ -71,12 +71,9 @@ test('full scene flow', async ({ page }) => {
   const running = await activeScenes(page);
   expect(running.filter((k) => [SceneKeys.Lobby, SceneKeys.Fry, SceneKeys.Glaze, SceneKeys.Toppings].includes(k as never))).toEqual([]);
 
-  // Closing the box carries it back to the Lobby; hand it to customer #1
+  // Closing the box hands it straight to customer #1 and shows the result card in the Lobby
   await tapNamed(page, SceneKeys.Box, 'btn-serve');
   await waitForScene(page, SceneKeys.Lobby);
-  await findNamed(page, SceneKeys.Lobby, 'banner-carry');
-  await shot(page, '07-carrying-box');
-  await tapNamed(page, SceneKeys.Lobby, 'waiting-1');
   await waitForScene(page, SceneKeys.Serve);
   await expectOnTop(page, SceneKeys.Serve);
   await shot(page, '07-serve');

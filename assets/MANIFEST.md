@@ -29,7 +29,8 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `fry-dispenser` | `public/assets/fry-dispenser.png` | 215×175 | 1 | Placeholder (code) | Mochi donut depositor over the vat. Donuts drop from its nozzle at the bottom centre (100, 170). |
 | `trash-bin` | `public/assets/trash-bin.png` | 160×160 | 1 | Placeholder (code) | Trash can at the Fry station: drag donuts here to throw them out; burnt donuts fly here on their own. |
 | `donut-fry` | `public/assets/donut-fry.png` | 160×160 | 1 | Placeholder (code) | **Must be white or greyscale:** it's tinted at runtime from raw (pale) to golden to burnt by `fryColor()`. Plain pon de ring, no glaze. |
-| `glaze-bowl` | `public/assets/glaze-bowl.png` | 260×170 | 1 | Placeholder (code) | Bowl of glaze at the Glaze station. |
+| `glaze-cup` | `public/assets/glaze-cup.png` | 150×160 | 1 | Placeholder (code) | Pouring cup for the Glaze station. **Draw it white/light grey:** it's tinted per glaze at runtime, which makes the coloured cups. Spout at the top left (about 6, 26); the stream falls from there. |
+| `sugar-sifter` | `public/assets/sugar-sifter.png` | 160×140 | 1 | Placeholder (code) | Powdered-sugar sifter (beignet's dust). Not tinted. |
 | `topping-jar` | `public/assets/topping-jar.png` | 160×220 | 1 | Placeholder (code) | Jar of toppings at the Toppings station. |
 | `donut-box` | `public/assets/donut-box.png` | 620×420 | 1 | Placeholder (code) | Open box with 6 slots at the Box station. |
 | `icon-lobby` | `public/assets/icons/lobby.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |

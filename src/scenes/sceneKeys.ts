@@ -13,6 +13,7 @@ export const SceneKeys = {
   Box: 'BoxScene',
   Serve: 'ServeScene',
   Settings: 'SettingsScene',
+  TicketView: 'TicketViewScene',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

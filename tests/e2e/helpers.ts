@@ -209,3 +209,35 @@ export async function seedTutorialDone(page: Page): Promise<void> {
     }
   });
 }
+
+/**
+ * Drag from one point to another (game coordinates). On touch devices this sends
+ * real touch events through the DevTools protocol, so drags are tested the way a
+ * finger does them; on desktop it uses the mouse.
+ */
+export async function dragGame(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, steps = 10): Promise<void> {
+  const a = await toPage(page, from.x, from.y);
+  const b = await toPage(page, to.x, to.y);
+  if (test.info().project.use.hasTouch) {
+    const cdp = await page.context().newCDPSession(page);
+    const point = (t: number) => ({ x: a.px + (b.px - a.px) * t, y: a.py + (b.py - a.py) * t });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(0)] });
+    for (let k = 1; k <= steps; k++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(k / steps)] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    return;
+  }
+  await page.mouse.move(a.px, a.py);
+  await page.mouse.down();
+  await page.mouse.move(b.px, b.py, { steps });
+  await page.mouse.up();
+}
+
+/** Drag one named object onto another (both in the same scene). */
+export async function dragNamedOnto(page: Page, sceneKey: string, name: string, targetName: string, offsetX = 0): Promise<void> {
+  const from = await findNamed(page, sceneKey, name);
+  const to = await findNamed(page, sceneKey, targetName);
+  await dragGame(page, from, { x: to.x + offsetX, y: to.y });
+}

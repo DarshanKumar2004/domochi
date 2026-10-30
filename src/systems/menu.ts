@@ -9,6 +9,8 @@ export interface Glaze {
   style: GlazeStyle;
   /** CSS hex color used to draw it. */
   color: string;
+  /** Optional detail flecks poured with the glaze (strawberry seeds, cookie crumbs…). */
+  speckles?: { colors: string[]; density: number };
 }
 
 export interface Topping {
@@ -72,6 +74,10 @@ export function validateMenu(menu: Menu): string[] {
   for (const g of menu.glazes) {
     if (!STYLES.includes(g.style)) errors.push(`glaze "${g.id}" has unknown style "${g.style}"`);
     if (!HEX.test(g.color)) errors.push(`glaze "${g.id}" color "${g.color}" is not #rrggbb`);
+    if (g.speckles) {
+      if (!(g.speckles.density >= 0 && g.speckles.density <= 1)) errors.push(`glaze "${g.id}" speckle density must be 0–1`);
+      for (const c of g.speckles.colors) if (!HEX.test(c)) errors.push(`glaze "${g.id}" speckle color "${c}" is not #rrggbb`);
+    }
   }
   for (const t of menu.toppings) {
     if (t.colors.length === 0) errors.push(`topping "${t.id}" has no colors`);

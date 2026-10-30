@@ -54,6 +54,8 @@ export interface FryDonut {
 
 /** A fried donut, out of the oil (on the rack or in an order). */
 export interface FriedDonut {
+  /** Stays with the donut through every station. */
+  id: number;
   /** Doneness of each side (a = the side that went in face-down). */
   a: number;
   b: number;
@@ -111,7 +113,7 @@ export function scoreDonut(d: FryDonut, b: FryBalance): FriedDonut {
   const bSide = flippedOdd ? d.down : d.up;
   const temperature = d.seconds > 0 ? clamp(d.secondsInRange / d.seconds, 0, 1) : 0;
   const doneness = (sideScore(a, b) + sideScore(bSide, b)) / 2;
-  return { a, b: bSide, temperature, score: Math.round(combine(doneness, temperature, 1, b) * 100) };
+  return { id: d.id, a, b: bSide, temperature, score: Math.round(combine(doneness, temperature, 1, b) * 100) };
 }
 
 /** An order's fry result: doneness and temperature averaged, plus how even the donuts are. */
