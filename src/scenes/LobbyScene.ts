@@ -1,66 +1,101 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
-import { save } from '../systems/services';
-import { Button } from '../ui/Button';
+import type { Customer } from '../systems/GameSession';
+import { session } from '../systems/services';
 import type { Viewport } from '../ui/layout';
+import { SpeechBubble } from '../ui/SpeechBubble';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { Truck } from '../ui/Truck';
-import { onLayout } from '../ui/viewport';
+import { getViewport, onLayout } from '../ui/viewport';
+import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
+
+/** Customer sprite height in texture pixels (see MANIFEST). */
+const CUSTOMER_H = 340;
+/** How fast customers walk, in logical px per second (visual only). */
+const WALK_SPEED = 700;
 
 /** Positions inside the content area, per orientation. */
 const LAYOUT = {
   portrait: {
-    groundY: 1000,
+    groundY: 700,
     // Truck y puts the wheels on the ground line.
-    truck: { x: 540, y: 760, scale: 0.9 },
-    sign: { x: 120, feetY: 1130, scale: 0.75 },
-    line: { x: [560, 760, 960], feetY: 1590 },
-    tagY: 1190,
-    waiting: { x: 200, y: 1460, labelY: 1630 },
+    truck: { x: 540, y: 470, scale: 0.9 },
+    sign: { x: 120, feetY: 850, scale: 0.7 },
+    line: { x: [600, 760, 920, 1080], feetY: 1300, scale: 0.85 },
+    waiting: {
+      x: 250,
+      y: 1185,
+      w: 440,
+      h: 560,
+      labelY: 1500,
+      scale: 0.7,
+      slots: [
+        [150, 1170],
+        [350, 1170],
+        [150, 1440],
+        [350, 1440],
+      ],
+    },
+    bannerY: 50,
   },
   landscape: {
-    groundY: 560,
-    truck: { x: 480, y: 365, scale: 0.75 },
-    sign: { x: 880, feetY: 670, scale: 0.7 },
-    line: { x: [1060, 1260, 1460], feetY: 880 },
-    tagY: 480,
-    waiting: { x: 1740, y: 700, labelY: 870 },
+    groundY: 380,
+    truck: { x: 420, y: 205, scale: 0.65 },
+    sign: { x: 820, feetY: 470, scale: 0.6 },
+    line: { x: [980, 1130, 1280, 1430], feetY: 700, scale: 0.8 },
+    waiting: {
+      x: 1730,
+      y: 500,
+      w: 360,
+      h: 470,
+      labelY: 755,
+      scale: 0.6,
+      slots: [
+        [1630, 480],
+        [1810, 480],
+        [1630, 715],
+        [1810, 715],
+      ],
+    },
+    bannerY: 40,
   },
 } as const;
 
-/** The lot by domochi's trailer. Phase 1: static line of placeholder customers. */
+interface CustomerView {
+  id: number;
+  image: Phaser.GameObjects.Image;
+  tag: Phaser.GameObjects.Text;
+  target: { x: number; y: number; scale: number } | null;
+  moving: boolean;
+  leaving: boolean;
+}
+
+/** The lot by domochi's trailer: the line, the waiting area, and handing over orders. */
 export class LobbyScene extends Phaser.Scene {
-  private dayText!: Phaser.GameObjects.Text;
+  private views = new Map<number, CustomerView>();
+  private frontTag!: Phaser.GameObjects.Text;
+  private banner!: Phaser.GameObjects.Text;
+  private doneText!: Phaser.GameObjects.Text;
+  private bubble: SpeechBubble | null = null;
 
   constructor() {
     super(SceneKeys.Lobby);
   }
 
   create(): void {
+    this.views = new Map();
+    this.bubble = null;
     this.cameras.main.setBackgroundColor(COLORS.sky);
     const ground = this.add.graphics();
     const truck = new Truck(this, 0, 0);
     const sign = this.add.image(0, 0, TextureKeys.SignAFrame).setOrigin(0.5, 1);
-
-    // Waiting area (customers move here after ordering, Phase 2).
-    const waiting = this.add.rectangle(0, 0, 300, 260, 0xffffff, 0.25).setStrokeStyle(6, COLORS.ink, 0.35);
+    const waiting = this.add.rectangle(0, 0, 1, 1, 0xffffff, 0.25).setStrokeStyle(6, COLORS.ink, 0.35);
     const waitingLabel = this.add
       .text(0, 0, 'Waiting', { fontFamily: FONT_FAMILY, fontSize: '40px', color: CSS.ink })
       .setOrigin(0.5);
 
-    // Customer line: front of the line is nearest the truck.
-    const customers = [0, 1, 2].map((i) => {
-      const c = this.add.image(0, 0, TextureKeys.Customer).setOrigin(0.5, 1);
-      if (i === 0) {
-        c.setName('customer-front').setInteractive({ useHandCursor: true });
-        c.on(Phaser.Input.Events.POINTER_UP, () => this.openOverlay(SceneKeys.Order));
-      } else {
-        c.setAlpha(0.85);
-      }
-      return c;
-    });
-    const tag = this.add
+    this.frontTag = this.add
       .text(0, 0, 'Tap me!', {
         fontFamily: FONT_FAMILY,
         fontSize: '42px',
@@ -69,27 +104,35 @@ export class LobbyScene extends Phaser.Scene {
         backgroundColor: CSS.cream,
         padding: { x: 18, y: 10 },
       })
-      .setOrigin(0.5);
-    this.tweens.add({ targets: tag, scale: 1.1, duration: 500, yoyo: true, repeat: -1 });
+      .setOrigin(0.5)
+      .setDepth(10);
+    this.tweens.add({ targets: this.frontTag, scale: 1.1, duration: 500, yoyo: true, repeat: -1 });
 
-    this.dayText = this.add.text(0, 0, '', {
-      fontFamily: FONT_FAMILY,
-      fontSize: '56px',
-      fontStyle: 'bold',
-      color: CSS.ink,
-    });
-    this.refreshHeader();
-    this.events.on(Phaser.Scenes.Events.WAKE, this.refreshHeader, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.events.off(Phaser.Scenes.Events.WAKE, this.refreshHeader, this);
-    });
+    this.banner = this.add
+      .text(0, 0, '', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '44px',
+        fontStyle: 'bold',
+        color: CSS.ink,
+        backgroundColor: CSS.pink,
+        padding: { x: 28, y: 14 },
+      })
+      .setOrigin(0.5)
+      .setDepth(20)
+      .setName('banner-carry');
+    this.doneText = this.add
+      .text(0, 0, "that's everyone for today!\n(the end-of-day summary arrives in Phase 6)", {
+        fontFamily: FONT_FAMILY,
+        fontSize: '44px',
+        color: CSS.ink,
+        align: 'center',
+        backgroundColor: CSS.cream,
+        padding: { x: 24, y: 16 },
+      })
+      .setOrigin(0.5)
+      .setDepth(20);
 
-    const settings = new Button(this, 0, 0, 'Settings', () => this.openOverlay(SceneKeys.Settings), {
-      width: 280,
-      height: 120,
-      fontSize: 44,
-      name: 'btn-settings',
-    });
+    listen(this, session().events, 'changed', () => this.sync(false));
 
     onLayout(this, (v: Viewport) => {
       const L = LAYOUT[v.orientation];
@@ -105,22 +148,182 @@ export class LobbyScene extends Phaser.Scene {
 
       truck.setPosition(c.x + L.truck.x, c.y + L.truck.y).setScale(L.truck.scale);
       sign.setPosition(c.x + L.sign.x, c.y + L.sign.feetY).setScale(L.sign.scale);
-      customers.forEach((cust, i) => cust.setPosition(c.x + (L.line.x[i] ?? 0), c.y + L.line.feetY));
-      tag.setPosition(c.x + L.line.x[0], c.y + L.tagY);
-      waiting.setPosition(c.x + L.waiting.x, c.y + L.waiting.y);
+      waiting.setPosition(c.x + L.waiting.x, c.y + L.waiting.y).setSize(L.waiting.w, L.waiting.h);
       waitingLabel.setPosition(c.x + L.waiting.x, c.y + L.waiting.labelY);
-
-      // HUD chrome hugs the real screen corners, not the safe area.
-      this.dayText.setPosition(40, 50);
-      settings.setPosition(v.width - 170, 90);
+      this.banner.setPosition(v.width / 2, c.y + L.bannerY);
+      this.doneText.setPosition(c.x + c.width / 2, c.y + (v.orientation === 'landscape' ? 160 : 230));
+      this.sync(true);
     });
   }
 
-  private refreshHeader(): void {
-    this.dayText.setText(`Day ${save().data.day}`);
+  // ---- Rendering from session state --------------------------------------
+
+  /** Bring sprites in line with the session. `snap` skips walking (used on relayout). */
+  private sync(snap: boolean): void {
+    const s = session();
+    const v = getViewport(this);
+    const L = LAYOUT[v.orientation];
+    const c = v.content;
+    const present = new Set<number>();
+
+    s.line.forEach((cust, i) => {
+      present.add(cust.id);
+      const x = c.x + (L.line.x[Math.min(i, L.line.x.length - 1)] ?? 0) + Math.max(0, i - 3) * 40;
+      const name = i === 0 && cust.state === 'inLine' ? 'customer-front' : '';
+      this.place(cust, { x, y: c.y + L.line.feetY, scale: L.line.scale }, name, snap, v);
+    });
+
+    s.waiting.forEach((cust, i) => {
+      present.add(cust.id);
+      const slot = L.waiting.slots[i % L.waiting.slots.length]!;
+      const wrap = Math.floor(i / L.waiting.slots.length) * 30;
+      this.place(cust, { x: c.x + slot[0] + wrap, y: c.y + slot[1] - wrap, scale: L.waiting.scale }, `waiting-${cust.ticketNo}`, snap, v);
+    });
+
+    for (const view of this.views.values()) {
+      if (!present.has(view.id) && !view.leaving) this.leave(view);
+    }
+
+    const front = s.line[0];
+    const frontView = front ? this.views.get(front.id) : undefined;
+    const showTag = !!frontView && front?.state === 'inLine' && !frontView.moving;
+    this.frontTag.setVisible(showTag);
+    if (showTag && frontView) {
+      this.frontTag.setPosition(frontView.image.x, frontView.image.y - CUSTOMER_H * frontView.image.scale - 50);
+    }
+
+    const held = s.heldTicket;
+    this.banner.setVisible(!!held).setText(held ? `hand box #${held.no} to its customer` : '');
+    this.doneText.setVisible(s.isDayComplete);
   }
 
-  private openOverlay(key: typeof SceneKeys.Order | typeof SceneKeys.Settings): void {
-    if (!this.scene.isActive(key)) this.scene.launch(key);
+  private place(cust: Customer, target: { x: number; y: number; scale: number }, name: string, snap: boolean, v: Viewport): void {
+    let view = this.views.get(cust.id);
+    if (!view) {
+      view = this.createView(cust, target, v);
+      this.views.set(cust.id, view);
+    }
+    // Hidden when empty: an empty Text still draws its background padding.
+    const label = cust.ticketNo !== undefined && cust.state === 'waiting' ? `#${cust.ticketNo}` : '';
+    view.tag.setText(label).setVisible(label !== '');
+
+    const t = view.target;
+    const same = !!t && t.x === target.x && t.y === target.y && t.scale === target.scale;
+    if (same && !snap) {
+      if (!view.moving) view.image.setName(name);
+      return;
+    }
+    view.target = target;
+    this.tweens.killTweensOf(view.image);
+
+    if (snap) {
+      view.image.setPosition(target.x, target.y).setScale(target.scale).setName(name);
+      view.moving = false;
+      this.positionTag(view);
+      return;
+    }
+
+    view.image.setName('');
+    view.moving = true;
+    const dist = Phaser.Math.Distance.Between(view.image.x, view.image.y, target.x, target.y);
+    const moving = view;
+    this.tweens.add({
+      targets: view.image,
+      x: target.x,
+      y: target.y,
+      scale: target.scale,
+      duration: Math.max(150, (dist / WALK_SPEED) * 1000),
+      onUpdate: () => this.positionTag(moving),
+      onComplete: () => {
+        moving.moving = false;
+        moving.image.setName(name);
+        this.positionTag(moving);
+        this.sync(false); // refresh the front tag now they've arrived
+      },
+    });
+  }
+
+  private createView(cust: Customer, target: { x: number; y: number; scale: number }, v: Viewport): CustomerView {
+    const key = session().typeOf(cust).sprite;
+    // New arrivals walk in from off the right edge.
+    const image = this.add.image(v.width + 120, target.y, key).setOrigin(0.5, 1).setScale(target.scale).setDepth(5);
+    image.setInteractive({ useHandCursor: true });
+    image.on(Phaser.Input.Events.POINTER_UP, () => this.onCustomerTap(cust.id));
+    const tag = this.add
+      .text(0, 0, '', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '40px',
+        fontStyle: 'bold',
+        color: CSS.cream,
+        backgroundColor: CSS.ink,
+        padding: { x: 12, y: 4 },
+      })
+      .setOrigin(0.5)
+      .setDepth(6);
+    return { id: cust.id, image, tag, target: null, moving: false, leaving: false };
+  }
+
+  private positionTag(view: CustomerView): void {
+    view.tag.setPosition(view.image.x, view.image.y - CUSTOMER_H * view.image.scale - 24);
+  }
+
+  /** Served customers walk off the left edge. */
+  private leave(view: CustomerView): void {
+    view.leaving = true;
+    view.image.disableInteractive().setName('');
+    view.tag.setVisible(false);
+    this.tweens.killTweensOf(view.image);
+    this.tweens.add({
+      targets: view.image,
+      x: -200,
+      duration: Math.max(300, ((view.image.x + 200) / WALK_SPEED) * 1000),
+      onComplete: () => {
+        view.image.destroy();
+        view.tag.destroy();
+        this.views.delete(view.id);
+      },
+    });
+  }
+
+  // ---- Input ----------------------------------------------------------------
+
+  private onCustomerTap(id: number): void {
+    const s = session();
+    const cust = s.customer(id);
+    const view = this.views.get(id);
+    if (!cust || !view || view.moving || view.leaving) return;
+
+    if (cust.state === 'inLine' && s.line[0]?.id === id) {
+      if (this.scene.isActive(SceneKeys.Order)) return;
+      const ticket = s.takeOrder(id);
+      this.scene.launch(SceneKeys.Order, { ticketNo: ticket.no });
+      return;
+    }
+
+    if (cust.state === 'waiting') {
+      const r = s.handTo(id);
+      if (r.ok) {
+        this.scene.launch(SceneKeys.Serve, { ticketNo: r.ticket.no, waitMs: r.waitMs });
+      } else if (r.reason === 'notMine') {
+        this.say(view, r.line);
+      } else if (r.reason === 'noBox') {
+        this.say(view, `#${cust.ticketNo} isn't boxed yet. finish it at the Box station!`);
+      }
+    }
+  }
+
+  /** Short-lived speech bubble above a customer. */
+  private say(view: CustomerView, text: string): void {
+    this.bubble?.destroy();
+    const v = getViewport(this);
+    const w = 560;
+    const x = Phaser.Math.Clamp(view.image.x, w / 2 + 20, v.width - w / 2 - 20);
+    const bubble = new SpeechBubble(this, x, 0, w, text, Phaser.Math.Clamp(view.image.x - x, -200, 200), 38);
+    bubble.setPosition(x, view.image.y - CUSTOMER_H * view.image.scale - 130).setDepth(30).setName('bubble-customer');
+    this.bubble = bubble;
+    this.time.delayedCall(2200, () => {
+      if (this.bubble === bubble) this.bubble = null;
+      bubble.destroy();
+    });
   }
 }

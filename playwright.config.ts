@@ -3,6 +3,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'tests/e2e',
   outputDir: 'test-results',
+  // Each browser renders WebGL in software (no GPU in headless Chromium), which
+  // is CPU-heavy. More than ~3 at once starves them and long flows time out.
+  workers: 3,
   use: {
     baseURL: 'http://localhost:5173',
   },

@@ -21,11 +21,11 @@ export class ToppingsScene extends StationScene {
     const c = v.content;
     if (v.orientation === 'landscape') {
       // Donut on the left, jars in a 2×2 grid on the right.
-      this.donut.setPosition(c.x + 640, c.y + 540).setScale(1.4);
-      this.jars.forEach((j, i) => j.setPosition(c.x + 1300 + (i % 2) * 280, c.y + 410 + Math.floor(i / 2) * 290));
+      this.donut.setPosition(c.x + 640, c.y + 440).setScale(1.2);
+      this.jars.forEach((j, i) => j.setPosition(c.x + 1300 + (i % 2) * 280, c.y + 310 + Math.floor(i / 2) * 270));
     } else {
-      this.donut.setPosition(c.x + 540, c.y + 760).setScale(1.6);
-      this.jars.forEach((j, i) => j.setPosition(c.x + 180 + i * 240, c.y + 1400));
+      this.donut.setPosition(c.x + 540, c.y + 620).setScale(1.5);
+      this.jars.forEach((j, i) => j.setPosition(c.x + 180 + i * 240, c.y + 1270));
     }
   }
 }

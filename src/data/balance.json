@@ -1,0 +1,18 @@
+{
+  "_note": "All game tuning numbers live here (CLAUDE.md). Arrays marked 'by day' are indexed from day 1; days past the end reuse the last entry.",
+  "customersPerDay": [4, 5, 6, 7, 8, 9],
+  "spawn": {
+    "firstDelaySec": 1.5,
+    "intervalSec": { "min": 9, "max": 15 },
+    "maxInLine": 4
+  },
+  "orderSizeByDay": [
+    { "min": 1, "max": 2 },
+    { "min": 1, "max": 3 },
+    { "min": 1, "max": 4 },
+    { "min": 2, "max": 6 },
+    { "min": 2, "max": 6 },
+    { "min": 3, "max": 6 }
+  ],
+  "favoriteWeight": 3
+}

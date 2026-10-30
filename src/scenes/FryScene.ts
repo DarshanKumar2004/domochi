@@ -21,7 +21,9 @@ export class FryScene extends StationScene {
 
   protected layoutStation(v: Viewport): void {
     const cx = v.width / 2;
-    const cy = v.content.y + (v.orientation === 'landscape' ? 560 : 900);
+    const L = v.orientation === 'landscape';
+    const cy = v.content.y + (L ? 470 : 800);
+    this.fryer.setScale(L ? 0.9 : 1);
     this.fryer.setPosition(cx, cy);
     this.donut.setPosition(cx - 110, cy - 30);
   }

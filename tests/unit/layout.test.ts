@@ -56,22 +56,23 @@ describe('gameSizeFor', () => {
 });
 
 describe('viewportFor', () => {
-  it('portrait 9:16: tab bar eats the bottom of the safe area', () => {
+  it('portrait 9:16: rail and tab bar eat the top and bottom of the safe area', () => {
     const v = viewportFor(1080, 1920);
     expect(v.orientation).toBe('portrait');
     expect(v.safe).toEqual({ x: 0, y: 0, width: 1080, height: 1920 });
-    expect(v.content).toEqual({ x: 0, y: 0, width: 1080, height: 1720 });
+    expect(v.content).toEqual({ x: 0, y: 170, width: 1080, height: 1550 });
   });
 
   it('landscape 16:9', () => {
     const v = viewportFor(1920, 1080);
     expect(v.orientation).toBe('landscape');
-    expect(v.content).toEqual({ x: 0, y: 0, width: 1920, height: 920 });
+    expect(v.content).toEqual({ x: 0, y: 140, width: 1920, height: 780 });
   });
 
-  it('tall phone: safe area is centred and clear of the tab bar', () => {
+  it('tall phone: safe area is centred and content is clear of rail and tab bar', () => {
     const v = viewportFor(1080, 2400);
     expect(v.safe.y).toBe(240);
+    expect(v.content.y).toBeGreaterThanOrEqual(v.railHeight);
     expect(v.content.y + v.content.height).toBeLessThanOrEqual(2400 - v.tabBarHeight);
   });
 });

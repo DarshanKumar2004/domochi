@@ -16,6 +16,8 @@ export const MAX_ASPECT = 2.4;
 export const MIN_HIT_SIZE = 120;
 
 export const TAB_BAR_HEIGHT = { portrait: 200, landscape: 160 } as const;
+/** Ticket rail across the top of the main game (day, tickets, settings). */
+export const RAIL_HEIGHT = { portrait: 170, landscape: 140 } as const;
 
 export type Orientation = 'portrait' | 'landscape';
 
@@ -34,7 +36,8 @@ export interface Viewport {
   /** Centred 1920×1080 or 1080×1920 area that is always on screen. */
   safe: Rect;
   tabBarHeight: number;
-  /** Safe area minus anything the tab bar covers: where station content goes. */
+  railHeight: number;
+  /** Safe area minus anything the ticket rail and tab bar cover: where station content goes. */
   content: Rect;
 }
 
@@ -69,8 +72,10 @@ export function viewportFor(width: number, height: number): Viewport {
   const safe: Rect = { x: (width - safeW) / 2, y: (height - safeH) / 2, width: safeW, height: safeH };
 
   const tabBarHeight = TAB_BAR_HEIGHT[orientation];
+  const railHeight = RAIL_HEIGHT[orientation];
+  const contentTop = Math.max(safe.y, railHeight);
   const contentBottom = Math.min(safe.y + safe.height, height - tabBarHeight);
-  const content: Rect = { x: safe.x, y: safe.y, width: safe.width, height: contentBottom - safe.y };
+  const content: Rect = { x: safe.x, y: contentTop, width: safe.width, height: contentBottom - contentTop };
 
-  return { width, height, orientation, safe, tabBarHeight, content };
+  return { width, height, orientation, safe, tabBarHeight, railHeight, content };
 }

@@ -4,6 +4,7 @@ import {
   activeScenes,
   expectFillsScreen,
   expectOnTop,
+  findNamed,
   gameSize,
   isSleeping,
   seedTutorialDone,
@@ -38,15 +39,21 @@ test('full scene flow', async ({ page }) => {
   await tapNamed(page, SceneKeys.Tutorial, 'btn-skip');
   await waitForScene(page, SceneKeys.Lobby);
   await waitForScene(page, SceneKeys.Hud);
+
+  // The first customer walks up to the window
+  await findNamed(page, SceneKeys.Lobby, 'customer-front');
   await shot(page, '04-lobby');
 
-  // Order popup
+  // Order popup: they say their order and a ticket is written
   await tapNamed(page, SceneKeys.Lobby, 'customer-front');
   await waitForScene(page, SceneKeys.Order);
   await expectOnTop(page, SceneKeys.Order);
   await shot(page, '05-order');
   await tapNamed(page, SceneKeys.Order, 'btn-take-order');
   await waitForScene(page, SceneKeys.Order, false);
+  await findNamed(page, SceneKeys.Hud, 'ticket-1');
+  await findNamed(page, SceneKeys.Lobby, 'waiting-1');
+  await shot(page, '05b-lobby-waiting');
 
   // Every station via the tab bar
   const stations = [
@@ -64,11 +71,14 @@ test('full scene flow', async ({ page }) => {
   const running = await activeScenes(page);
   expect(running.filter((k) => [SceneKeys.Lobby, SceneKeys.Fry, SceneKeys.Glaze, SceneKeys.Toppings].includes(k as never))).toEqual([]);
 
-  // Serving cuts back to the Lobby with the result card
+  // Closing the box carries it back to the Lobby; hand it to customer #1
   await tapNamed(page, SceneKeys.Box, 'btn-serve');
+  await waitForScene(page, SceneKeys.Lobby);
+  await findNamed(page, SceneKeys.Lobby, 'banner-carry');
+  await shot(page, '07-carrying-box');
+  await tapNamed(page, SceneKeys.Lobby, 'waiting-1');
   await waitForScene(page, SceneKeys.Serve);
   await expectOnTop(page, SceneKeys.Serve);
-  await waitForScene(page, SceneKeys.Lobby);
   await shot(page, '07-serve');
   await tapNamed(page, SceneKeys.Serve, 'btn-serve-done');
   await waitForScene(page, SceneKeys.Serve, false);
@@ -81,7 +91,7 @@ test('full scene flow', async ({ page }) => {
   await waitForScene(page, SceneKeys.Lobby);
 
   // Settings
-  await tapNamed(page, SceneKeys.Lobby, 'btn-settings');
+  await tapNamed(page, SceneKeys.Hud, 'btn-settings');
   await waitForScene(page, SceneKeys.Settings);
   await expectOnTop(page, SceneKeys.Settings);
   await shot(page, '08-settings');
@@ -95,7 +105,7 @@ test('full scene flow', async ({ page }) => {
   expect(await activeScenes(page)).not.toContain(SceneKeys.Tutorial);
 
   // Replay tutorial from Settings
-  await tapNamed(page, SceneKeys.Lobby, 'btn-settings');
+  await tapNamed(page, SceneKeys.Hud, 'btn-settings');
   await waitForScene(page, SceneKeys.Settings);
   await tapNamed(page, SceneKeys.Settings, 'btn-replay-tutorial');
   await waitForScene(page, SceneKeys.Tutorial);
@@ -104,7 +114,7 @@ test('full scene flow', async ({ page }) => {
   await waitForScene(page, SceneKeys.Lobby);
 
   // Reset progress (two taps) brings the tutorial back
-  await tapNamed(page, SceneKeys.Lobby, 'btn-settings');
+  await tapNamed(page, SceneKeys.Hud, 'btn-settings');
   await waitForScene(page, SceneKeys.Settings);
   await tapNamed(page, SceneKeys.Settings, 'btn-reset');
   await shot(page, '09-settings-confirm-reset');

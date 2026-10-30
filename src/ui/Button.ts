@@ -47,6 +47,7 @@ export class Button extends Phaser.GameObjects.Container {
     this.setSize(w, h);
     this.setInteractive({ useHandCursor: true });
     this.on('pointerdown', () => {
+      if (!this.enabled) return;
       this.pressed = true;
       this.setScale(0.96);
     });
@@ -54,11 +55,25 @@ export class Button extends Phaser.GameObjects.Container {
     this.on('pointerup', () => {
       const wasPressed = this.pressed;
       this.release();
-      if (wasPressed) onTap();
+      if (wasPressed && this.enabled) onTap();
     });
 
     if (opts.name) this.setName(opts.name);
     scene.add.existing(this);
+  }
+
+  private enabled = true;
+
+  get isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  /** Disabled buttons are faded and ignore taps. */
+  setEnabled(enabled: boolean): this {
+    this.enabled = enabled;
+    this.setAlpha(enabled ? 1 : 0.45);
+    if (!enabled) this.release();
+    return this;
   }
 
   setLabel(text: string): this {

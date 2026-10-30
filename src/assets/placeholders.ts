@@ -162,16 +162,71 @@ function paintEthan(g: G): void {
   }
 }
 
-function paintCustomer(g: G): void {
-  g.fillStyle(0x4a4a5a);
-  g.fillRect(45, 280, 35, 60);
-  g.fillRect(100, 280, 35, 60);
-  g.fillStyle(0x7fb069);
-  g.fillRoundedRect(30, 130, 120, 170, 40);
-  g.fillStyle(0xe0ac69);
-  g.fillCircle(90, 75, 55);
-  g.fillStyle(0x3b2a20);
-  g.fillEllipse(90, 38, 112, 50);
+interface CustomerLook {
+  shirt: number;
+  pants: number;
+  skin: number;
+  hair: number;
+  /** Optional extra: backpack straps, tie, etc. */
+  extra?: (g: G) => void;
+}
+
+const CUSTOMER_LOOKS = {
+  // UL Lafayette vermilion hoodie with backpack straps.
+  student: {
+    shirt: 0xce181e,
+    pants: 0x3b4a6b,
+    skin: 0xc68642,
+    hair: 0x1b1210,
+    extra: (g: G) => {
+      g.fillStyle(0x2b2b2b);
+      g.fillRect(44, 140, 14, 120);
+      g.fillRect(122, 140, 14, 120);
+    },
+  },
+  office: {
+    shirt: 0x4a6fa5,
+    pants: 0x2f3440,
+    skin: 0xf1c27d,
+    hair: 0x6b4423,
+    extra: (g: G) => {
+      g.fillStyle(0x1f1a17);
+      g.fillTriangle(82, 135, 98, 135, 90, 215);
+    },
+  },
+  parent: { shirt: 0x8e6bbf, pants: 0x4a4a5a, skin: 0xe0ac69, hair: 0x3b2a20 },
+  // Regulars wear the domochi tee.
+  regular: {
+    shirt: 0x1f1a17,
+    pants: 0x6b6f73,
+    skin: 0x8d5524,
+    hair: 0x0f0f0f,
+    extra: (g: G) => {
+      g.fillStyle(0xffffff);
+      g.fillCircle(90, 190, 18);
+      g.fillStyle(0x1f1a17);
+      g.fillCircle(90, 190, 8);
+    },
+  },
+} satisfies Record<string, CustomerLook>;
+
+function paintCustomer(look: CustomerLook): (g: G) => void {
+  return (g) => {
+    g.fillStyle(look.pants);
+    g.fillRect(45, 280, 35, 60);
+    g.fillRect(100, 280, 35, 60);
+    g.fillStyle(look.shirt);
+    g.fillRoundedRect(30, 130, 120, 170, 40);
+    look.extra?.(g);
+    g.fillStyle(look.skin);
+    g.fillCircle(90, 75, 55);
+    g.fillStyle(look.hair);
+    g.fillEllipse(90, 38, 112, 50);
+    paintFace(g);
+  };
+}
+
+function paintFace(g: G): void {
   g.fillStyle(DARK);
   g.fillCircle(70, 78, 6);
   g.fillCircle(110, 78, 6);
@@ -306,7 +361,10 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
     frameWidth: ETHAN_FRAME.width,
     paint: paintEthan,
   },
-  [TextureKeys.Customer]: { width: 180, height: 340, paint: paintCustomer },
+  [TextureKeys.CustomerStudent]: { width: 180, height: 340, paint: paintCustomer(CUSTOMER_LOOKS.student) },
+  [TextureKeys.CustomerOffice]: { width: 180, height: 340, paint: paintCustomer(CUSTOMER_LOOKS.office) },
+  [TextureKeys.CustomerParent]: { width: 180, height: 340, paint: paintCustomer(CUSTOMER_LOOKS.parent) },
+  [TextureKeys.CustomerRegular]: { width: 180, height: 340, paint: paintCustomer(CUSTOMER_LOOKS.regular) },
   [TextureKeys.DonutPlain]: { width: 320, height: 320, paint: paintDonut },
   [TextureKeys.Fryer]: { width: 760, height: 460, paint: paintFryer },
   [TextureKeys.GlazeBowl]: { width: 260, height: 170, paint: paintGlazeBowl },

@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { save, startSession } from '../systems/services';
 import type { HudScene } from './HudScene';
 import { SceneKeys, type SceneKey } from './sceneKeys';
 
@@ -15,8 +16,9 @@ const MAIN_GAME_SCENES: readonly SceneKey[] = [
   SceneKeys.Settings,
 ];
 
-/** Leave `from` and enter the game at the Lobby, with the tab bar on top. */
+/** Leave `from` and enter the game at the Lobby, with the tab bar on top, starting a fresh day. */
 export function startMainGame(from: Phaser.Scene): void {
+  startSession(save().data.day);
   from.scene.launch(SceneKeys.Lobby);
   from.scene.launch(SceneKeys.Hud);
   from.scene.stop();

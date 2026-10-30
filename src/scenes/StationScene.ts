@@ -31,8 +31,8 @@ export abstract class StationScene extends Phaser.Scene {
 
     onLayout(this, (v) => {
       const L = v.orientation === 'landscape';
-      title.setPosition(v.width / 2, v.content.y + (L ? 80 : 110));
-      subtitle.setPosition(v.width / 2, v.content.y + (L ? 160 : 200));
+      title.setPosition(v.width / 2, v.content.y + (L ? 55 : 80));
+      subtitle.setPosition(v.width / 2, v.content.y + (L ? 120 : 160));
       this.layoutStation(v);
     });
   }

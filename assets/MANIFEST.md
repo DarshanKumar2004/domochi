@@ -19,7 +19,10 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `truck` | `public/assets/truck.png` | 900×620 | 1 | Placeholder (code) | domochi's white trailer (based on Kumar's photos): window on the left, OPEN sign, logo on the right side. Anchors are set in `TRUCK_SPEC`: window bottom centre (250, 390), OPEN sign (515, 200), logo centre (720, 250) at 260 px, @handle (720, 430). The logo, OPEN text and handle are overlaid by `ui/Truck.ts`, so real truck art should leave those areas blank. |
 | `sign-aframe` | `public/assets/sign-aframe.png` | 220×320 | 1 | Placeholder (code) | Sidewalk A-frame poster ("DOMOCHI MOCHI DONUTS" plus donut photos) next to the trailer. Origin at the bottom centre. |
 | `ethan` | `public/assets/ethan.png` | 880×260 sheet | 4 × (220×260) | Placeholder (code) | Ethan (owner), torso up, waving. Feet anchor at the bottom centre of each frame. |
-| `customer` | `public/assets/customer.png` | 180×340 | 1 | Placeholder (code) | Generic customer, origin at the bottom centre. |
+| `customer-student` | `public/assets/customer-student.png` | 180×340 | 1 | Placeholder (code) | UL student: vermilion hoodie and backpack straps. Origin at the bottom centre. Picked by `sprite` in customers.json. |
+| `customer-office` | `public/assets/customer-office.png` | 180×340 | 1 | Placeholder (code) | Office worker: blue shirt and tie. Origin at the bottom centre. Picked by `sprite` in customers.json. |
+| `customer-parent` | `public/assets/customer-parent.png` | 180×340 | 1 | Placeholder (code) | Parent: purple top. Origin at the bottom centre. Picked by `sprite` in customers.json. |
+| `customer-regular` | `public/assets/customer-regular.png` | 180×340 | 1 | Placeholder (code) | Regular: black domochi tee. Origin at the bottom centre. Picked by `sprite` in customers.json. |
 | `donut-plain` | `public/assets/donut-plain.png` | 320×320 | 1 | Placeholder (code) | Plain pon de ring (8 balls), before glaze. |
 | `fryer` | `public/assets/fryer.png` | 760×460 | 1 | Placeholder (code) | Fry station: oil vat, heat dial and oil gauge. |
 | `glaze-bowl` | `public/assets/glaze-bowl.png` | 260×170 | 1 | Placeholder (code) | Bowl of glaze at the Glaze station. |
