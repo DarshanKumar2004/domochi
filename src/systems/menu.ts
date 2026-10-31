@@ -16,7 +16,7 @@ export interface Glaze {
 /** 'sprinkle': shaken on in many small pieces. 'piece': placed one at a time (a whole cookie). */
 export type ToppingStyle = 'sprinkle' | 'piece';
 /** How a piece is drawn. */
-export type ToppingShape = 'crumb' | 'loop' | 'biscuit';
+export type ToppingShape = 'crumb' | 'loop' | 'flake' | 'biscuit';
 
 export interface Topping {
   id: string;
@@ -40,8 +40,21 @@ export interface Flavor {
   /** Optional stripes over the base coat: id of a 'drizzle' glaze. */
   drizzle?: string;
   toppings: string[];
+  /**
+   * Where the drizzle goes (like the shop's photos): stripes as segments in
+   * normalised donut coordinates. Without one, any even drizzle scores.
+   */
+  drizzlePattern?: Stripe[];
   /** First in-game day this flavor can be ordered. */
   unlockDay: number;
+}
+
+/** A straight stripe, normalised to the donut (centre 0,0, edges ±1). */
+export interface Stripe {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
 }
 
 export interface BoxSize {
@@ -63,7 +76,7 @@ export interface Menu {
 const HEX = /^#[0-9a-f]{6}$/i;
 const STYLES: readonly string[] = ['dip', 'drizzle', 'dust'];
 const TOPPING_STYLES: readonly string[] = ['sprinkle', 'piece'];
-const SHAPES: readonly string[] = ['crumb', 'loop', 'biscuit'];
+const SHAPES: readonly string[] = ['crumb', 'loop', 'flake', 'biscuit'];
 
 function duplicates(ids: string[]): string[] {
   return ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -97,7 +110,7 @@ export function validateMenu(menu: Menu): string[] {
     for (const c of t.colors) if (!HEX.test(c)) errors.push(`topping "${t.id}" color "${c}" is not #rrggbb`);
     if (!TOPPING_STYLES.includes(t.style)) errors.push(`topping "${t.id}" has unknown style "${t.style}"`);
     if (!SHAPES.includes(t.shape)) errors.push(`topping "${t.id}" has unknown shape "${t.shape}"`);
-    if (!(t.size > 0 && t.size < 0.5)) errors.push(`topping "${t.id}" size must be between 0 and 0.5`);
+    if (!(t.size > 0 && t.size < 1)) errors.push(`topping "${t.id}" size must be between 0 and 1`);
     if (!(t.amount && Number.isInteger(t.amount.min) && t.amount.min >= 1 && t.amount.max >= t.amount.min)) {
       errors.push(`topping "${t.id}" amount needs integer 1 <= min <= max`);
     }
@@ -114,6 +127,13 @@ export function validateMenu(menu: Menu): string[] {
       else if (d.style !== 'drizzle') errors.push(`flavor "${f.id}" drizzle "${f.drizzle}" is not a drizzle glaze`);
     }
     for (const t of f.toppings) if (!toppingIds.has(t)) errors.push(`flavor "${f.id}" uses unknown topping "${t}"`);
+    if (f.drizzlePattern !== undefined) {
+      if (!f.drizzle) errors.push(`flavor "${f.id}" has a drizzlePattern but no drizzle`);
+      const ok = (v: unknown) => typeof v === 'number' && v >= -1.2 && v <= 1.2;
+      if (f.drizzlePattern.length === 0 || !f.drizzlePattern.every((s) => ok(s.x0) && ok(s.y0) && ok(s.x1) && ok(s.y1))) {
+        errors.push(`flavor "${f.id}" drizzlePattern needs stripes with coordinates in [-1.2, 1.2]`);
+      }
+    }
     if (!Number.isInteger(f.unlockDay) || f.unlockDay < 1) errors.push(`flavor "${f.id}" unlockDay must be an integer >= 1`);
     if (!(f.price > 0)) errors.push(`flavor "${f.id}" price must be > 0`);
   }

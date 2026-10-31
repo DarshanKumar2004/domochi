@@ -14,8 +14,14 @@ export const SAVE_VERSION = 1;
 export interface SaveData {
   version: number;
   tutorialDone: boolean;
+  /** The day you're on (the next one to play). */
   day: number;
+  /** Money banked from finished days (sales + tips). */
   money: number;
+  /** Customers served over all finished days. */
+  served: number;
+  /** Best single order score so far (0–100). */
+  bestOrder: number;
   settings: {
     sound: boolean;
     music: boolean;
@@ -28,6 +34,8 @@ export function defaultSave(): SaveData {
     tutorialDone: false,
     day: 1,
     money: 0,
+    served: 0,
+    bestOrder: 0,
     settings: { sound: true, music: true },
   };
 }
@@ -48,6 +56,8 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (typeof raw.tutorialDone === 'boolean') data.tutorialDone = raw.tutorialDone;
   if (typeof raw.day === 'number' && Number.isInteger(raw.day) && raw.day >= 1) data.day = raw.day;
   if (typeof raw.money === 'number' && Number.isFinite(raw.money) && raw.money >= 0) data.money = raw.money;
+  if (typeof raw.served === 'number' && Number.isInteger(raw.served) && raw.served >= 0) data.served = raw.served;
+  if (typeof raw.bestOrder === 'number' && raw.bestOrder >= 0 && raw.bestOrder <= 100) data.bestOrder = raw.bestOrder;
 
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;

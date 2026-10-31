@@ -27,6 +27,8 @@ import { StationScene } from './StationScene';
 const CANVAS_KEY = 'toppings-board';
 /** Pieces that missed the donut, left on the tray. */
 const MESS_KEY = 'toppings-mess';
+/** Where a whole cookie should sit (normalised y of its centre): across the top of the ring. */
+const COOKIE_SPOT_Y = -0.42;
 /** Copy of the board flying into the trash on Redo. */
 const SNAP_KEY = 'toppings-trash-snap';
 const SLOTS = 6;
@@ -394,11 +396,26 @@ export class ToppingsScene extends StationScene {
     drawDashedPath(this.guideRing, x, y, half, circlePoints(r));
     this.guideRing.lineStyle(5, COLORS.cream, 0.9);
     drawDashedPath(this.guideRing, x, y, half, circlePoints(r));
+    // A whole cookie goes across the top of the ring (like the shop's cookie butter photo):
+    // an outline the size of the cookie, centred where it should land.
     this.guideSpot.clear();
-    this.guideSpot.lineStyle(10, COLORS.ink, 0.25);
-    drawDashedPath(this.guideSpot, x, y - r * half, half, circlePoints(0.17, 24), 14, 10);
-    this.guideSpot.lineStyle(5, COLORS.cream, 0.9);
-    drawDashedPath(this.guideSpot, x, y - r * half, half, circlePoints(0.17, 24), 14, 10);
+    const cookie = menu.toppings.find((tp) => tp.style === 'piece');
+    if (cookie) {
+      const w = cookie.size * 1.6;
+      const h = cookie.size * 1.05;
+      const cy = COOKIE_SPOT_Y;
+      const box = [
+        { x: -w / 2, y: cy - h / 2 },
+        { x: w / 2, y: cy - h / 2 },
+        { x: w / 2, y: cy + h / 2 },
+        { x: -w / 2, y: cy + h / 2 },
+        { x: -w / 2, y: cy - h / 2 },
+      ];
+      this.guideSpot.lineStyle(10, COLORS.ink, 0.25);
+      drawDashedPath(this.guideSpot, x, y, half, box, 14, 10);
+      this.guideSpot.lineStyle(5, COLORS.cream, 0.9);
+      drawDashedPath(this.guideSpot, x, y, half, box, 14, 10);
+    }
   }
 
   private selectedTopping(): Topping | undefined {

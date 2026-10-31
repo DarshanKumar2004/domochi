@@ -35,12 +35,15 @@ export class TicketRail extends Phaser.GameObjects.Container {
     private readonly onSelect: (ticketNo: number) => void,
     /** Double-tap: open the big ticket view. */
     private readonly onOpen: (ticketNo: number) => void,
+    /** Money so far (banked from earlier days plus today's sales and tips). */
+    private readonly money: () => number,
   ) {
     super(scene, 0, 0);
     this.bg = scene.make.graphics({}, false);
     this.dayText = scene.make
       .text({ text: '', style: { fontFamily: FONT_FAMILY, fontSize: '44px', fontStyle: 'bold', color: CSS.cream } }, false)
-      .setOrigin(0, 0.5);
+      .setOrigin(0, 0.5)
+      .setName('rail-day');
     this.tickets = scene.make.container({}, false);
     this.add([this.bg, this.dayText, this.tickets]);
     scene.add.existing(this);
@@ -61,8 +64,8 @@ export class TicketRail extends Phaser.GameObjects.Container {
   refresh(session: GameSession): void {
     const v = this.viewport;
     if (!v) return;
-    this.dayText.setText(`Day ${session.day}\n${session.servedCount}/${session.customersToday}`);
-    this.dayText.setLineSpacing(-6).setFontSize(v.orientation === 'landscape' ? 36 : 42);
+    this.dayText.setText(`Day ${session.day}\n${session.servedCount}/${session.customersToday} served\n$${this.money().toFixed(2)}`);
+    this.dayText.setLineSpacing(-8).setFontSize(v.orientation === 'landscape' ? 28 : 34);
 
     const h = v.railHeight - 30;
     const startX = LEFT_PAD + 170;

@@ -8,7 +8,7 @@
 
 import { ringBallCenters, ringBallRadius } from './donutGeometry';
 import type { FriedDonut } from './fry';
-import type { Flavor, GlazeStyle, Menu } from '../systems/menu';
+import type { Flavor, GlazeStyle, Menu, Stripe } from '../systems/menu';
 
 export interface GlazeBalance {
   /** Cells per side of the coverage grid. */
@@ -39,6 +39,10 @@ export interface GlazeBalance {
   fallMs: number;
   /** Most glazed donuts the shelf holds. */
   shelfCapacity: number;
+  /** Share of a flavour's drizzle stripes covered for full marks. */
+  patternGoodCoverage: number;
+  /** Paint off the stripes (relative to their size) at which a patterned drizzle scores 0. Gentler than spillZeroAt: the stripes are a small target. */
+  patternSpillZeroAt: number;
 }
 
 export type LayerKind = 'base' | 'drizzle';
@@ -117,6 +121,73 @@ export function ringMask(b: GlazeBalance): MaskTemplate {
     }
   }
   return { target, allowed, allowedDrizzle, targetCount, ballOf, ballCells };
+}
+
+function distToSegment(x: number, y: number, s: Stripe): number {
+  const dx = s.x1 - s.x0;
+  const dy = s.y1 - s.y0;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? clamp(((x - s.x0) * dx + (y - s.y0) * dy) / len2, 0, 1) : 0;
+  return Math.hypot(x - (s.x0 + dx * t), y - (s.y0 + dy * t));
+}
+
+/**
+ * Mask for a flavour's drizzle stripes: the target is the ring under the stripes
+ * (as wide as the stream); paint a little either side of a stripe, or over the
+ * hole, isn't spill.
+ */
+export function patternMask(b: GlazeBalance, stripes: readonly Stripe[]): MaskTemplate {
+  const ring = ringMask(b);
+  const n = b.gridSize;
+  const r = b.brushRadius.drizzle;
+  const target = new Uint8Array(n * n);
+  const allowed = new Uint8Array(n * n);
+  const ballOf = new Int8Array(n * n).fill(-1);
+  const ballCells = new Array<number>(ring.ballCells.length).fill(0);
+  let targetCount = 0;
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const idx = j * n + i;
+      const x = cellCentre(i, n);
+      const y = cellCentre(j, n);
+      let d = Infinity;
+      for (const s of stripes) d = Math.min(d, distToSegment(x, y, s));
+      if (ring.target[idx] && d <= r) {
+        target[idx] = 1;
+        targetCount++;
+        ballOf[idx] = ring.ballOf[idx]!;
+        ballCells[ring.ballOf[idx]!]!++;
+      }
+      if (d <= r * 1.75 || (ring.allowedDrizzle[idx] && !ring.allowed[idx])) allowed[idx] = 1;
+    }
+  }
+  return { target, allowed, allowedDrizzle: allowed, targetCount, ballOf, ballCells };
+}
+
+const patternCache = new WeakMap<readonly Stripe[], MaskTemplate>();
+
+function patternFor(stripes: readonly Stripe[], b: GlazeBalance): MaskTemplate {
+  let tpl = patternCache.get(stripes);
+  if (!tpl) {
+    tpl = patternMask(b, stripes);
+    patternCache.set(stripes, tpl);
+  }
+  return tpl;
+}
+
+/** How well a drizzle follows a flavour's stripes (0–1): coverage of them, minus paint off them. */
+export function drizzlePatternQuality(layer: Pick<GlazeLayer, 'segments'>, stripes: readonly Stripe[], b: GlazeBalance): number {
+  const m = paintOnPattern(layer, stripes, b);
+  return clamp(m.coverage / b.patternGoodCoverage, 0, 1) * (1 - clamp(m.spill / b.patternSpillZeroAt, 0, 1));
+}
+
+/** The drizzle re-painted onto a flavour's stripe mask (for its score and the live readout). */
+export function paintOnPattern(layer: Pick<GlazeLayer, 'segments'>, stripes: readonly Stripe[], b: GlazeBalance): PaintMask {
+  const m = new PaintMask(patternFor(stripes, b), b.gridSize, true);
+  const r = b.brushRadius.drizzle;
+  const s = layer.segments;
+  for (let k = 0; k < s.length; k += 4) m.stroke(s[k]!, s[k + 1]!, s[k + 2]!, s[k + 3]!, r);
+  return m;
 }
 
 /** A coverage grid for one layer. Counts update incrementally, so reading them is free. */
@@ -221,7 +292,8 @@ export function glazeScoreFor(d: GlazedDonut, flavor: Flavor, b: GlazeBalance): 
   const drizzle = d.layers.find((l) => l.kind === 'drizzle');
   const baseScore = base && base.style !== 'drizzle' ? layerScore(base.coverage, base.spill, base.style, base.glazeId === flavor.glaze, b) : 0;
   if (flavor.drizzle) {
-    const drizzleScore = drizzle ? drizzleQuality(drizzle, b) * (drizzle.glazeId === flavor.drizzle ? 1 : b.wrongGlazeFactor) : b.missingDrizzleScore;
+    const quality = drizzle ? (flavor.drizzlePattern ? drizzlePatternQuality(drizzle, flavor.drizzlePattern, b) : drizzleQuality(drizzle, b)) : 0;
+    const drizzleScore = drizzle ? quality * (drizzle.glazeId === flavor.drizzle ? 1 : b.wrongGlazeFactor) : b.missingDrizzleScore;
     return (1 - b.drizzleWeight) * baseScore + b.drizzleWeight * drizzleScore;
   }
   return baseScore * (drizzle ? b.unwantedDrizzleFactor : 1);

@@ -225,3 +225,32 @@ Kumar's feedback after Phase 5.
 - **The pouring/shaking finger is read directly every frame** (`pointer.isDown`, `x`, `y`) instead of through move and up events. If the finger strayed onto the ticket rail or tab bar, those scenes got its events, so the cup or jar froze and could stay stuck pouring. This is the likely cause of "the glaze stops too".
 - **Drag or tap:** rack donuts can be dragged onto the glaze board as well as tapped, and the same for shelf donuts onto the toppings board.
 - **Tests:** guides and steam are checked with a new `isVisibleNamed` helper, because Graphics objects have no bounds for `findNamed`. The golden cues get their own fry test at a steady temperature: the main fry test turns the dial up, so its donuts overshoot golden.
+
+## Phase 6: scoring, tips, reactions, days; flavours from the shop's photos; slower oil (2026-10-30)
+
+- **The oil heats more slowly** (Kumar): `heatLagPerSec` went from 0.35 to 0.2. The oil closes 20% of the gap to the dial per second, instead of 35%: about 8 s from 300°F to 340°F, and 12 s to settle in range.
+- **Flavours match the shop's product photos.** The photos come from the Square store API (`thumbnail` on each product, re-fetchable like the menu); I looked at all six.
+  - **Strawberry:** salmon-pink glaze with dark seeds, and white stripes over the top-right half.
+  - **Chocolate hazelnut:** glossy caramel-brown glaze, and **it has the white drizzle too** (the photo shows it, so the menu now does). Same half as strawberry.
+  - **Cookie butter:** light tan glaze, stripes over the left half, and **the Biscoff-style cookie is big**, across the top of the ring (size 0.7, about 60% of the donut's width, as in the photo).
+  - **Cookies & cream:** plain white glaze; the crumbs are only the topping. Fruity cereal: white glaze with **flat cereal flakes** (new `flake` shape), not rings.
+  - Beignet already matched (all powdered sugar).
+- **Drizzle patterns are data** (`flavors[].drizzlePattern`: stripes in donut coordinates, a game-only field).
+  - A drizzle on a patterned flavour is scored **like a coat over its stripes**: coverage of the stripes / `patternGoodCoverage` (0.7) × (1 − paint off them / `patternSpillZeroAt` (1.5)).
+  - Measured: following the stripes scores 100; a slightly sloppy follow still scores 100; generic stripes across score 36; the wrong half scores 5; smothering scores 0.
+  - The glaze station draws **that flavour's stripes as the guide**, picked from the base glaze on the board (strawberry glaze shows strawberry's stripes, and so on). The readout says "drizzle: N% of the stripes".
+  - The cookie guide is a dashed outline of the cookie across the top of the ring.
+- **Order score** (`systems/score.ts`, all numbers in `balance.json` `scoring`):
+  - Weighted average: fry 30%, glaze 25%, toppings 25%, box 10%, wait 10% (CLAUDE.md).
+  - **Wait is a soft curve per customer:** full marks until 60% of their `patienceSec`, then easing (cosine) to 0 at 3× their patience. That's about 1 min of grace and 5 min to zero for a 100 s customer.
+  - **Reaction tiers:** great ≥ 90, good ≥ 70, okay ≥ 45, otherwise bad. The customer's thank-you line comes from that tier in `customers.json`.
+  - **Tip** = $0.75 × donuts × curve(score). The curve is [score, multiplier] points with straight lines between: 0→0, 40→0.2, 70→0.7, 90→1, 100→1.25.
+- **Sales:** a full box sells at the box price (trio $11, flight $20, domochi box $30), otherwise $4 per donut. These are the real shop prices.
+- **Result card:** each station's score, the wait score (with seconds), the order score with a word ("amazing!", "nice work", "not bad", "needs work"), the tip and the sale.
+- **End of day:** after the last customer's card, the **day summary** opens:
+  - customers served, average and best order, reactions, donuts thrown away, sales and tips;
+  - today's take and the running total;
+  - **what unlocks tomorrow** (flavours by `unlockDay`).
+  - **Start day N+1** banks the money and saves (`day`, `money`, plus new `served` and `bestOrder` stats), then restarts the main scenes on a fresh session. Reloading continues on the saved day.
+- **The ticket rail** shows Day, served/total and money (banked plus today's sales and tips).
+- **Kumar's ideas for later** (opening/closing tasks with a Dough station, and event invites for pop-up booth days) are recorded under Future ideas in CLAUDE.md.

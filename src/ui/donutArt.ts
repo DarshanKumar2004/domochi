@@ -198,7 +198,8 @@ export function drawToppingPiece(ctx: CanvasRenderingContext2D, size: number, p:
   const cx = (p.x + 1) * half;
   const cy = (p.y + 1) * half;
   const r = t.size * half;
-  const rnd = seeded((p.x + 2) * 7919 + (p.y + 2) * 104729);
+  // Seeded by position and rotation: the same piece always looks the same, and pieces drawn at one spot (a jar) still vary.
+  const rnd = seeded((p.x + 2) * 7919 + (p.y + 2) * 104729 + p.rot * 1013);
   const color = t.colors[Math.floor(rnd() * t.colors.length)]!;
   ctx.save();
   ctx.translate(cx, cy);
@@ -219,6 +220,21 @@ export function drawToppingPiece(ctx: CanvasRenderingContext2D, size: number, p:
       }
       ctx.closePath();
       ctx.fill();
+      break;
+    }
+    case 'flake': {
+      // A flat cereal flake: an irregular rounded sliver with a pale sugary edge.
+      const w = r * (0.9 + rnd() * 0.5);
+      const h = r * (0.45 + rnd() * 0.3);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = Math.max(1, r * 0.18);
+      ctx.beginPath();
+      ctx.ellipse(-w * 0.15, -h * 0.2, w * 0.55, h * 0.45, 0, Math.PI * 1.1, Math.PI * 1.7);
+      ctx.stroke();
       break;
     }
     case 'loop': {

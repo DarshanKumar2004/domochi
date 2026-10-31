@@ -1,5 +1,5 @@
 {
-  "_note": "Customer types for the order loop. Lines use {order} (e.g. 'a strawberry and two beignet') and {ticket} (the ticket number). 'thanks' tiers are picked by order score from Phase 6; until then 'good' is used. favorites must be menu flavor ids; sprite must be a texture key.",
+  "_note": "Customer types for the order loop. Lines use {order} (e.g. 'a strawberry and two beignet') and {ticket} (the ticket number). 'thanks' tiers are picked by order score (balance.json scoring.tiers). favorites must be menu flavor ids; sprite must be a texture key.",
   "types": [
     {
       "id": "student",

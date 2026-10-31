@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import balanceJson from '../../src/data/balance.json';
 import menuJson from '../../src/data/menu.json';
 import type { Balance } from '../../src/systems/balance';
-import type { Flavor, Menu } from '../../src/systems/menu';
+import type { Flavor, Menu, Stripe } from '../../src/systems/menu';
 import { ringBallCenters } from '../../src/stations/donutGeometry';
 import type { FriedDonut } from '../../src/stations/fry';
-import { drizzleQuality, GlazeWork, glazeScoreFor, layerScore, PaintMask, ringMask } from '../../src/stations/glaze';
+import { drizzlePatternQuality, drizzleQuality, GlazeWork, glazeScoreFor, layerScore, PaintMask, ringMask } from '../../src/stations/glaze';
 
 const B = (balanceJson as Balance).glaze;
 const menu = menuJson as Menu;
@@ -127,15 +127,36 @@ describe('GlazeWork', () => {
 });
 
 describe('glazeScoreFor: matching a glazed donut to a flavour', () => {
-  function make(base: string | null, drizzle: string | null) {
+  /** Glaze a donut; the drizzle follows `pattern` stripes if given, else a generic zig-zag. */
+  function make(base: string | null, drizzle: string | null, pattern?: readonly Stripe[]) {
     const w = new GlazeWork(1, fried, menu, B);
     if (base) pourRing((a, b, c, d) => w.pour(base, a, b, c, d));
-    if (drizzle) zigzag((a, b, c, d) => w.pour(drizzle, a, b, c, d));
+    if (drizzle && pattern) for (const s of pattern) w.pour(drizzle, s.x0, s.y0, s.x1, s.y1);
+    else if (drizzle) zigzag((a, b, c, d) => w.pour(drizzle, a, b, c, d));
     return w.finish();
   }
 
-  it('a careful strawberry with a zig-zag drizzle scores high as strawberry', () => {
-    expect(glazeScoreFor(make('strawberry', 'white-icing'), flavor('strawberry'), B)).toBeGreaterThan(0.85);
+  it("a careful strawberry, drizzled along the shop's stripes, scores high as strawberry", () => {
+    const pattern = flavor('strawberry').drizzlePattern!;
+    expect(glazeScoreFor(make('strawberry', 'white-icing', pattern), flavor('strawberry'), B)).toBeGreaterThan(0.9);
+  });
+
+  it("a drizzle that ignores the flavour's stripes scores much less; the wrong half scores about nothing", () => {
+    const f = flavor('strawberry');
+    const right = drizzlePatternQuality(make(null, 'white-icing', f.drizzlePattern).layers[0]!, f.drizzlePattern!, B);
+    const generic = drizzlePatternQuality(make(null, 'white-icing').layers[0]!, f.drizzlePattern!, B);
+    const mirrored = f.drizzlePattern!.map((s) => ({ x0: -s.x0, y0: s.y0, x1: -s.x1, y1: s.y1 }));
+    const wrongHalf = drizzlePatternQuality(make(null, 'white-icing', mirrored).layers[0]!, f.drizzlePattern!, B);
+    expect(right).toBeCloseTo(1);
+    expect(generic).toBeLessThan(0.6);
+    expect(wrongHalf).toBeLessThan(0.15);
+  });
+
+  it('every drizzled flavour on the menu has stripes from the photos, and they score 100% when followed', () => {
+    for (const f of menu.flavors.filter((x) => x.drizzle)) {
+      expect(f.drizzlePattern?.length).toBeGreaterThan(0);
+      expect(drizzlePatternQuality(make(null, f.drizzle!, f.drizzlePattern).layers[0]!, f.drizzlePattern!, B)).toBeCloseTo(1);
+    }
   });
 
   it('drizzle over the hole is fine (it falls through), but smothering the donut is not', () => {

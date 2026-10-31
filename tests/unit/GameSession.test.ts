@@ -5,7 +5,7 @@ import menuJson from '../../src/data/menu.json';
 import type { Balance } from '../../src/systems/balance';
 import type { CustomersData } from '../../src/systems/customers';
 import { GameSession } from '../../src/systems/GameSession';
-import { flavorsForDay, type Menu } from '../../src/systems/menu';
+import { flavorsForDay, type Menu, type Stripe } from '../../src/systems/menu';
 import { createRng } from '../../src/systems/rng';
 
 const menu = menuJson as Menu;
@@ -222,7 +222,8 @@ describe('GameSession: frying', () => {
 });
 
 /** Pour a careful ring of glaze (and optionally a zig-zag drizzle) on the board's donut. */
-function glazeBoard(s: GameSession, base: string, drizzle?: string) {
+/** Glaze the donut on the board; a drizzle follows the flavour's stripes if given (else three across). */
+function glazeBoard(s: GameSession, base: string, drizzle?: string, pattern?: readonly Stripe[]) {
   const w = s.glazeWork!;
   const R = baseBalance.glaze.ringRadius;
   for (const radius of [R - 0.14, R, R + 0.14]) {
@@ -232,8 +233,9 @@ function glazeBoard(s: GameSession, base: string, drizzle?: string) {
       w.pour(base, Math.cos(a0) * radius, Math.sin(a0) * radius, Math.cos(a1) * radius, Math.sin(a1) * radius);
     }
   }
+  if (drizzle && pattern) for (const p of pattern) w.pour(drizzle, p.x0, p.y0, p.x1, p.y1);
   // Three stripes across, kept on the donut.
-  if (drizzle) for (const y of [-0.6, 0, 0.6]) w.pour(drizzle, -Math.sqrt(0.64 - y * y), y, Math.sqrt(0.64 - y * y), y);
+  else if (drizzle) for (const y of [-0.6, 0, 0.6]) w.pour(drizzle, -Math.sqrt(0.64 - y * y), y, Math.sqrt(0.64 - y * y), y);
 }
 
 /** Fry n good donuts onto the rack. */
@@ -306,7 +308,7 @@ function makeFlavor(s: GameSession, flavorId: string) {
   const f = menu.flavors.find((x) => x.id === flavorId)!;
   fryRack(s, 1);
   s.startGlazing(s.rack.length - 1);
-  glazeBoard(s, f.glaze, f.drizzle);
+  glazeBoard(s, f.glaze, f.drizzle, f.drizzlePattern);
   s.finishGlazing();
   if (f.toppings.length) {
     s.startToppings(s.shelf.length - 1);
@@ -377,6 +379,37 @@ describe('GameSession: box and serving', () => {
     expect(r.fry!.score).toBeGreaterThan(80);
     expect(s.box).toHaveLength(0);
     expect(s.shelf).toHaveLength(0);
+
+    // Phase 6: the order score, reaction, tip and sale.
+    expect(r.score!.total).toBeGreaterThan(85);
+    expect(['great', 'good']).toContain(r.score!.tier);
+    expect(r.score!.wait).toBe(100); // 4 s is no wait at all
+    expect(r.score!.tip).toBeGreaterThan(0);
+    expect(e.score).toBe(r.score);
+    expect(r.sale).toBeGreaterThan(0);
+    const sum = s.summary();
+    expect(sum).toMatchObject({ day: 1, served: 1, averageScore: r.score!.total, bestScore: r.score!.total, sales: r.sale, tips: r.score!.tip });
+  });
+
+  it("the day summary adds up every served order and counts thrown-away donuts", () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 5);
+    s.tick(1000);
+    s.tick(2000);
+    orderFront(s);
+    orderFront(s);
+    s.dropDonut();
+    s.pullAll();
+    s.trashRackDonut(0);
+    const a = s.serveActiveTicket(); // empty boxes: low scores, no tip
+    const b = s.serveActiveTicket();
+    const sum = s.summary();
+    expect(sum.served).toBe(2);
+    expect(sum.averageScore).toBe(Math.round((a.score.total + b.score.total) / 2));
+    expect(sum.tips).toBeCloseTo(a.score.tip + b.score.tip);
+    expect(sum.sales).toBeCloseTo(a.sale + b.sale);
+    expect(sum.trashed).toBe(1);
+    expect(sum.tiers.bad).toBe(2);
+    expect(s.isDayComplete).toBe(true);
   });
 
   it('a donut can be moved between slots or taken back out', () => {

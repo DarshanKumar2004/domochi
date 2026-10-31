@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
-import type { GlazeLayer, GlazeWork, PourCheck } from '../stations/glaze';
-import type { Glaze } from '../systems/menu';
+import { paintOnPattern, type GlazeLayer, type GlazeWork, type PourCheck } from '../stations/glaze';
+import type { Glaze, Stripe } from '../systems/menu';
 import { flavorsForDay } from '../systems/menu';
 import { balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
@@ -33,8 +33,8 @@ const CANVAS = 420;
 const CANVAS_KEY = 'glaze-paint';
 /** Glaze that missed the donut, left on the tray. */
 const MESS_KEY = 'glaze-mess';
-/** Drizzle guide stripes (normalised y), matching what scores well with the thick stream. */
-const DRIZZLE_STRIPES = [-0.6, 0, 0.6];
+/** Drizzle guide when the base glaze isn't a drizzled flavour's: three stripes across. */
+const GENERIC_STRIPES: readonly Stripe[] = [-0.6, 0, 0.6].map((y) => ({ x0: -Math.sqrt(0.64 - y * y), y0: y, x1: Math.sqrt(0.64 - y * y), y1: y }));
 const SLOTS = 6;
 /** How far above your finger the cup hovers while pouring (game px). */
 const CUP_LIFT = 170;
@@ -130,6 +130,8 @@ export class GlazeScene extends StationScene {
   private lastLand = { stroke: -1, nx: 0, ny: 0 };
   private dirty = false;
   private shownWork: GlazeWork | null = null;
+  /** The drizzle stripes the guide shows (null: the generic ones). */
+  private guidePattern: readonly Stripe[] | null = null;
 
   constructor() {
     super(SceneKeys.Glaze, 'Glaze Station', 0x6b4a5a, null);
@@ -148,6 +150,7 @@ export class GlazeScene extends StationScene {
     this.selected = null;
     this.pouring = false;
     this.shownWork = null;
+    this.guidePattern = null;
     this.input.dragDistanceThreshold = 16;
 
     this.trayBg = this.add.graphics();
@@ -372,7 +375,12 @@ export class GlazeScene extends StationScene {
     const layer = work?.currentLayer ?? work?.layers[work.layers.length - 1];
     if (!work) this.readout.setText('');
     else if (!layer) this.readout.setText(this.selected ? 'press on the donut to pour' : 'pick a cup');
-    else if (layer.kind === 'drizzle') this.readout.setText(`drizzle ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`);
+    else if (layer.kind === 'drizzle') {
+      const cover = this.patternCoverage(work);
+      this.readout.setText(
+        cover !== null ? `drizzle: ${Math.round(cover * 100)}% of the stripes` : `drizzle ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`,
+      );
+    }
     else this.readout.setText(`glaze ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`);
   }
 
@@ -546,30 +554,64 @@ export class GlazeScene extends StationScene {
     this.canvas.refresh();
   }
 
-  /** Dashed guides: two loops round the ring (base coat), three stripes across (drizzle). */
+  /** Dashed guides: two loops round the ring (base coat) and the drizzle stripes. */
   private drawGuides(): void {
     const { x, y, size } = this.boardPos;
     const half = size / 2;
     const r = balance.glaze.ringRadius;
     this.guideBase.clear();
-    this.guideDrizzle.clear();
     for (const rr of [r - 0.1, r + 0.1]) {
       this.guideBase.lineStyle(10, COLORS.ink, 0.25);
       drawDashedPath(this.guideBase, x, y, half, circlePoints(rr));
       this.guideBase.lineStyle(5, COLORS.cream, 0.9);
       drawDashedPath(this.guideBase, x, y, half, circlePoints(rr));
     }
-    for (const sy of DRIZZLE_STRIPES) {
-      const sx = Math.sqrt(0.64 - sy * sy);
+    this.drawDrizzleGuide(this.guidePattern ?? GENERIC_STRIPES);
+  }
+
+  private drawDrizzleGuide(stripes: readonly Stripe[]): void {
+    const { x, y, size } = this.boardPos;
+    const g = this.guideDrizzle;
+    g.clear();
+    for (const s of stripes) {
       const pts = [
-        { x: -sx, y: sy },
-        { x: sx, y: sy },
+        { x: s.x0, y: s.y0 },
+        { x: s.x1, y: s.y1 },
       ];
-      this.guideDrizzle.lineStyle(10, COLORS.ink, 0.25);
-      drawDashedPath(this.guideDrizzle, x, y, half, pts);
-      this.guideDrizzle.lineStyle(5, 0xffffff, 0.95);
-      drawDashedPath(this.guideDrizzle, x, y, half, pts);
+      g.lineStyle(10, COLORS.ink, 0.25);
+      drawDashedPath(g, x, y, size / 2, pts);
+      g.lineStyle(5, 0xffffff, 0.95);
+      drawDashedPath(g, x, y, size / 2, pts);
     }
+  }
+
+  /**
+   * The drizzle stripes for the donut on the board: the shop's pattern for the
+   * flavour its base glaze belongs to (strawberry, chocolate hazelnut, cookie
+   * butter), or null if that flavour has no drizzle.
+   */
+  private patternFor(work: GlazeWork | null): readonly Stripe[] | null {
+    if (!work) return null;
+    let baseId: string | undefined;
+    for (const l of work.layers) if (l.kind === 'base') baseId = l.glazeId;
+    if (!baseId && work.currentLayer?.kind === 'base') baseId = work.currentLayer.glazeId;
+    if (!baseId) return null;
+    return menu.flavors.find((fl) => fl.glaze === baseId && fl.drizzlePattern)?.drizzlePattern ?? null;
+  }
+
+  /** The drizzle layer on the board, if any. */
+  private drizzleLayer(work: GlazeWork | null): GlazeLayer | undefined {
+    if (!work) return undefined;
+    if (work.currentLayer?.kind === 'drizzle') return work.currentLayer;
+    return work.layers.find((l) => l.kind === 'drizzle');
+  }
+
+  /** How much of the flavour's stripes the drizzle covers (0–1), or null without a pattern. */
+  private patternCoverage(work: GlazeWork | null): number | null {
+    const pattern = this.patternFor(work);
+    const d = this.drizzleLayer(work);
+    if (!pattern) return null;
+    return d ? paintOnPattern(d, pattern, balance.glaze).coverage : 0;
   }
 
   /** Show the guide for the selected cup until that layer is done well enough. */
@@ -577,21 +619,20 @@ export class GlazeScene extends StationScene {
     const work = session().glazeWork;
     const g = this.selected ? menu.glazes.find((x) => x.id === this.selected) : undefined;
     const gb = balance.glaze;
-    // Runs as glaze lands, so it checks the layers in place instead of building a list.
-    const done = (l: GlazeLayer | undefined, kind: 'base' | 'drizzle') =>
-      !!l &&
-      l.kind === kind &&
-      (kind === 'drizzle' ? l.coverage >= gb.drizzleAmount.idealMin : l.style !== 'drizzle' && l.coverage >= gb.goodCoverage[l.style]);
-    let baseDone = false;
-    let drizzleDone = false;
-    if (work) {
-      for (const l of work.layers) {
-        baseDone ||= done(l, 'base');
-        drizzleDone ||= done(l, 'drizzle');
-      }
-      baseDone ||= done(work.currentLayer, 'base');
-      drizzleDone ||= done(work.currentLayer, 'drizzle');
+    const pattern = this.patternFor(work);
+    if (pattern !== this.guidePattern) {
+      this.guidePattern = pattern;
+      this.drawDrizzleGuide(pattern ?? GENERIC_STRIPES);
     }
+    let baseDone = false;
+    if (work) {
+      const isDone = (l: GlazeLayer | undefined) => !!l && l.kind === 'base' && l.style !== 'drizzle' && l.coverage >= gb.goodCoverage[l.style];
+      for (const l of work.layers) baseDone ||= isDone(l);
+      baseDone ||= isDone(work.currentLayer);
+    }
+    const cover = this.patternCoverage(work);
+    const d = this.drizzleLayer(work);
+    const drizzleDone = cover !== null ? cover >= gb.patternGoodCoverage : !!d && d.coverage >= gb.drizzleAmount.idealMin;
     this.guideBase.setVisible(!!work && !!g && g.style !== 'drizzle' && !baseDone);
     this.guideDrizzle.setVisible(!!work && !!g && g.style === 'drizzle' && !drizzleDone);
   }

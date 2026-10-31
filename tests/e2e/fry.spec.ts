@@ -33,7 +33,7 @@ async function startAtFryer(page: Page): Promise<void> {
   await pauseClock(page); // the test drives time, so slow screenshots can't burn anything
   await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
   await waitForScene(page, SceneKeys.Fry);
-  await advance(page, 8000); // let the oil heat up
+  await advance(page, 12_000); // let the oil heat up
 }
 
 test('fry one at a time: drop, flip individually, grate, dial, drag to the rack, pull all', async ({ page }) => {

@@ -24,7 +24,7 @@ describe('oil temperature', () => {
     f.temp = 300;
     f.setTarget(350);
     const seen: number[] = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 40; i++) {
       run(f, 0.5);
       seen.push(f.temp);
     }

@@ -29,6 +29,18 @@ export function orderSizeRange(day: Range, type: Range): Range {
   return { min, max };
 }
 
+/**
+ * What the order sells for: the box's price when it's full (the trio, the
+ * flight, the domochi box), otherwise each donut at its own price.
+ */
+export function orderPrice(menu: Menu, order: Order): number {
+  const box = menu.boxes.find((b) => b.id === order.boxId);
+  if (box && box.size === order.flavors.length) return box.price;
+  let sum = 0;
+  for (const id of order.flavors) sum += menu.flavors.find((f) => f.id === id)?.price ?? 0;
+  return sum;
+}
+
 /** Flavor counts in first-appearance order. */
 export function groupFlavors(flavors: readonly string[]): FlavorCount[] {
   const groups: FlavorCount[] = [];

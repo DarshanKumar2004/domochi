@@ -27,7 +27,7 @@ async function rackThenGlaze(page: Page, n: number): Promise<void> {
   await pauseClock(page);
   await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
   await waitForScene(page, SceneKeys.Fry);
-  await advance(page, 8000);
+  await advance(page, 12_000);
   const b = await page.evaluate(() => (window as unknown as { __session: SessionView }).__session.fryer.balance);
   for (let i = 0; i < n; i++) await tapNamed(page, SceneKeys.Fry, 'btn-drop');
   await advance(page, b.secondsPerSide * 1000);

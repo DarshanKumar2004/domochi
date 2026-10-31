@@ -1,15 +1,16 @@
 import Phaser from 'phaser';
-import { session } from '../systems/services';
+import { orderVerdict } from '../systems/score';
+import { balance, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
-import { CSS, FONT_FAMILY } from '../ui/theme';
+import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { onLayout } from '../ui/viewport';
 import { SceneKeys } from './sceneKeys';
 
 const CARD_W = 860;
-const CARD_H = 900; // fits both orientations (landscape height is 1080)
+const CARD_H = 1000;
 
-/** Result card after handing an order over. Station scores and tips arrive in Phase 6. */
+/** Result card after handing an order over: each station's score, the order score, the reaction and the tip. */
 export class ServeScene extends Phaser.Scene {
   private ticketNo = 0;
   private waitMs = 0;
@@ -28,51 +29,54 @@ export class ServeScene extends Phaser.Scene {
     const s = session();
     const ticket = s.ticket(this.ticketNo);
     const cust = ticket ? s.customer(ticket.customerId) : undefined;
-    // Until scoring exists (Phase 6), every order gets a 'good' reaction.
-    const thanks = cust ? s.thanksLine(cust, 'good') : '';
+    const r = ticket?.results;
+    const score = r?.score;
+    const thanks = cust && score ? s.thanksLine(cust, score.tier) : '';
 
     // Everything lives in one container centred on the screen, laid out relative to the card centre.
     const card = this.add.container(0, 0, [addCard(this, CARD_W, CARD_H)]);
-    card.add(
-      this.add
-        .text(0, -370, `Order #${this.ticketNo} served!`, { fontFamily: FONT_FAMILY, fontSize: '72px', fontStyle: 'bold', color: CSS.ink })
-        .setOrigin(0.5),
-    );
-    card.add(
-      this.add
-        .text(0, -270, `"${thanks}"`, {
-          fontFamily: FONT_FAMILY,
-          fontSize: '42px',
-          fontStyle: 'italic',
-          color: CSS.ink,
-          align: 'center',
-          wordWrap: { width: CARD_W - 120 },
-        })
-        .setOrigin(0.5),
-    );
+    const text = (x: number, y: number, str: string, size: number, opts: Partial<Phaser.Types.GameObjects.Text.TextStyle> = {}) =>
+      this.add.text(x, y, str, { fontFamily: FONT_FAMILY, fontSize: `${size}px`, color: CSS.ink, ...opts });
+    card.add(text(0, -425, `Order #${this.ticketNo} served!`, 68, { fontStyle: 'bold' }).setOrigin(0.5));
+    card.add(text(0, -335, `"${thanks}"`, 40, { fontStyle: 'italic', align: 'center', wordWrap: { width: CARD_W - 120 } }).setOrigin(0.5).setName('serve-thanks'));
 
-    const rowStyle = { fontFamily: FONT_FAMILY, fontSize: '50px', color: CSS.ink };
-    const r = ticket?.results;
-    const score = (x: { score: number } | undefined) => (x ? String(x.score) : '—');
+    const val = (x: { score: number } | undefined) => (x ? String(x.score) : '—');
     const rows: [string, string][] = [
-      ['Fry', score(r?.fry)],
-      ['Glaze', score(r?.glaze)],
-      ['Toppings', score(r?.toppings)],
-      ['Box', score(r?.box)],
-      ['Wait time', `${Math.round(this.waitMs / 1000)}s`],
+      ['Fry', val(r?.fry)],
+      ['Glaze', val(r?.glaze)],
+      ['Toppings', val(r?.toppings)],
+      ['Box', val(r?.box)],
+      ['Wait', score ? `${score.wait}  (${Math.round(this.waitMs / 1000)}s)` : `${Math.round(this.waitMs / 1000)}s`],
     ];
     rows.forEach(([label, value], i) => {
-      const y = -170 + i * 80;
-      card.add(this.add.text(-340, y, label, rowStyle).setOrigin(0, 0.5));
-      card.add(this.add.text(340, y, value, rowStyle).setOrigin(1, 0.5).setName(`serve-${label.toLowerCase().replace(' ', '-')}`));
+      const y = -235 + i * 66;
+      card.add(text(-340, y, label, 46).setOrigin(0, 0.5));
+      card.add(text(340, y, value, 46).setOrigin(1, 0.5).setName(`serve-${label.toLowerCase()}`));
     });
-    card.add(
-      this.add
-        .text(0, 245, 'Tip: — (scoring arrives in Phase 6)', { fontFamily: FONT_FAMILY, fontSize: '40px', fontStyle: 'bold', color: CSS.ink })
-        .setOrigin(0.5),
-    );
-    card.add(new Button(this, 0, 360, 'Back to lobby', () => this.scene.stop(), { name: 'btn-serve-done' }));
+    const line = this.add.graphics();
+    line.lineStyle(4, COLORS.ink, 0.2);
+    line.lineBetween(-360, 95, 360, 95);
+    card.add(line);
 
-    onLayout(this, (v) => card.setPosition(v.width / 2, v.height / 2));
+    if (score) {
+      card.add(text(0, 160, `${score.total}  ·  ${orderVerdict(score.total, balance.scoring)}`, 64, { fontStyle: 'bold' }).setOrigin(0.5).setName('serve-total'));
+      card.add(
+        text(0, 245, `tip $${score.tip.toFixed(2)}   ·   sold for $${(r?.sale ?? 0).toFixed(2)}`, 40, { color: '#6b5d52' })
+          .setOrigin(0.5)
+          .setName('serve-tip'),
+      );
+    }
+    card.add(new Button(this, 0, 380, 'Back to lobby', () => this.close(), { name: 'btn-serve-done' }));
+
+    onLayout(this, (v) => {
+      const scale = Math.min(1, (v.height - 40) / CARD_H, (v.width - 40) / CARD_W);
+      card.setPosition(v.width / 2, v.height / 2).setScale(scale);
+    });
+  }
+
+  /** Back to the lobby; if that was the last customer, the day is done. */
+  private close(): void {
+    if (session().isDayComplete) this.scene.launch(SceneKeys.DaySummary);
+    this.scene.stop();
   }
 }

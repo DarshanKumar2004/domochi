@@ -90,6 +90,11 @@ describe('sanitizeSave', () => {
     expect(d).not.toHaveProperty('extra');
   });
 
+  it('keeps progress stats (served, best order) and drops bad ones', () => {
+    expect(sanitizeSave({ day: 3, money: 42.5, served: 12, bestOrder: 97 })).toMatchObject({ day: 3, money: 42.5, served: 12, bestOrder: 97 });
+    expect(sanitizeSave({ served: -1, bestOrder: 140 })).toMatchObject({ served: 0, bestOrder: 0 });
+  });
+
   it.each([null, 5, 'save', [1, 2]])('returns defaults for non-object %p', (raw) => {
     expect(sanitizeSave(raw)).toEqual(defaultSave());
   });

@@ -1,0 +1,108 @@
+// Order scoring, wait time, tips and the customer's reaction. Pure: no Phaser.
+// All the numbers live in balance.json ("scoring").
+import type { ThanksTier } from './customers';
+
+export interface ScoringBalance {
+  /** Weights of each station's score and the wait score (they needn't sum to 1). */
+  weights: { fry: number; glaze: number; toppings: number; box: number; wait: number };
+  /** Wait score: full marks until patience × graceShare, easing to 0 at patience × zeroShare. */
+  wait: { graceShare: number; zeroShare: number };
+  /** Lowest order score for each reaction tier (below `okay` is `bad`). */
+  tiers: { great: number; good: number; okay: number };
+  /** Tip = perDonut × donuts × curve(order score). Curve: [score, multiplier] points, straight lines between. */
+  tip: { perDonut: number; curve: number[][] };
+}
+
+export interface StationScores {
+  fry: number;
+  glaze: number;
+  toppings: number;
+  box: number;
+}
+
+export interface OrderScore extends StationScores {
+  wait: number;
+  /** Weighted overall score, 0–100. */
+  total: number;
+  tier: ThanksTier;
+  /** Dollars, rounded to cents. */
+  tip: number;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+/** 0–100. A soft curve: full marks for a reasonable wait, then a gentle slide to 0. */
+export function waitScore(waitSec: number, patienceSec: number, b: ScoringBalance): number {
+  const grace = patienceSec * b.wait.graceShare;
+  const zero = patienceSec * b.wait.zeroShare;
+  if (waitSec <= grace) return 100;
+  if (waitSec >= zero) return 0;
+  const x = (waitSec - grace) / (zero - grace);
+  return Math.round(50 * (1 + Math.cos(Math.PI * x)));
+}
+
+export function tierFor(score: number, b: ScoringBalance): ThanksTier {
+  if (score >= b.tiers.great) return 'great';
+  if (score >= b.tiers.good) return 'good';
+  if (score >= b.tiers.okay) return 'okay';
+  return 'bad';
+}
+
+/** The tip curve at a score (straight lines between points, flat past the ends). */
+export function tipMultiplier(score: number, b: ScoringBalance): number {
+  const pts = b.tip.curve;
+  const x = (i: number) => pts[i]![0]!;
+  const y = (i: number) => pts[i]![1]!;
+  if (score <= x(0)) return y(0);
+  for (let i = 1; i < pts.length; i++) {
+    if (score <= x(i)) return y(i - 1) + ((y(i) - y(i - 1)) * (score - x(i - 1))) / (x(i) - x(i - 1));
+  }
+  return y(pts.length - 1);
+}
+
+export function tipFor(score: number, donuts: number, b: ScoringBalance): number {
+  return Math.round(b.tip.perDonut * donuts * tipMultiplier(score, b) * 100) / 100;
+}
+
+/** Everything about how an order went: the weighted score, reaction tier and tip. */
+export function scoreOrder(stations: StationScores, waitSec: number, patienceSec: number, donuts: number, b: ScoringBalance): OrderScore {
+  const wait = waitScore(waitSec, patienceSec, b);
+  const w = b.weights;
+  const sum = w.fry + w.glaze + w.toppings + w.box + w.wait;
+  const total = Math.round(
+    clamp((stations.fry * w.fry + stations.glaze * w.glaze + stations.toppings * w.toppings + stations.box * w.box + wait * w.wait) / sum, 0, 100),
+  );
+  return { ...stations, wait, total, tier: tierFor(total, b), tip: tipFor(total, donuts, b) };
+}
+
+/** Problems with the scoring numbers (empty = fine). */
+export function validateScoring(b: ScoringBalance): string[] {
+  const errors: string[] = [];
+  const w = b.weights;
+  if (![w.fry, w.glaze, w.toppings, w.box, w.wait].every((x) => x >= 0) || w.fry + w.glaze + w.toppings + w.box + w.wait <= 0) {
+    errors.push('scoring.weights must be >= 0 and not all 0');
+  }
+  if (!(b.wait.graceShare >= 0 && b.wait.zeroShare > b.wait.graceShare)) errors.push('scoring.wait needs 0 <= graceShare < zeroShare');
+  if (!(b.tiers.great > b.tiers.good && b.tiers.good > b.tiers.okay)) errors.push('scoring.tiers needs great > good > okay');
+  const c = b.tip.curve;
+  if (!(b.tip.perDonut >= 0 && c.length >= 2 && c.every((p, i) => p.length === 2 && (i === 0 || p[0]! > c[i - 1]![0]!)))) {
+    errors.push('scoring.tip needs perDonut >= 0 and a curve of 2+ points with rising scores');
+  }
+  return errors;
+}
+
+/** A word for an order score (0–100). */
+export function orderVerdict(score: number, b: ScoringBalance): string {
+  switch (tierFor(score, b)) {
+    case 'great':
+      return 'amazing!';
+    case 'good':
+      return 'nice work';
+    case 'okay':
+      return 'not bad';
+    default:
+      return 'needs work';
+  }
+}

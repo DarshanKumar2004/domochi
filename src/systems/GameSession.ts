@@ -13,7 +13,8 @@ import { forDay, type Balance } from './balance';
 import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
 import { Emitter } from './events';
 import type { Menu } from './menu';
-import { describeOrder, generateOrder, orderSizeRange, type Order } from './orders';
+import { describeOrder, generateOrder, orderPrice, orderSizeRange, type Order } from './orders';
+import { scoreOrder, type OrderScore } from './score';
 import type { Rng } from './rng';
 
 export type CustomerState = 'inLine' | 'ordering' | 'waiting' | 'served';
@@ -57,6 +58,10 @@ export interface Ticket {
     packed?: PackedDonut[];
     /** Ordered donuts with nothing in the box to match them. */
     missing?: number;
+    /** The weighted order score, the customer's reaction tier and their tip. */
+    score?: OrderScore;
+    /** What the order sold for (dollars). */
+    sale?: number;
   };
 }
 
@@ -64,6 +69,23 @@ export interface ServedEvent {
   customer: Customer;
   ticket: Ticket;
   waitMs: number;
+  score: OrderScore;
+  sale: number;
+}
+
+/** How the day went, for the end-of-day summary. */
+export interface DaySummary {
+  day: number;
+  served: number;
+  /** Average order score (0–100), 0 if nobody was served. */
+  averageScore: number;
+  bestScore: number;
+  sales: number;
+  tips: number;
+  /** Donuts thrown away (trashed or burnt). */
+  trashed: number;
+  /** Orders by reaction tier. */
+  tiers: Record<'great' | 'good' | 'okay' | 'bad', number>;
 }
 
 export interface SessionEvents extends Record<string, unknown> {
@@ -552,11 +574,50 @@ export class GameSession {
     t.servedAtMs = this.now;
     c.state = 'served';
     this.activeNo = this.allTickets.find((x) => x.status === 'open')?.no ?? null;
-    const event: ServedEvent = { customer: c, ticket: t, waitMs: this.now - t.takenAtMs };
+    const waitMs = this.now - t.takenAtMs;
+    const score = scoreOrder(
+      { fry: t.results.fry!.score, glaze: t.results.glaze!.score, toppings: t.results.toppings!.score, box: t.results.box!.score },
+      waitMs / 1000,
+      this.typeOf(c).patienceSec,
+      needed,
+      balance.scoring,
+    );
+    const sale = orderPrice(menu, t.order);
+    t.results.score = score;
+    t.results.sale = sale;
+    const event: ServedEvent = { customer: c, ticket: t, waitMs, score, sale };
     this.events.emit('served', event);
     this.events.emit('changed', undefined);
     if (this.isDayComplete) this.events.emit('dayComplete', undefined);
     return event;
+  }
+
+  /** Totals for the day so far (the summary at the end of the day). */
+  summary(): DaySummary {
+    const served = this.allTickets.filter((t) => t.status === 'served' && t.results.score);
+    const tiers = { great: 0, good: 0, okay: 0, bad: 0 };
+    let total = 0;
+    let best = 0;
+    let sales = 0;
+    let tips = 0;
+    for (const t of served) {
+      const s = t.results.score!;
+      total += s.total;
+      best = Math.max(best, s.total);
+      tips += s.tip;
+      sales += t.results.sale ?? 0;
+      tiers[s.tier]++;
+    }
+    return {
+      day: this.day,
+      served: served.length,
+      averageScore: served.length ? Math.round(total / served.length) : 0,
+      bestScore: best,
+      sales: Math.round(sales * 100) / 100,
+      tips: Math.round(tips * 100) / 100,
+      trashed: this.trashedCount,
+      tiers,
+    };
   }
 
   private trashed1(): void {

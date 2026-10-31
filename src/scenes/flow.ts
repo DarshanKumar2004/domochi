@@ -15,6 +15,7 @@ const MAIN_GAME_SCENES: readonly SceneKey[] = [
   SceneKeys.Serve,
   SceneKeys.Settings,
   SceneKeys.TicketView,
+  SceneKeys.DaySummary,
 ];
 
 /** Leave `from` and enter the game at the Lobby, with the tab bar on top, starting a fresh day. */

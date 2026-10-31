@@ -174,3 +174,5 @@ tests/              # vitest + playwright
 ## Future ideas (not scheduled yet)
 
 - **Morning deliveries:** domochi also delivers to local coffee shops and through delivery apps. A morning rush could mix walk-up customers with batch orders for partner coffee shops (Kumar suggested Campus Grounds at UL Lafayette) and delivery-app pickups. Before using any real partner's name, get their OK. Use a generic "delivery app" rather than a real brand name.
+- **Opening and closing tasks** (Kumar, 2026-10-30). At opening, make the day's **mochi dough** first thing, at a new **Dough station**. Dough is used up as you fry. If you run out mid-day, make a second batch while orders wait. At closing, there are clean-up tasks: wiping the glaze and toppings trays (their mess already builds up during the day), cleaning or filtering the fryer oil, and so on. These could feed into the day summary.
+- **Event invites** (Kumar, 2026-10-30). Some customers, whether they buy something or not, invite you to their event. On a later day domochi runs a **pop-up booth** there, selling mochi donuts in a different setting, perhaps with its own crowd and menu.

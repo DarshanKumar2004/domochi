@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { isClockPaused, menu, session } from '../systems/services';
+import { isClockPaused, menu, save, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
@@ -36,6 +36,10 @@ export class HudScene extends Phaser.Scene {
       (no) => session().selectTicket(no),
       (no) => {
         if (!this.scene.isActive(SceneKeys.TicketView)) this.scene.launch(SceneKeys.TicketView, { ticketNo: no });
+      },
+      () => {
+        const today = session().summary();
+        return save().data.money + today.sales + today.tips;
       },
     );
     const settings = new Button(this, 0, 0, 'Settings', () => this.openSettings(), {

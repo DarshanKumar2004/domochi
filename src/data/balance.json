@@ -24,7 +24,7 @@
     "startTempF": 300,
     "startTargetF": 350,
     "dial": { "minF": 250, "maxF": 425 },
-    "heatLagPerSec": 0.35,
+    "heatLagPerSec": 0.2,
     "oilDriftF": 60,
     "idealRangeF": { "min": 340, "max": 360 },
     "cookRate": { "zeroAtF": 250, "oneAtF": 350, "max": 1.8 },
@@ -57,7 +57,10 @@
     "unwantedDrizzleFactor": 0.6,
     "drizzleWeight": 0.35,
     "fallMs": 140,
-    "shelfCapacity": 6
+    "shelfCapacity": 6,
+    "_pattern": "Flavours with a drizzlePattern score the drizzle like a coat over those stripes: coverage of the stripes / patternGoodCoverage, minus spill off them (0 at patternSpillZeroAt × the stripes' size).",
+    "patternGoodCoverage": 0.7,
+    "patternSpillZeroAt": 1.5
   },
   "toppings": {
     "_note": "Pieces are placed in normalised donut coordinates. Per wanted topping: amount (menu topping.amount, too much is 0 at max × tooMuchZeroAtFactor) × evenness over the 8 balls × (1 − share that fell off / messZeroAt). Each unwanted topping multiplies by unwantedFactor.",
@@ -70,6 +73,13 @@
     "evennessFloor": 0.4,
     "messZeroAt": 0.5,
     "unwantedFactor": 0.5
+  },
+  "scoring": {
+    "_note": "Order score = weighted average of the station scores (0-100) and the wait score. Wait: full marks until patienceSec × graceShare, easing (cosine) to 0 at patienceSec × zeroShare. Tip = tip.perDonut × donuts × curve(order score), the curve is [score, multiplier] points joined by straight lines. Thanks tiers by order score.",
+    "weights": { "fry": 0.3, "glaze": 0.25, "toppings": 0.25, "box": 0.1, "wait": 0.1 },
+    "wait": { "graceShare": 0.6, "zeroShare": 3 },
+    "tiers": { "great": 90, "good": 70, "okay": 45 },
+    "tip": { "perDonut": 0.75, "curve": [[0, 0], [40, 0.2], [70, 0.7], [90, 1], [100, 1.25]] }
   },
   "box": {
     "_note": "Each ordered slot holding its flavour = 1, that flavour in the wrong slot = wrongSpotCredit, minus extraPenalty per extra donut.",

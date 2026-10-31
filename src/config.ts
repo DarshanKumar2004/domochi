@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { BoxScene } from './scenes/BoxScene';
+import { DaySummaryScene } from './scenes/DaySummaryScene';
 import { FryScene } from './scenes/FryScene';
 import { GlazeScene } from './scenes/GlazeScene';
 import { HudScene } from './scenes/HudScene';
@@ -46,6 +47,7 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       ServeScene,
       SettingsScene,
       TicketViewScene,
+      DaySummaryScene,
     ],
   };
 }

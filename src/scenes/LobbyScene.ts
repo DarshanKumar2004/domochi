@@ -106,7 +106,7 @@ export class LobbyScene extends Phaser.Scene {
     this.tweens.add({ targets: this.frontTag, scale: 1.1, duration: 500, yoyo: true, repeat: -1 });
 
     this.doneText = this.add
-      .text(0, 0, "that's everyone for today!\n(the end-of-day summary arrives in Phase 6)", {
+      .text(0, 0, "that's everyone for today!\nthanks for a sweet day", {
         fontFamily: FONT_FAMILY,
         fontSize: '44px',
         color: CSS.ink,

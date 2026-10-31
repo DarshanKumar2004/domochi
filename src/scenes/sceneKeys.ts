@@ -14,6 +14,7 @@ export const SceneKeys = {
   Serve: 'ServeScene',
   Settings: 'SettingsScene',
   TicketView: 'TicketViewScene',
+  DaySummary: 'DaySummaryScene',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];
