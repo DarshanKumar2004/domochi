@@ -39,6 +39,8 @@ export interface JournalPage {
   doodle?: string;
   /** How the day went, 0–3 stars. */
   stars?: number;
+  /** A real-shop coupon earned that day (brand.json coupons). */
+  coupon?: string;
 }
 
 /**
@@ -186,4 +188,17 @@ export function addPage(pages: JournalPage[], page: JournalPage): JournalPage[] 
   out.sort((a, b) => a.day - b.day);
   for (let i = 0; i < out.length - DOODLE_PAGES; i++) delete out[i]!.doodle;
   return out;
+}
+
+/** Something that opens up on a later day (flavours, features). */
+export interface Milestone {
+  day: number;
+  text: string;
+}
+
+/** The next milestone after `day` (the soonest), if any. */
+export function nextMilestone(list: readonly Milestone[], day: number): Milestone | undefined {
+  let best: Milestone | undefined;
+  for (const m of list) if (m.day > day && (!best || m.day < best.day)) best = m;
+  return best;
 }

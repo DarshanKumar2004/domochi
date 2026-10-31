@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import brand from '../data/brand.json';
 import { flavorsForDay } from '../systems/menu';
-import { addPage, dayNote, dayStars, type JournalPage } from '../systems/journal';
+import { addPage, dayNote, dayStars, nextMilestone, type JournalPage, type Milestone } from '../systems/journal';
 import { createRng } from '../systems/rng';
-import { audio, feedback, journalData, menu, save, session, stickers } from '../systems/services';
+import { couponCode, earnsCoupon } from '../systems/coupons';
+import { audio, balance, feedback, journalData, menu, save, session, stickers } from '../systems/services';
 import { drawFinishedDonut } from '../ui/donutArt';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
@@ -26,6 +27,7 @@ const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(n).toFixed(2)}`;
  * opens the supply store before the next day.
  */
 export class DaySummaryScene extends Phaser.Scene {
+  private coupon: string | undefined;
   constructor() {
     super(SceneKeys.DaySummary);
   }
@@ -38,6 +40,14 @@ export class DaySummaryScene extends Phaser.Scene {
     const bank = save().data.money;
     const today = sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus;
     const counted = s.tracksSupplies;
+    // A great day (once Ethan's coupons are on) earns a code to show at the real truck.
+    const earns = earnsCoupon(brand.coupons, sum.day, dayStars(sum));
+    if (earns && !save().data.playerId) {
+      const id = Math.random().toString(36).slice(2, 10);
+      void save().update((d) => void (d.playerId = id));
+    }
+    const coupon = earns ? couponCode(sum.day, save().data.playerId) : undefined;
+    this.coupon = coupon;
     // The day's stickers (finishing the day, a tidy close, no waste...).
     const tracker = stickers();
     tracker?.endOfDay(sum, counted);
@@ -76,6 +86,7 @@ export class DaySummaryScene extends Phaser.Scene {
       ...(sum.goal ? [['daily goal', sum.goalBonus ? `done! +${money(sum.goalBonus)}` : 'missed', 'goal'] as Row] : []),
       ...(sum.bestStreak >= 2 ? [['best streak', `${sum.bestStreak} in a row`, 'streak'] as Row] : []),
       ...(sum.specialsSold ? [["special sold", `${sum.specialsSold}`, 'specials'] as Row] : []),
+      ...(coupon ? [['coupon for the truck!', coupon, 'coupon'] as Row] : []),
       ...(earned.length ? [['new stickers', earned.map((st) => st.glyph).join(' '), 'stickers'] as Row] : []),
       ...(counted && sum.suppliesCost - sum.wasteCost >= 0.005 ? [['other supplies used', `−${money(Math.max(0, sum.suppliesCost - sum.wasteCost))}`, 'supplies'] as Row] : []),
     ];
@@ -98,7 +109,7 @@ export class DaySummaryScene extends Phaser.Scene {
     );
     card.add(
       text(0, 378, [sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '', fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!
-(its glaze and toppings are at the supply store)` : sum.nextEvent ? '' : 'same menu tomorrow'].filter(Boolean).join('\n'), 38, {
+(its glaze and toppings are at the supply store)` : sum.nextEvent ? '' : this.comingUp(sum.day)].filter(Boolean).join('\n'), 38, {
         color: fresh.length || sum.nextEvent ? '#b0406a' : '#6b5d52',
         fontStyle: fresh.length || sum.nextEvent ? 'bold' : 'normal',
         align: 'center',
@@ -113,6 +124,22 @@ export class DaySummaryScene extends Phaser.Scene {
       const scale = Math.min(1, (v.height - 40) / CARD_H, (v.width - 40) / CARD_W);
       card.setPosition(v.width / 2, v.height / 2).setScale(scale);
     });
+  }
+
+  /** What opens up next (so the long road has signposts). */
+  private comingUp(day: number): string {
+    const list: Milestone[] = [
+      ...menu.flavors.map((f) => ({ day: f.unlockDay, text: `${f.name}!` })),
+      { day: balance.special.fromDay ?? 1, text: 'a special of the day' },
+      { day: balance.goals.fromDay, text: 'daily goals' },
+      { day: balance.supplies.friendsFromDay ?? 1, text: "Ethan's friends drop by" },
+      { day: balance.events.fromDay ?? 1, text: 'invites to pop-up events' },
+      { day: Math.min(...balance.decor.items.map((d) => d.unlockDay)), text: 'decorations for the lot' },
+      ...(brand.coupons.enabled ? [{ day: brand.coupons.fromDay, text: 'coupons for the real truck' }] : []),
+      { day: Math.min(...balance.staff.hires.map((h) => h.unlockDay)), text: 'hiring a crew' },
+    ];
+    const m = nextMilestone(list, day + 1);
+    return m ? `next up on day ${m.day}: ${m.text}` : 'same menu tomorrow';
   }
 
   /** Bank today's money and the supplies left, save, then the supply store (or straight to the next day). */
@@ -139,6 +166,7 @@ export class DaySummaryScene extends Phaser.Scene {
       stickers: [...(stickers()?.today ?? [])],
       note: dayNote(journalData, sum, createRng(sum.day * 7919 + sum.served)),
       stars: dayStars(sum),
+      ...(this.coupon ? { coupon: this.coupon } : {}),
       ...(doodle ? { doodle } : {}),
     };
     void save().update((d) => {

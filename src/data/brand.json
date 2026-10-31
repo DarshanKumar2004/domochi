@@ -8,5 +8,11 @@
   "website": "https://www.domochitreats.com",
   "instagram": "@domochi.treats",
   "feedbackEndpoint": "",
-  "_feedbackNote": "Where players' flavour ideas and notes for Ethan go: a URL that takes a JSON POST and emails it on (e.g. a Formspree form, or a small serverless function). Empty = notes wait on the device until it's set. TODO-BRAND: Kumar to pick the service and Ethan's address."
+  "_feedbackNote": "Where players' flavour ideas and notes for Ethan go: a URL that takes a JSON POST and emails it on (e.g. a Formspree form, or a small serverless function). Empty = notes wait on the device until it's set. TODO-BRAND: Kumar to pick the service and Ethan's address.",
+  "coupons": {
+    "enabled": false,
+    "fromDay": 50,
+    "offer": "$1 off a box",
+    "_note": "Real-shop coupons: from fromDay, a three-star day earns a code to show at the truck. TODO-BRAND: OFF until Ethan agrees on the offer, how many a day, and how staff check a code (codes are DMC-<day>-<4 letters>; the letters come from the day and the player's save id, so the same day on the same phone always gives the same code). Then set enabled: true."
+  }
 }

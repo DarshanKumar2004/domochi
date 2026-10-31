@@ -499,3 +499,29 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
 - **Layout:**
   - The summary card is taller and spaced so the extra rows don't crowd it.
   - The portrait morning checklist moved down so it clears mochi's journal button.
+
+## Kumar's month-long pacing, gated closing, mochi's shopping plan, email relay, decorations, crew, coupons (2026-11-01)
+
+- **Pacing** (Kumar: "this slow/fast, not strict"):
+  - **New flavours:** chocolate hazelnut day 3, fruity cereal day 17, cookie butter day 38, beignet day 62. Each flavour's glaze and toppings are sold from that day.
+  - **Features:** daily goals from day 5, the special of the day from day 10, Ethan's friends from day 20, event invites from day 30, decorations from day 45, coupons from day 50 (off; see below), hiring a crew from day 75.
+  - **Signposts:** the day summary's "what's new" line says what's coming next, e.g. "next up on day 3: chocolate hazelnut!".
+- **Close early only when out of baking materials.** That means the tub is empty, nothing is in the bowl, and an ingredient is at 0. Then mochi's note in the lobby says what ran out and to restock. This stops skipping days without playing them.
+- **mochi's shopping plan** (`shopNeeds` / `shoppingPlan` in `systems/supplies.ts`):
+  - **Musts:** dough for 3 batches, trio and single boxes, oil.
+  - **Shoulds:** glazes and toppings for today's menu, flight boxes.
+  - **Nice-to-haves:** anything else running low.
+  - It's filled from the cash you have, musts first. A little mochi sits on each pick (pink = must, gold = should, grey = nice) with how many packs to buy, or "need!" when you can't afford it. The tip line says what to get first and what's short when money's tight. "low!" on a tile now means mochi wants more of it.
+- **Email** (Kumar chose Resend). The key must not be in the public repo or site, and Resend also blocks calls straight from a browser.
+  - So `relay/` is a ~60-line Cloudflare Worker that holds the key and the recipient as Worker secrets. It accepts reports only from the game's own pages and emails them.
+  - **Tested locally:** a real report reached Kumar's inbox. Other sites get a 403, and empty reports get a 400.
+  - **To go live:** Kumar deploys it (`relay/README.md`, about 5 minutes) and puts the Worker URL in `brand.json` `feedbackEndpoint`.
+- **Decorations** (`balance.decor`, from day 45). Each is bought once, shows on the lot, and gives a small perk:
+  - **Flower boxes and a second picnic table:** a little more patience.
+  - **Pink string lights and a neon "mochi donuts" sign:** a little more in tips.
+  - **A mochi mural on the deck:** a few more walk-ups.
+- **Your crew** (`balance.staff`, `systems/staff.ts`, from day 75: Mai, then Theo at 90 and Rosa at 110):
+  - **What they earn:** while you're away, cap × (1 − ½^(hours / 6)), where each hire adds to the cap. It levels off rather than growing in a straight line, and anything under half an hour counts for nothing.
+  - **When you come back:** "while you were away, Mai sold $X" (tap to close), and the money is banked.
+- **Coupons for the real truck** (`brand.json` `coupons`, `systems/coupons.ts`): from day 50, a three-star day earns a code (DMC-<day>-<4 letters>, steady per day and phone). It shows on the summary and the journal page.
+  - **Built but OFF** until Ethan agrees on the offer, the daily cap, and how staff check a code (TODO-BRAND).
