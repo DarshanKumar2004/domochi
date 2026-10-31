@@ -135,16 +135,19 @@ export const MESS_SIZE = Math.round(ART_SIZE * (1 + 2 * TRAY_PAD));
 
 /**
  * Draw on the mess canvas in donut coordinates (a ART_SIZE square, like the
- * board). Whatever lands on the ring is wiped: that part is on the donut.
+ * board). With a donut on that spot, whatever lands on the ring is wiped: that
+ * part is on the donut. On an empty spot it all lands on the tray.
  */
-export function drawOnTray(ctx: CanvasRenderingContext2D, draw: (ctx: CanvasRenderingContext2D, size: number) => void): void {
+export function drawOnTray(ctx: CanvasRenderingContext2D, draw: (ctx: CanvasRenderingContext2D, size: number) => void, donutThere = true): void {
   const off = ART_SIZE * TRAY_PAD;
   ctx.save();
   ctx.translate(off, off);
   draw(ctx, ART_SIZE);
-  ctx.globalCompositeOperation = 'destination-out';
-  ringPath(ctx, ART_SIZE);
-  ctx.fill();
+  if (donutThere) {
+    ctx.globalCompositeOperation = 'destination-out';
+    ringPath(ctx, ART_SIZE);
+    ctx.fill();
+  }
   ctx.restore();
 }
 

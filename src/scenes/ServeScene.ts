@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { orderVerdict } from '../systems/score';
-import { audio, balance, session } from '../systems/services';
+import type { PackedDonut } from '../systems/GameSession';
+import { audio, balance, menu, session } from '../systems/services';
+import { shareDonut } from '../ui/share';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -8,7 +10,7 @@ import { onLayout } from '../ui/viewport';
 import { SceneKeys } from './sceneKeys';
 
 const CARD_W = 860;
-const CARD_H = 1000;
+const CARD_H = 1100;
 
 /** Result card after handing an order over: each station's score, the order score, the reaction and the tip. */
 export class ServeScene extends Phaser.Scene {
@@ -38,8 +40,8 @@ export class ServeScene extends Phaser.Scene {
     const card = this.add.container(0, 0, [addCard(this, CARD_W, CARD_H)]);
     const text = (x: number, y: number, str: string, size: number, opts: Partial<Phaser.Types.GameObjects.Text.TextStyle> = {}) =>
       this.add.text(x, y, str, { fontFamily: FONT_FAMILY, fontSize: `${size}px`, color: CSS.ink, ...opts });
-    card.add(text(0, -425, `Order #${this.ticketNo} ${ticket?.delivery ? 'picked up!' : 'served!'}`, 68, { fontStyle: 'bold' }).setOrigin(0.5));
-    card.add(text(0, -335, `"${thanks}"`, 40, { fontStyle: 'italic', align: 'center', wordWrap: { width: CARD_W - 120 } }).setOrigin(0.5).setName('serve-thanks'));
+    card.add(text(0, -470, `Order #${this.ticketNo} ${ticket?.delivery ? 'picked up!' : 'served!'}`, 68, { fontStyle: 'bold' }).setOrigin(0.5));
+    card.add(text(0, -370, `"${thanks}"`, 40, { fontStyle: 'italic', align: 'center', wordWrap: { width: CARD_W - 120 } }).setOrigin(0.5).setName('serve-thanks'));
 
     const val = (x: { score: number } | undefined) => (x ? String(x.score) : '—');
     const rows: [string, string][] = [
@@ -50,21 +52,21 @@ export class ServeScene extends Phaser.Scene {
       ['Wait', score ? `${score.wait}  (${Math.round(this.waitMs / 1000)}s)` : `${Math.round(this.waitMs / 1000)}s`],
     ];
     rows.forEach(([label, value], i) => {
-      const y = -235 + i * 66;
+      const y = -265 + i * 66;
       card.add(text(-340, y, label, 46).setOrigin(0, 0.5));
       card.add(text(340, y, value, 46).setOrigin(1, 0.5).setName(`serve-${label.toLowerCase()}`));
     });
     const line = this.add.graphics();
     line.lineStyle(4, COLORS.ink, 0.2);
-    line.lineBetween(-360, 95, 360, 95);
+    line.lineBetween(-360, 65, 360, 65);
     card.add(line);
 
     if (score && r) {
-      card.add(text(0, 160, `${score.total}  ·  ${orderVerdict(score.total, balance.scoring)}`, 64, { fontStyle: 'bold' }).setOrigin(0.5).setName('serve-total'));
+      card.add(text(0, 125, `${score.total}  ·  ${orderVerdict(score.total, balance.scoring)}`, 64, { fontStyle: 'bold' }).setOrigin(0.5).setName('serve-total'));
       card.add(
         text(
           0,
-          245,
+          210,
           this.payLine(score.tip, score.giftTip, r.sale ?? 0, r.price ?? r.sale ?? 0),
           score.giftTip > 0 || (r.sale ?? 0) < (r.price ?? 0) ? 32 : 40,
           { color: (r.sale ?? 0) < (r.price ?? 0) ? '#b03a3a' : '#6b5d52', align: 'center', wordWrap: { width: CARD_W - 80 } },
@@ -74,7 +76,39 @@ export class ServeScene extends Phaser.Scene {
       );
     }
     if (score) audio().play(score.tip > 0 ? 'cash' : 'tap');
-    card.add(new Button(this, 0, 380, 'Back to lobby', () => this.close(), { name: 'btn-serve-done' }));
+    // A regular got to know you a bit better (or not).
+    const reg = r?.regular;
+    if (reg) {
+      const max = balance.regulars.maxLevel;
+      const hearts = '♥'.repeat(reg.after) + '♡'.repeat(Math.max(0, max - reg.after));
+      const how =
+        reg.after >= balance.regulars.usualAt && reg.before < balance.regulars.usualAt
+          ? 'knows you now: next time, "the usual!"'
+          : reg.after > reg.before
+            ? 'likes you more!'
+            : reg.after < reg.before
+              ? 'was a bit let down'
+              : 'is a regular';
+      card.add(text(0, 300, `${reg.name} ${how}  ${hearts}`, 36, { fontStyle: 'bold', color: '#b0406a', align: 'center', wordWrap: { width: CARD_W - 80 } }).setOrigin(0.5).setName('serve-regular'));
+    }
+
+    // Share the best donut in the box (a picture for Instagram and friends).
+    let best: PackedDonut | undefined;
+    for (const p of r?.packed ?? []) if (p.donut && (!best || p.glazeScore + p.toppingScore > best.glazeScore + best.toppingScore)) best = p;
+    const share = best?.donut;
+    const flavor = best ? menu.flavors.find((f) => f.id === best.flavorId) : undefined;
+    if (share && score) {
+      card.add(
+        new Button(this, -255, 440, 'Share', () => {
+          void shareDonut(this, {
+            donut: share,
+            title: `my ${flavor?.name ?? 'mochi'} mochi donut`,
+            subtitle: `order score ${score.total} · ${orderVerdict(score.total, balance.scoring)}`,
+          });
+        }, { width: 290, fill: COLORS.dough, name: 'btn-share' }),
+      );
+    }
+    card.add(new Button(this, share && score ? 165 : 0, 440, 'Back to lobby', () => this.close(), { width: share && score ? 480 : 520, name: 'btn-serve-done' }));
 
     onLayout(this, (v) => {
       const scale = Math.min(1, (v.height - 40) / CARD_H, (v.width - 40) / CARD_W);

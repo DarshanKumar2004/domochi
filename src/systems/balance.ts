@@ -6,6 +6,7 @@ import type { ToppingsBalance } from '../stations/toppings';
 import type { DoughBalance } from '../stations/dough';
 import { validateScoring, type ScoringBalance } from './score';
 import type { GuideItem, PaymentBalance, SuppliesBalance } from './supplies';
+import type { WeatherBalance } from './weather';
 
 export interface Range {
   min: number;
@@ -39,6 +40,8 @@ export interface Balance {
   payment: PaymentBalance;
   supplies: SuppliesBalance;
   guides: { items: GuideItem[] };
+  weather: WeatherBalance;
+  regulars: { chance: number; usualAt: number; maxLevel: number };
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */

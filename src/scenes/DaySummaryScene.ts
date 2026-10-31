@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import brand from '../data/brand.json';
 import { flavorsForDay } from '../systems/menu';
-import { audio, menu, save, session } from '../systems/services';
+import { addPage, dayNote, type JournalPage } from '../systems/journal';
+import { createRng } from '../systems/rng';
+import { audio, journalData, menu, save, session, stickers } from '../systems/services';
+import { drawFinishedDonut } from '../ui/donutArt';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -11,6 +14,9 @@ import { SceneKeys } from './sceneKeys';
 
 const CARD_W = 860;
 const CARD_H = 1180;
+
+/** Size of a journal doodle (the day's best donut), px. Small: it lives in the save. */
+const DOODLE_PX = 160;
 
 const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(n).toFixed(2)}`;
 
@@ -32,6 +38,10 @@ export class DaySummaryScene extends Phaser.Scene {
     const bank = save().data.money;
     const today = sum.sales + sum.tips + sum.tidyBonus;
     const counted = s.tracksSupplies;
+    // The day's stickers (finishing the day, a tidy close, no waste...).
+    const tracker = stickers();
+    tracker?.endOfDay(sum, counted);
+    const earned = (tracker?.today ?? []).map((id) => journalData.stickers.find((st) => st.id === id)).filter((st) => !!st);
     const known = new Set(flavorsForDay(menu, sum.day).map((f) => f.id));
     const fresh = flavorsForDay(menu, sum.day + 1).filter((f) => !known.has(f.id));
 
@@ -56,10 +66,11 @@ export class DaySummaryScene extends Phaser.Scene {
       counted
         ? ['wasted', `${sum.wasted} donut${sum.wasted === 1 ? '' : 's'}  −${money(sum.wasteCost)}`, 'waste']
         : ['donuts thrown away', `${sum.trashed}`, 'waste'],
+      ...(earned.length ? [['new stickers', earned.map((st) => st.glyph).join(' '), 'stickers'] as Row] : []),
       ...(counted && sum.suppliesCost - sum.wasteCost >= 0.005 ? [['other supplies used', `−${money(Math.max(0, sum.suppliesCost - sum.wasteCost))}`, 'supplies'] as Row] : []),
     ];
     rows.forEach(([label, value, name], i) => {
-      const y = -365 + i * (rows.length > 9 ? 54 : 60);
+      const y = -365 + i * Math.min(60, 505 / Math.max(1, rows.length - 1));
       card.add(text(-360, y, label, 40).setOrigin(0, 0.5));
       card.add(text(360, y, value, 40, { fontStyle: 'bold' }).setOrigin(1, 0.5).setName(`summary-${name}`));
     });
@@ -98,6 +109,26 @@ export class DaySummaryScene extends Phaser.Scene {
     const s = session();
     const sum = s.summary();
     const invite = s.inviteWasAccepted ? s.invite : undefined;
+    // mochi writes the day's page, with a doodle of the best donut.
+    const best = s.bestDonut;
+    let doodle: string | undefined;
+    if (best) {
+      const c = document.createElement('canvas');
+      c.width = c.height = DOODLE_PX;
+      drawFinishedDonut(c.getContext('2d')!, DOODLE_PX, best);
+      doodle = c.toDataURL('image/png');
+    }
+    const page: JournalPage = {
+      day: sum.day,
+      ...(s.weather ? { weather: s.weather.name } : {}),
+      ...(sum.event ? { event: sum.event } : {}),
+      served: sum.served,
+      best: sum.bestScore,
+      ...(s.tracksSupplies ? { profit: sum.profit } : {}),
+      stickers: [...(stickers()?.today ?? [])],
+      note: dayNote(journalData, sum, createRng(sum.day * 7919 + sum.served)),
+      ...(doodle ? { doodle } : {}),
+    };
     void save().update((d) => {
       d.day = sum.day + 1;
       d.money = Math.round((d.money + sum.sales + sum.tips + sum.tidyBonus) * 100) / 100;
@@ -107,6 +138,8 @@ export class DaySummaryScene extends Phaser.Scene {
       d.served += sum.served;
       d.bestOrder = Math.max(d.bestOrder, sum.bestScore);
       if (s.stock) d.stock = { ...s.stock };
+      if (s.regularsLevels) d.regulars = { ...s.regularsLevels };
+      d.journal.pages = addPage(d.journal.pages, page);
     });
     if (s.tracksSupplies) {
       this.scene.launch(SceneKeys.Store);

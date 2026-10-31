@@ -20,6 +20,7 @@ const MAIN_GAME_SCENES: readonly SceneKey[] = [
   SceneKeys.DaySummary,
   SceneKeys.Invite,
   SceneKeys.Store,
+  SceneKeys.Journal,
 ];
 
 /**

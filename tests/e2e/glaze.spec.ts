@@ -137,3 +137,44 @@ test('glaze from the tray: pour with the tilted cup, drizzle, done → shelf; re
 
   expect(errors).toEqual([]);
 });
+
+test('pouring on an empty tray spot splatters the tray (the ring area too: no donut is there)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await rackThenGlaze(page, 1);
+  // One donut on the first spot; the second spot stays empty.
+  await tapNamed(page, SceneKeys.Glaze, 'glaze-tray-0');
+  await tapNamed(page, SceneKeys.Glaze, 'cup-strawberry');
+  type Board = { x: number; y: number; size: number; messKey: string };
+  const spot = await page.evaluate(() => {
+    const sc = (window as unknown as { __game: { scene: { getScene(k: string): { boards: Board[] } } } }).__game.scene.getScene('GlazeScene');
+    const b = sc.boards[1]!;
+    return { x: b.x, y: b.y, half: b.size / 2, key: b.messKey };
+  });
+  const mess = () => page.evaluate(() => (window as unknown as { __session: { messOn(t: string): number } }).__session.messOn('glaze'));
+  const before = await mess();
+  // Pour round the empty spot's ring, where a donut would sit.
+  await drawPath(page, Array.from({ length: 21 }, (_, k) => ({ x: spot.x + Math.cos((k / 20) * Math.PI * 2) * 0.62 * spot.half, y: spot.y + Math.sin((k / 20) * Math.PI * 2) * 0.62 * spot.half })));
+  await page.waitForTimeout(500);
+  expect(await mess()).toBeGreaterThan(before);
+  // The mess canvas has glaze right on the ring (it isn't cut out as if a donut were there).
+  const alpha = await page.evaluate((key) => {
+    const tex = (window as unknown as { __game: { textures: { get(k: string): { getSourceImage(): HTMLCanvasElement } } } }).__game.textures.get(key);
+    const c = tex.getSourceImage();
+    const ctx = c.getContext('2d')!;
+    let hits = 0;
+    const s = c.width;
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      // Ring radius 0.62 of the donut, inside the padded mess canvas (pad 0.15 each side).
+      const px = Math.round(s / 2 + (Math.cos(a) * 0.62 * s) / 2 / 1.3);
+      const py = Math.round(s / 2 + (Math.sin(a) * 0.62 * s) / 2 / 1.3);
+      if (ctx.getImageData(px, py, 1, 1).data[3]! > 0) hits++;
+    }
+    return hits;
+  }, spot.key);
+  expect(alpha).toBeGreaterThan(8);
+  // And the donut on the first spot is untouched.
+  const working = await page.evaluate(() => (window as unknown as { __session: { glazeBoards: ({ hasGlaze: boolean } | null)[] } }).__session.glazeBoards[0]!.hasGlaze);
+  expect(working).toBe(false);
+  await shot(page, 'glaze-6-empty-spot-splat');
+});

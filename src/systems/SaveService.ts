@@ -1,3 +1,4 @@
+import type { JournalPage } from './journal';
 /**
  * Async key-value storage. Async so it can be backed by Capacitor Preferences
  * later without changing SaveService or any scene.
@@ -28,6 +29,10 @@ export interface SaveData {
   stock?: Record<string, number>;
   /** Glaze guides bought at the supply store (balance.guides ids). */
   guides: string[];
+  /** How well each regular knows you (customers.json regulars ids). */
+  regulars: Record<string, number>;
+  /** mochi's journal: stickers earned (ids, in order) and a page per finished day. */
+  journal: { stickers: string[]; pages: JournalPage[]; seen: number };
   settings: {
     sound: boolean;
     music: boolean;
@@ -43,6 +48,8 @@ export function defaultSave(): SaveData {
     served: 0,
     bestOrder: 0,
     guides: [],
+    regulars: {},
+    journal: { stickers: [], pages: [], seen: 0 },
     settings: { sound: true, music: true },
   };
 }
@@ -75,6 +82,19 @@ export function sanitizeSave(raw: unknown): SaveData {
     data.stock = stock;
   }
   if (Array.isArray(raw.guides)) data.guides = [...new Set(raw.guides.filter((g): g is string => typeof g === 'string'))];
+  if (isRecord(raw.regulars)) {
+    for (const [k, v] of Object.entries(raw.regulars)) if (typeof v === 'number' && Number.isInteger(v) && v >= 0) data.regulars[k] = v;
+  }
+  if (isRecord(raw.journal)) {
+    const j = raw.journal;
+    if (Array.isArray(j.stickers)) data.journal.stickers = [...new Set(j.stickers.filter((s): s is string => typeof s === 'string'))];
+    if (Array.isArray(j.pages)) {
+      data.journal.pages = j.pages.filter(
+        (p): p is JournalPage => isRecord(p) && typeof p.day === 'number' && typeof p.served === 'number' && typeof p.best === 'number' && Array.isArray(p.stickers) && typeof p.note === 'string',
+      );
+    }
+    if (typeof j.seen === 'number' && j.seen >= 0) data.journal.seen = Math.floor(j.seen);
+  }
 
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;

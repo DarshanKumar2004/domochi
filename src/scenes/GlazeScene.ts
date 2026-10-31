@@ -574,9 +574,16 @@ export class GlazeScene extends StationScene {
 
   private startPour(p: Phaser.Input.Pointer): void {
     if (!this.selected) {
-      // No cup in hand: scrub the tray if it's messy.
-      if (this.wiper.dirty) this.wiper.start(p);
-      else if (!this.anyWork) this.flash(session().rack.length ? 'take a donut from the rack first' : 'fry some donuts first');
+      // No cup in hand. On a donut: you need a cup. On the bare tray: scrub it, if it's messy.
+      const spot = this.nearestSpot(p.worldX, p.worldY);
+      const b = this.boards[spot]!;
+      const { nx, ny } = this.toNorm(b, p.worldX, p.worldY);
+      const onDonut = !!this.work(spot) && Math.hypot(nx, ny) <= 1;
+      if (onDonut) this.flash('pick a cup first!');
+      else if (this.wiper.dirty) {
+        this.wiper.start(p);
+        this.flash('scrubbing the tray clean');
+      } else if (!this.anyWork) this.flash(session().rack.length ? 'take a donut from the rack first' : 'fry some donuts first');
       else this.flash('pick a cup first!');
       this.refreshControls();
       return;
@@ -713,7 +720,7 @@ export class GlazeScene extends StationScene {
     b.lastLand.nx = nx;
     b.lastLand.ny = ny;
     if (!work) {
-      drawOnTray(b.mess.context, (m, size) => drawGlazeSegment(m, size, d.glazeId, x0, y0, nx, ny, d.stroke * 31 + Math.round(nx * 97)));
+      drawOnTray(b.mess.context, (m, size) => drawGlazeSegment(m, size, d.glazeId, x0, y0, nx, ny, d.stroke * 31 + Math.round(nx * 97)), false);
       session().addMess('glaze', 1);
       b.messDirty = true;
       return;

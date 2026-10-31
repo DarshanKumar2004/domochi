@@ -30,6 +30,20 @@ export interface CustomersData {
   giftLines: string[];
   /** Ethan's friends, who drop off supplies you're low on ({item}, {qty}). */
   friends?: { names: string[]; lines: string[] };
+  /** The same people coming back, day after day. */
+  regulars?: { list: RegularDef[] };
+}
+
+/** A regular: a named customer with a usual order, who gets to know you. */
+export interface RegularDef {
+  id: string;
+  name: string;
+  /** A customer type id (sprite, patience, thanks lines). */
+  type: string;
+  /** Their usual order (flavour ids). */
+  usual: string[];
+  /** Order lines by how well they know you ({order} filled in). */
+  lines: { hello: string[]; warm: string[]; usual: string[] };
 }
 
 /** Replace {name} placeholders. Unknown placeholders are left as-is so typos are visible. */
@@ -65,6 +79,12 @@ export function validateCustomers(data: CustomersData, menu: Menu, textureKeys: 
     for (const tier of TIERS) {
       if (!(t.lines.thanks[tier]?.length > 0)) errors.push(`customer "${t.id}" has no "${tier}" thanks lines`);
     }
+  }
+  for (const r of data.regulars?.list ?? []) {
+    if (!data.types.some((t) => t.id === r.type && !t.delivery)) errors.push(`regular "${r.id}" type "${r.type}" is not a walk-up customer type`);
+    if (!r.usual.length) errors.push(`regular "${r.id}" has no usual order`);
+    for (const f of r.usual) if (!flavorIds.has(f)) errors.push(`regular "${r.id}" usual "${f}" is not a menu flavor`);
+    for (const k of ['hello', 'warm', 'usual'] as const) if (!r.lines[k]?.length) errors.push(`regular "${r.id}" has no "${k}" lines`);
   }
   return errors;
 }

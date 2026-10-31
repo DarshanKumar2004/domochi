@@ -5,6 +5,7 @@ import { DaySummaryScene } from './scenes/DaySummaryScene';
 import { DoughScene } from './scenes/DoughScene';
 import { InviteScene } from './scenes/InviteScene';
 import { StoreScene } from './scenes/StoreScene';
+import { JournalScene } from './scenes/JournalScene';
 import { FryScene } from './scenes/FryScene';
 import { GlazeScene } from './scenes/GlazeScene';
 import { HudScene } from './scenes/HudScene';
@@ -57,6 +58,7 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       DaySummaryScene,
       InviteScene,
       StoreScene,
+      JournalScene,
     ],
   };
 }

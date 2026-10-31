@@ -18,6 +18,7 @@ export const SceneKeys = {
   DaySummary: 'DaySummaryScene',
   Invite: 'InviteScene',
   Store: 'StoreScene',
+  Journal: 'JournalScene',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

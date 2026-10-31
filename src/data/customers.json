@@ -274,5 +274,104 @@
       "brought you {qty} {item}, Ethan says hi!",
       "special delivery: {qty} {item}. go get em!"
     ]
+  },
+  "regulars": {
+    "_note": "Regulars: the same people coming back. type: a customer type above (sprite, patience, thanks lines). usual: their order (every flavour must be unlocked for them to come). lines by how well they know you: hello (first visits), warm (getting friendly), usual (from balance regulars.usualAt). {order} is filled in. Names are made up.",
+    "list": [
+      {
+        "id": "jade",
+        "name": "Jade",
+        "type": "student",
+        "usual": [
+          "strawberry",
+          "strawberry"
+        ],
+        "lines": {
+          "hello": [
+            "hi! I'm Jade, I have class in 10. {order}?",
+            "first time here! {order}, please"
+          ],
+          "warm": [
+            "me again! {order}, you know the drill",
+            "hiii! {order} please, my study fuel"
+          ],
+          "usual": [
+            "the usual!",
+            "you know what I want ;)"
+          ]
+        }
+      },
+      {
+        "id": "thibodeaux",
+        "name": "Mr. Thibodeaux",
+        "type": "office",
+        "usual": [
+          "cookies-and-cream",
+          "cookies-and-cream",
+          "cookies-and-cream"
+        ],
+        "lines": {
+          "hello": [
+            "morning. {order} for the office, please",
+            "they told me to try this place. {order}"
+          ],
+          "warm": [
+            "the office loved them. {order} again",
+            "back for more: {order}"
+          ],
+          "usual": [
+            "the usual, chief!",
+            "you know my order by now"
+          ]
+        }
+      },
+      {
+        "id": "vo",
+        "name": "Ms. Vo",
+        "type": "parent",
+        "usual": [
+          "chocolate-hazelnut",
+          "chocolate-hazelnut",
+          "strawberry"
+        ],
+        "lines": {
+          "hello": [
+            "hi! the kids picked: {order}",
+            "{order}, please. it was a promise"
+          ],
+          "warm": [
+            "the kids keep asking for you! {order}",
+            "hello again! {order} please"
+          ],
+          "usual": [
+            "the usual, please! they say hi",
+            "our usual!"
+          ]
+        }
+      },
+      {
+        "id": "remy",
+        "name": "Remy",
+        "type": "regular",
+        "usual": [
+          "fruity-cereal",
+          "beignet"
+        ],
+        "lines": {
+          "hello": [
+            "heard the new flavors are good. {order}?",
+            "{order}, cher"
+          ],
+          "warm": [
+            "ça va? {order} today",
+            "{order}, my weekly treat"
+          ],
+          "usual": [
+            "the usual, cher!",
+            "you know me: the usual"
+          ]
+        }
+      }
+    ]
   }
 }

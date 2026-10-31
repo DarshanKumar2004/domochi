@@ -173,6 +173,9 @@ tests/              # vitest + playwright
 
 ## Future ideas (not scheduled yet)
 
+- **Coupons** (Kumar, 2026-10-31, for another day). After a great day or a high score, the game gives a code to show at the truck (e.g. $1 off). It needs Kumar's and Ethan's OK on the offer, the daily cap and how codes are checked.
+- **Seasonal menus that match the real shop** (Kumar, 2026-10-31, for another day). When domochi runs a seasonal flavour, it appears in the game the same week.
+
 - **Morning deliveries:** domochi also delivers to local coffee shops and through delivery apps. A morning rush could mix walk-up customers with batch orders for partner coffee shops (Kumar suggested Campus Grounds at UL Lafayette) and delivery-app pickups. Before using any real partner's name, get their OK. Use a generic "delivery app" rather than a real brand name.
 - **Opening and closing tasks** (Kumar, 2026-10-30). At opening, make the day's **mochi dough** first thing, at a new **Dough station**. Dough is used up as you fry. If you run out mid-day, make a second batch while orders wait. At closing, there are clean-up tasks: wiping the glaze and toppings trays (their mess already builds up during the day), cleaning or filtering the fryer oil, and so on. These could feed into the day summary.
 - **Event invites** (Kumar, 2026-10-30). Some customers, whether they buy something or not, invite you to their event. On a later day domochi runs a **pop-up booth** there, selling mochi donuts in a different setting, perhaps with its own crowd and menu.

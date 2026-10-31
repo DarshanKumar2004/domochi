@@ -11,6 +11,22 @@ const SKIES: Record<'morning' | 'day' | 'sunset', { top: number; bottom: number;
   sunset: { top: 0x6b5b9e, bottom: 0xf6a46b, sun: 0xff9a4d, glow: 1 },
 };
 const CLOUDS = 3;
+/** Raindrops on a rainy day (fixed pool: nothing is allocated while it rains). */
+const RAIN = 90;
+
+/** Blend two colours (t = 0: a, 1: b). */
+function mix(a: number, b: number, t: number): number {
+  const ch = (s: number) => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+/** How the weather changes the sky: blend towards a colour, sun brightness and size, cloud tint. */
+const WEATHER_LOOK: Record<string, { toward: number; amount: number; sun: number; sunScale: number; cloud: number }> = {
+  sunny: { toward: 0xffffff, amount: 0, sun: 1, sunScale: 1, cloud: 0xffffff },
+  cloudy: { toward: 0xb8c2cc, amount: 0.45, sun: 0.35, sunScale: 1, cloud: 0xdde3e8 },
+  rainy: { toward: 0x7d8894, amount: 0.7, sun: 0, sunScale: 1, cloud: 0x9aa3ad },
+  hot: { toward: 0xffc46b, amount: 0.25, sun: 1, sunScale: 1.4, cloud: 0xffffff },
+};
 /** Cloud drift, px per second. */
 const CLOUD_SPEED = [14, 9, 20];
 
@@ -44,6 +60,9 @@ export class LobbyScenery {
   private sceneryLayout: SceneryLayout | null = null;
   private viewport: Viewport | null = null;
   private time: keyof typeof SKIES = 'day';
+  private weather = 'sunny';
+  private readonly rain: Phaser.GameObjects.Graphics;
+  private readonly drops: { x: number; y: number; speed: number }[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.sky = scene.add.graphics().setDepth(-20);
@@ -56,11 +75,25 @@ export class LobbyScenery {
     this.patio = scene.add.graphics().setDepth(-13);
     this.table = scene.add.image(0, 0, TextureKeys.PatioTable).setOrigin(0.5, 1).setDepth(-12);
     this.planter = scene.add.image(0, 0, TextureKeys.Planter).setOrigin(0.5, 1).setDepth(-2);
+    this.rain = scene.add.graphics().setDepth(9).setVisible(false);
+    for (let i = 0; i < RAIN; i++) this.drops.push({ x: 0, y: 0, speed: 900 + ((i * 137) % 500) });
+  }
+
+  /** Today's weather: the sky, the sun and clouds, and rain. */
+  setWeather(id: string): void {
+    this.weather = WEATHER_LOOK[id] ? id : 'sunny';
+    const look = WEATHER_LOOK[this.weather]!;
+    for (const c of this.clouds) c.setTint(look.cloud);
+    this.rain.setVisible(this.weather === 'rainy');
+    const v = this.viewport;
+    if (v) this.drops.forEach((d, i) => ((d.x = ((i * 0.618) % 1) * v.width), (d.y = ((i * 0.381) % 1) * v.height)));
+    this.drawSkyAndLights();
   }
 
   layout(v: Viewport, l: SceneryLayout): void {
     this.viewport = v;
     this.sceneryLayout = l;
+    this.drops.forEach((d, i) => ((d.x = ((i * 0.618) % 1) * v.width), (d.y = ((i * 0.381) % 1) * v.height)));
     const L = v.orientation === 'landscape';
     const gy = l.groundY;
 
@@ -116,7 +149,7 @@ export class LobbyScenery {
     this.drawSkyAndLights();
   }
 
-  /** Clouds drift (no allocations: it runs every frame). */
+  /** Clouds drift and rain falls (no allocations: it runs every frame). */
   update(deltaMs: number): void {
     const v = this.viewport;
     if (!v) return;
@@ -125,13 +158,30 @@ export class LobbyScenery {
       c.x += (CLOUD_SPEED[i % CLOUD_SPEED.length]! * deltaMs) / 1000;
       if (c.x > v.width + 150) c.x = -150;
     }
+    if (!this.rain.visible) return;
+    const g = this.rain;
+    g.clear();
+    g.lineStyle(3, 0xdfe8f2, 0.55);
+    const dt = deltaMs / 1000;
+    for (const d of this.drops) {
+      d.y += d.speed * dt;
+      d.x -= d.speed * 0.12 * dt;
+      if (d.y > v.height) {
+        d.y -= v.height + 40;
+        d.x = (d.x + 397) % (v.width + 100);
+      }
+      if (d.x < -20) d.x += v.width + 40;
+      g.lineBetween(d.x, d.y, d.x - 5, d.y + 28);
+    }
   }
 
   private drawSkyAndLights(): void {
     const v = this.viewport;
     const l = this.sceneryLayout;
     if (!v || !l) return;
-    const s = SKIES[this.time];
+    const base = SKIES[this.time];
+    const look = WEATHER_LOOK[this.weather]!;
+    const s = { ...base, top: mix(base.top, look.toward, look.amount), bottom: mix(base.bottom, look.toward, look.amount) };
     const L = v.orientation === 'landscape';
     this.sky.clear();
     this.sky.fillGradientStyle(s.top, s.top, s.bottom, s.bottom, 1);
@@ -140,9 +190,9 @@ export class LobbyScenery {
     // The sun: low on the left in the morning, high at midday, low and big at sunset.
     const sx = this.time === 'morning' ? v.width * 0.18 : this.time === 'day' ? v.width * 0.8 : v.width * 0.86;
     const sy = this.time === 'day' ? v.content.y + (L ? 60 : 120) : l.groundY - (L ? 70 : 110);
-    const sr = this.time === 'sunset' ? 70 : 55;
-    this.sun.setPosition(sx, sy).setRadius(sr).setFillStyle(s.sun);
-    this.sunGlow.setPosition(sx, sy).setRadius(sr * 1.7).setFillStyle(s.sun, 0.25);
+    const sr = (this.time === 'sunset' ? 70 : 55) * look.sunScale;
+    this.sun.setPosition(sx, sy).setRadius(sr).setFillStyle(s.sun).setAlpha(look.sun);
+    this.sunGlow.setPosition(sx, sy).setRadius(sr * 1.7).setFillStyle(s.sun, 0.25).setAlpha(look.sun);
 
     // Bistro string lights draped across the top of the lot.
     const g = this.lights;

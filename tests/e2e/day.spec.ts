@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import balanceJson from '../../src/data/balance.json' with { type: 'json' };
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene, openDay } from './helpers';
+import { advance, findNamed, isVisibleNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene, openDay } from './helpers';
 
 interface SessionView {
   day: number;
@@ -75,6 +75,17 @@ test('a whole day: serve until the clock runs out, close, see the summary, shop 
   await findNamed(page, SceneKeys.Serve, 'serve-total');
   await findNamed(page, SceneKeys.Serve, 'serve-tip');
   await shot(page, 'day-1-serve-card');
+  // Share the donut: no share sheet in a desktop test browser, so the picture downloads.
+  const btn = await page.evaluate(() => {
+    const sc = (window as unknown as { __game: { scene: { getScene(k: string): { children: { list: { list?: { name?: string }[] }[] } } } } }).__game.scene.getScene('ServeScene');
+    return sc.children.list.some((o) => o.list?.some((x) => x.name === 'btn-share'));
+  });
+  if (btn) {
+    const download = page.waitForEvent('download', { timeout: 10_000 }).catch(() => null);
+    await tapNamed(page, SceneKeys.Serve, 'btn-share');
+    const file = await download;
+    if (file) expect(file.suggestedFilename()).toBe('my-domochi-donut.png');
+  }
   await tapNamed(page, SceneKeys.Serve, 'btn-serve-done');
 
   // That was the last customer: closing time. Close up (skipping the clean-up), then the day summary.
@@ -117,6 +128,36 @@ test('a whole day: serve until the clock runs out, close, see the summary, shop 
   // Day 2 starts with what was left of yesterday's stock, plus what was bought.
   expect(await s((x) => x.stockOf('egg'))).toBe(after.stock.egg);
   await shot(page, 'day-3-day-two');
+
+  // mochi's journal: day 1's page is written, with the "opening day" sticker.
+  expect(saved.journal.pages.map((p: { day: number }) => p.day)).toEqual([1]);
+  expect(saved.journal.stickers).toContain('first-day');
+  await tapNamed(page, SceneKeys.Lobby, 'btn-journal');
+  await waitForScene(page, SceneKeys.Journal);
+  await findNamed(page, SceneKeys.Journal, 'journal-sticker-count'); // new stickers: it opens on the sticker book
+  await shot(page, 'day-4-journal-stickers');
+  await tapNamed(page, SceneKeys.Journal, 'journal-tab-pages');
+  await findNamed(page, SceneKeys.Journal, 'journal-note');
+  await page.waitForTimeout(300);
+  await shot(page, 'day-5-journal-page');
+  await tapNamed(page, SceneKeys.Journal, 'btn-journal-close');
+  await waitForScene(page, SceneKeys.Journal, false);
+
+  // One of Ethan's friends drops by: their message stays until it's tapped.
+  await page.evaluate(() =>
+    (window as unknown as { __session: { events: { emit(e: string, d: unknown): void } } }).__session.events.emit('friend', {
+      name: 'Maya',
+      line: "hey! Ethan said you're low on eggs. here's 4!",
+      itemId: 'egg',
+      qty: 4,
+    }),
+  );
+  await findNamed(page, SceneKeys.Lobby, 'friend-bubble');
+  await page.waitForTimeout(4000);
+  await shot(page, 'day-6-friend');
+  await findNamed(page, SceneKeys.Lobby, 'friend-bubble'); // still there
+  await tapNamed(page, SceneKeys.Lobby, 'friend-bubble');
+  await expect.poll(() => isVisibleNamed(page, SceneKeys.Lobby, 'friend-bubble')).toBe(false);
 
   // Reloading keeps you on day 2.
   await page.reload();

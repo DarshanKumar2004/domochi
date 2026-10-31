@@ -11,12 +11,14 @@ import { Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../
 import { GlazeWork, glazeScoreFor, ringMask, type MaskTemplate } from '../stations/glaze';
 import { ToppingWork, toppingScoreFor, type FinishedDonut } from '../stations/toppings';
 import { forDay, type Balance } from './balance';
-import { pickLine, type CustomerType, type CustomersData, type ThanksTier } from './customers';
+import { pickLine, type CustomerType, type CustomersData, type RegularDef, type ThanksTier } from './customers';
 import { Emitter } from './events';
 import type { Menu } from './menu';
-import { describeOrder, generateOrder, orderPrice, orderSizeRange, type Order } from './orders';
+import { flavorsForDay } from './menu';
+import { boxFor, describeOrder, generateOrder, orderPrice, orderSizeRange, type Order } from './orders';
 import { scoreOrder, type OrderScore } from './score';
 import { boxStockId, doughCostPerDonut, paymentFor, unitCost, type Stock } from './supplies';
+import type { WeatherType } from './weather';
 import type { Rng } from './rng';
 
 export type CustomerState = 'inLine' | 'ordering' | 'waiting' | 'served';
@@ -32,6 +34,8 @@ export interface Customer {
   delivery?: boolean;
   /** Left without being served (the window closed, or sent home). */
   wentHome?: boolean;
+  /** A regular (customers.json regulars). */
+  regularId?: string;
 }
 
 /**
@@ -95,6 +99,8 @@ export interface Ticket {
     napkin?: boolean;
     /** The customer invited domochi to this event (an events.json id). */
     invite?: string;
+    /** A regular's friendship before and after this order. */
+    regular?: { name: string; before: number; after: number };
   };
 }
 
@@ -155,6 +161,14 @@ export interface SessionEvents extends Record<string, unknown> {
   timeUp: undefined;
   /** One of Ethan's friends dropped off a pack of something you were low on. */
   friend: { name: string; line: string; itemId: string; qty: number };
+  /** A donut came out of the oil onto the rack (its fry score). */
+  pulled: { score: number };
+  /** A donut went into the oil: how many are frying now, of how many slots. */
+  dropped: { frying: number; slots: number };
+  /** A batch of dough went in the tub. */
+  doughMade: { quality: number };
+  /** A regular who knows you ordered "the usual": straight onto the rail. */
+  usual: { customerId: number; name: string; line: string };
 }
 
 export interface SessionDeps {
@@ -186,6 +200,10 @@ export interface SessionDeps {
    * session keeps its own copy (see `stock`). Without it, supplies never run out.
    */
   stock?: Stock;
+  /** Today's weather (sunny if not given). */
+  weather?: WeatherType;
+  /** How well each regular knows you (id → level). Without it, no regulars come. */
+  regulars?: Record<string, number>;
 }
 
 export class GameSession {
@@ -238,22 +256,59 @@ export class GameSession {
   private readonly used: Stock = {};
   private friendsToday = 0;
   private nextFriendCheckMs = Infinity;
+  private readonly friendship: Record<string, number> | null;
+  /** Regulars who've come today (once a day each). */
+  private readonly regularsToday = new Set<string>();
 
   constructor(private readonly deps: SessionDeps) {
     this.day = deps.day;
     this.isTutorial = !!deps.script;
     const base = deps.script ? deps.script.orders.length : forDay(deps.balance.customersPerDay, deps.day);
     this.walkUpsToday = deps.event ? Math.round(base * deps.event.customersMultiplier) : base;
-    const pickups = deps.dayFlow && !deps.event ? forDay(deps.balance.deliveries.byDay, deps.day) : 0;
+    const pickups = deps.dayFlow && !deps.event ? forDay(deps.balance.deliveries.byDay, deps.day) + (deps.weather?.extraPickups ?? 0) : 0;
     this.customersToday = this.walkUpsToday + pickups;
     this.nextSpawnAtMs = deps.balance.spawn.firstDelaySec * 1000;
-    this.fryer = new Fryer(deps.balance.fry);
+    // Hot days: the oil heats (and cools) faster.
+    const fry = deps.balance.fry;
+    this.fryer = new Fryer(deps.weather ? { ...fry, heatLagPerSec: fry.heatLagPerSec * deps.weather.heatLag } : fry);
     this.glazeMask = ringMask(deps.balance.glaze);
     this.boards = new Array<GlazeWork | null>(Math.max(1, deps.balance.glaze.boards ?? 1)).fill(null);
     this.dayPhase = deps.dayFlow ? 'prep' : 'open';
     this.doughLeft = deps.dayFlow || deps.trackDough ? 0 : Infinity;
     for (let i = 0; i < pickups; i++) this.addPickup();
     this.supplies = deps.stock ? { ...deps.stock } : null;
+    this.friendship = deps.regulars ? { ...deps.regulars } : null;
+  }
+
+  /** Today's weather, if the day has any. */
+  get weather(): WeatherType | undefined {
+    return this.deps.weather;
+  }
+
+  // ---- Regulars ----------------------------------------------------------------
+
+  /** A customer's regular, if they are one. */
+  regularOf(c: Customer): RegularDef | undefined {
+    return c.regularId ? this.deps.customers.regulars?.list.find((r) => r.id === c.regularId) : undefined;
+  }
+
+  /** How well a regular knows you (0 = first visit). */
+  friendshipOf(id: string): number {
+    return this.friendship?.[id] ?? 0;
+  }
+
+  /** Every regular's friendship now, to save at the end of the day (null without regulars). */
+  get regularsLevels(): Readonly<Record<string, number>> | null {
+    return this.friendship;
+  }
+
+  /** A regular due today (their usual is on the menu, and they haven't come yet), picked at random. */
+  private dueRegular(): RegularDef | undefined {
+    const list = this.deps.customers.regulars?.list;
+    if (!this.friendship || !list?.length) return undefined;
+    const open = new Set(flavorsForDay(this.deps.menu, this.day).map((f) => f.id));
+    const due = list.filter((r) => !this.regularsToday.has(r.id) && r.usual.every((f) => open.has(f)));
+    return due.length ? this.deps.rng.pick(due) : undefined;
   }
 
   /** A morning pickup order: on the rail from the start, collected by a courier. */
@@ -334,6 +389,12 @@ export class GameSession {
     let n = 0;
     for (const c of this.allCustomers) if (c.state !== 'served' && !c.delivery) n++;
     return n;
+  }
+
+  /** The customer at the front of the line (checked every frame, so no array is built). */
+  private get frontOfLine(): Customer | undefined {
+    for (const c of this.allCustomers) if (c.state === 'inLine' || c.state === 'ordering') return c;
+    return undefined;
   }
 
   /** Customers in line (checked every frame while someone is due, so no array is built). */
@@ -477,6 +538,14 @@ export class GameSession {
       this.events.emit('changed', undefined);
     }
     const { spawn } = this.deps.balance;
+    // A regular who knows you well doesn't need to order: "the usual!", and it's on the rail.
+    const front = this.friendship && this.dayPhase === 'open' ? this.frontOfLine : undefined;
+    const reg = front?.state === 'inLine' ? this.regularOf(front) : undefined;
+    if (front && reg && this.knowsYou(reg) === 'usual') {
+      const t = this.takeOrder(front.id);
+      this.finishOrdering(front.id);
+      this.events.emit('usual', { customerId: front.id, name: reg.name, line: t.line });
+    }
     if (this.dayPhase === 'open' && this.deps.dayFlow && !this.windowClosed) {
       if (this.now >= this.dayEndsAtMs) this.closeWindow();
       else if (this.now >= this.nextFriendCheckMs) {
@@ -496,11 +565,20 @@ export class GameSession {
     ) {
       this.spawn();
       const gap = this.deps.rng.int(spawn.intervalSec.min * 1000, spawn.intervalSec.max * 1000);
-      this.nextSpawnAtMs = this.now + gap * (this.deps.event?.spawnFactor ?? 1);
+      this.nextSpawnAtMs = this.now + gap * (this.deps.event?.spawnFactor ?? 1) * (this.deps.weather?.spawnFactor ?? 1);
     }
   }
 
   private spawn(): void {
+    // Now and then it's a regular.
+    const reg = this.friendship && this.deps.rng.next() < this.deps.balance.regulars.chance ? this.dueRegular() : undefined;
+    if (reg) {
+      this.regularsToday.add(reg.id);
+      this.allCustomers.push({ id: this.nextCustomerId++, typeId: reg.type, state: 'inLine', arrivedAtMs: this.now, regularId: reg.id });
+      this.spawned++;
+      this.events.emit('changed', undefined);
+      return;
+    }
     const type = this.deps.rng.pick(this.deps.customers.types.filter((t) => !t.delivery));
     this.allCustomers.push({ id: this.nextCustomerId++, typeId: type.id, state: 'inLine', arrivedAtMs: this.now });
     this.spawned++;
@@ -639,6 +717,7 @@ export class GameSession {
     this.doughQ = (this.doughQ * left + w.quality * added) / (left + added);
     if (Number.isFinite(this.doughLeft)) this.doughLeft += added;
     this.doughWork = null;
+    this.events.emit('doughMade', { quality: w.quality });
     this.events.emit('changed', undefined);
     return { quality: w.quality, added };
   }
@@ -700,14 +779,17 @@ export class GameSession {
     const type = this.typeOf(front);
     const size = orderSizeRange(forDay(balance.orderSizeByDay, this.day), type.orderSize);
     const scripted = this.deps.script?.orders[this.nextTicketNo - 1];
+    const reg = this.regularOf(front);
     const order = scripted
       ? { flavors: [...scripted.flavors], boxId: scripted.boxId }
-      : generateOrder(menu, this.day, size, type.favorites, balance.favoriteWeight, rng);
+      : reg
+        ? { flavors: [...reg.usual], boxId: boxFor(menu, reg.usual.length).id }
+        : generateOrder(menu, this.day, size, type.favorites, balance.favoriteWeight, rng);
     const ticket: Ticket = {
       no: this.nextTicketNo++,
       customerId,
       order,
-      line: pickLine(type.lines.order, rng, { order: describeOrder(menu, order) }),
+      line: pickLine(reg ? reg.lines[this.knowsYou(reg)] : type.lines.order, rng, { order: describeOrder(menu, order) }),
       status: 'open',
       takenAtMs: this.now,
       results: {},
@@ -718,6 +800,12 @@ export class GameSession {
     if (this.activeNo === null) this.activeNo = ticket.no;
     this.events.emit('changed', undefined);
     return ticket;
+  }
+
+  /** Which lines a regular uses: hello (new), warm, or usual (they know you well). */
+  private knowsYou(r: RegularDef): 'hello' | 'warm' | 'usual' {
+    const lv = this.friendshipOf(r.id);
+    return lv >= this.deps.balance.regulars.usualAt ? 'usual' : lv > 0 ? 'warm' : 'hello';
   }
 
   /** The customer steps aside to the waiting area. */
@@ -759,6 +847,7 @@ export class GameSession {
       this.fryer.slots[slot]!.dough = this.doughQ;
       this.dirt++;
     }
+    this.events.emit('dropped', { frying: this.fryer.count, slots: this.fryer.slots.length });
     this.events.emit('changed', undefined);
     return slot;
   }
@@ -773,6 +862,7 @@ export class GameSession {
     const d = this.fryer.take(slot);
     if (!d) return null;
     this.rackDonuts.push(d);
+    this.events.emit('pulled', { score: d.score });
     this.events.emit('changed', undefined);
     return d;
   }
@@ -782,8 +872,10 @@ export class GameSession {
     const taken: number[] = [];
     for (let i = 0; i < this.fryer.slots.length; i++) {
       if (this.fryer.slots[i] && !this.rackFull) {
-        this.rackDonuts.push(this.fryer.take(i)!);
+        const d = this.fryer.take(i)!;
+        this.rackDonuts.push(d);
         taken.push(i);
+        this.events.emit('pulled', { score: d.score });
       }
     }
     if (taken.length) this.events.emit('changed', undefined);
@@ -1103,13 +1195,15 @@ export class GameSession {
     const score = scoreOrder(
       { fry: t.results.fry!.score, glaze: t.results.glaze!.score, toppings: t.results.toppings!.score, box: t.results.box!.score },
       waitMs / 1000,
-      this.typeOf(c).patienceSec,
+      this.typeOf(c).patienceSec * (this.deps.weather?.patience ?? 1),
       needed,
       balance.scoring,
       t.results.box!.gifts,
     );
     // A pop-up crowd tips more.
     if (this.deps.event) score.tip = Math.round(score.tip * this.deps.event.tipMultiplier * 100) / 100;
+    // Rainy-day customers are grateful you're open.
+    if (this.deps.weather && this.deps.weather.tip !== 1) score.tip = Math.round(score.tip * this.deps.weather.tip * 100) / 100;
     // A poor order pays less (and no tip); an awful one pays nothing and takes some back out of the tip jar.
     const price = orderPrice(menu, t.order);
     const pay = paymentFor(score.total, score.tier, balance.payment);
@@ -1121,6 +1215,15 @@ export class GameSession {
     if (pay.takesFromJar > 0) score.tip = -Math.min(pay.takesFromJar, Math.max(0, this.tipJar));
     t.results.price = price;
     t.results.score = score;
+    // A regular gets to know you better (or not).
+    const reg = this.regularOf(c);
+    if (reg && this.friendship) {
+      const before = this.friendshipOf(reg.id);
+      const step = score.tier === 'great' || score.tier === 'good' ? 1 : score.tier === 'bad' ? -1 : 0;
+      const after = Math.max(0, Math.min(balance.regulars.maxLevel, before + step));
+      this.friendship[reg.id] = after;
+      t.results.regular = { name: reg.name, before, after };
+    }
     // A happy walk-up customer may invite you to their event (one invite a day).
     if (this.deps.dayFlow && !c.delivery && !this.deps.event && !this.inviteId && this.deps.events?.length) {
       const chance = balance.events.inviteChance[score.tier] + (score.gifts > 0 ? balance.events.giftBonus : 0);
@@ -1136,6 +1239,18 @@ export class GameSession {
     // Last order out: time to clean up and close.
     this.checkClosing();
     return event;
+  }
+
+  /** The day's best donut: from the best-scoring order, the donut that matched its flavour best. */
+  get bestDonut(): FinishedDonut | undefined {
+    let best: Ticket | undefined;
+    for (const t of this.allTickets) {
+      const s = t.results.score;
+      if (s && t.results.packed?.some((p) => p.donut) && (!best || s.total > best.results.score!.total)) best = t;
+    }
+    let pick: PackedDonut | undefined;
+    for (const p of best?.results.packed ?? []) if (p.donut && (!pick || p.glazeScore + p.toppingScore > pick.glazeScore + pick.toppingScore)) pick = p;
+    return pick?.donut;
   }
 
   /** Tips so far today (what an awful order can take back). */

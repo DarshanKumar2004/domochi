@@ -420,3 +420,29 @@ Kumar's "almost ready for launch" batch.
   - The tutorial bubble's tail points sideways at mochi, not down at the tab bar.
   - The trailer's OPEN/CLOSED sign flips over when it changes. A stabiliser jack now stands under the trailer's right end.
   - The rail's text no longer runs under the tickets.
+
+## mochi's journal, regulars, weather, share your donut; glaze and friend fixes (2026-10-31)
+
+- **mochi's journal** (Kumar loved the idea; `JournalScene`, `systems/journal.ts`, `data/journal.json`). Tap mochi on the lot (the badge says "new sticker!") to open a notebook with two tabs:
+  - **pages:** one per finished day (weather, event, served, best order, profit), mochi's note picked by how the day went, a polaroid doodle of the day's best donut, and the stickers earned that day.
+  - **stickers:** 20 to collect, 4 of them secret (shown as "?" until earned). Tap one to see how to earn it.
+  - **How it works:** the sticker checks live in `StickerTracker` (by id); the names, descriptions, colours and glyphs are in the data. Earned stickers are saved straight away and announced with a note under the rail. The tutorial day doesn't count.
+  - **Save size:** the doodles are 160 px PNG data URLs. Only the last 60 pages keep theirs; older pages keep their words.
+- **Regulars** (`customers.json` `regulars`, `balance.json` `regulars`):
+  - **Who:** Jade (2 strawberry), Mr. Thibodeaux (3 cookies & cream), Ms. Vo (2 chocolate hazelnut + strawberry) and Remy (fruity cereal + beignet). The names are made up.
+  - **When they come:** about 1 walk-up in 4, each at most once a day, and only once their whole usual is on the menu.
+  - **Friendship** (0–5, saved) goes up with a good or great order and down with a bad one. The serve card shows hearts.
+  - **"The usual":** from 3, they skip ordering. They say "the usual!" and the order goes straight on the rail. Regulars wear name tags in the lot.
+- **Weather** (`balance.json` `weather`). Each day gets the same weather every time you play it, and day 1 is always sunny.
+  - **Rainy:** fewer walk-ups, 2 extra delivery orders, more patience and +20% tips. Grey sky and falling rain.
+  - **Hot:** the oil heats 1.6× faster, less patience, +10% tips. A big sun.
+  - **Cloudy:** a little quieter and more patient.
+  - The morning checklist says what to expect.
+- **Share your donut** (`ui/share.ts`). On the serve card, **Share** makes a 1080×1350 picture of the best donut in the box, with the logo, the score, @domochi.treats and domochitreats.com.
+  - Phones that can share pictures get their share sheet; anything else downloads the PNG.
+  - There's no QR code, because that would need a library (ask first). The Android app will want Capacitor's Share plugin (Phase 8, ask first).
+- **Fixes:**
+  - **Glaze on an empty tray spot:** it now splatters the tray across the whole spot. The mess canvas was cutting out the ring shape as if a donut sat there.
+  - **No cup in hand, touching a donut:** says "pick a cup first!" instead of starting the sponge, which looked like some unknown topping. Wiping only starts on the bare tray, with a "scrubbing the tray clean" note.
+  - **Ethan's friends** wait at the window with their message until you tap them, then wave off. At a station, their note stays until tapped.
+- **For another day** (Kumar): high-score coupon codes, and seasonal menus that match the real shop.

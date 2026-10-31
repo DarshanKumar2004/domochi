@@ -12,6 +12,9 @@ import { createRng, randomSeed } from './rng';
 import { AudioService } from './AudioService';
 import type { SaveService } from './SaveService';
 import { fillStock } from './supplies';
+import journalJson from '../data/journal.json';
+import { StickerTracker, type JournalData } from './journal';
+import { weatherFor } from './weather';
 
 // Game-wide services, set up once in main.ts before Phaser starts.
 
@@ -68,6 +71,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
   const flavors = [...tutorialData.order];
   const booked = saveService?.data.event;
   const event = !opts.tutorial && booked?.day === day ? popupEvents.find((e) => e.id === booked.id) : undefined;
+  const weather = weatherFor(day, balance.weather);
   currentSession = new GameSession({
     menu,
     customers: customersData,
@@ -76,9 +80,38 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
     rng: createRng(seedOverride ?? randomSeed()),
     ...(opts.tutorial
       ? { script: { orders: [{ flavors, boxId: boxFor(menu, flavors.length).id }] }, trackDough: true }
-      : { dayFlow: true, events: popupEvents, stock: fillStock(saveService?.data.stock, balance.supplies), ...(event ? { event } : {}) }),
+      : {
+          dayFlow: true,
+          events: popupEvents,
+          stock: fillStock(saveService?.data.stock, balance.supplies),
+          weather,
+          regulars: { ...(saveService?.data.regulars ?? {}) },
+          ...(event ? { event } : {}),
+        }),
   });
+  // mochi's journal watches every real day (not the tutorial).
+  currentTracker?.detach();
+  currentTracker = null;
+  if (!opts.tutorial && saveService) {
+    const s = saveService;
+    currentTracker = new StickerTracker(journalData, new Set(s.data.journal.stickers), {
+      weather: weather.id,
+      guidesOwned: () => s.data.guides.length,
+      guideCount: balance.guides.items.length,
+    });
+    currentTracker.watch(currentSession);
+    // Earned stickers are saved straight away.
+    currentTracker.events.on('earned', (st) => void s.update((d) => void (d.journal.stickers.includes(st.id) || d.journal.stickers.push(st.id))));
+  }
   return currentSession;
+}
+
+export const journalData = journalJson as JournalData;
+let currentTracker: StickerTracker | null = null;
+
+/** Today's sticker tracker (null on the tutorial day). */
+export function stickers(): StickerTracker | null {
+  return currentTracker;
 }
 
 export function session(): GameSession {

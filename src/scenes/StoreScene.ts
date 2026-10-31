@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { audio, balance, menu, save } from '../systems/services';
+import { audio, balance, menu, save, stickers } from '../systems/services';
 import { fillStock, priceOn } from '../systems/supplies';
 import { Button } from '../ui/Button';
 import { beginOverlay } from '../ui/overlay';
@@ -80,6 +80,7 @@ export class StoreScene extends Phaser.Scene {
             d.guides.push(g.id);
             d.money = Math.round((d.money - g.price) * 100) / 100;
           });
+          stickers()?.checkGuides();
         }),
       );
     }

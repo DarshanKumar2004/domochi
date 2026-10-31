@@ -152,6 +152,22 @@
     "friendChance": 0.5,
     "friendsPerDay": 1
   },
+  "weather": {
+    "_note": "Each day's weather (the same for a given day; day 1 is always firstDay), picked by weight. spawnFactor: × the gap between walk-ups (bigger = fewer). extraPickups: more morning delivery orders. heatLag: × how fast the oil reaches the dial. patience: × how long customers happily wait. tip: × tips. note: shown on the morning checklist.",
+    "firstDay": "sunny",
+    "types": [
+      { "id": "sunny", "name": "sunny", "weight": 4, "spawnFactor": 1, "extraPickups": 0, "heatLag": 1, "patience": 1, "tip": 1, "note": "sunny: a steady crowd" },
+      { "id": "cloudy", "name": "cloudy", "weight": 2, "spawnFactor": 1.1, "extraPickups": 0, "heatLag": 1, "patience": 1.15, "tip": 1, "note": "cloudy and mild: folks are patient" },
+      { "id": "hot", "name": "hot", "weight": 2, "spawnFactor": 0.9, "extraPickups": 0, "heatLag": 1.6, "patience": 0.8, "tip": 1.1, "note": "hot! the oil heats fast and nobody wants to wait" },
+      { "id": "rainy", "name": "rainy", "weight": 2, "spawnFactor": 1.6, "extraPickups": 2, "heatLag": 1, "patience": 1.2, "tip": 1.2, "note": "rainy: fewer walk-ups, more delivery orders" }
+    ]
+  },
+  "regulars": {
+    "_note": "Named regulars (customers.json) come back day after day. chance: share of walk-ups who are a regular (if one is due). Friendship goes up with a good or great order and down with a bad one (0 to maxLevel). From usualAt they just say 'the usual!' and their order goes straight on the rail.",
+    "chance": 0.25,
+    "usualAt": 3,
+    "maxLevel": 5
+  },
   "guides": {
     "_note": "Dashed guides at the Glaze station, bought once at the supply store (the tutorial shows them all). 'base' is the loops for any base coat; the others are a flavour's drizzle stripes.",
     "items": [

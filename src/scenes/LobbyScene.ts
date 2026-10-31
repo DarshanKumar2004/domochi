@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { Customer } from '../systems/GameSession';
-import { audio, session } from '../systems/services';
+import { audio, save, session, stickers } from '../systems/services';
 import { Booth } from '../ui/Booth';
 import { LobbyScenery } from '../ui/LobbyScenery';
 import { Button } from '../ui/Button';
@@ -28,6 +28,7 @@ const LAYOUT = {
     line: { x: [600, 760, 920, 1080], feetY: 1300, scale: 0.85 },
     panel: { x: 780, y: 1060, buttonY: 1330, width: 540 },
     pickups: { x: 780, y: 1500 },
+    journal: { x: 955, y: 820, scale: 0.6 },
     waiting: {
       x: 250,
       y: 1185,
@@ -52,6 +53,7 @@ const LAYOUT = {
     // Checklists and buttons in the open middle of the lot, clear of the line and the patio.
     panel: { x: 1240, y: 330, buttonY: 640, width: 520 },
     pickups: { x: 1730, y: 215 },
+    journal: { x: 105, y: 610, scale: 0.55 },
     waiting: {
       x: 1730,
       y: 500,
@@ -93,6 +95,9 @@ export class LobbyScene extends Phaser.Scene {
   /** After time's up: send whoever's still waiting home (unpaid). */
   private sendHomeButton!: Button;
   private pickupsText!: Phaser.GameObjects.Text;
+  /** mochi's journal: tap mochi on the lot. */
+  private journalButton!: Phaser.GameObjects.Image;
+  private journalLabel!: Phaser.GameObjects.Text;
 
   constructor() {
     super(SceneKeys.Lobby);
@@ -104,6 +109,7 @@ export class LobbyScene extends Phaser.Scene {
     this.confirmOpen = false;
     this.cameras.main.setBackgroundColor(COLORS.sky);
     this.scenery = new LobbyScenery(this);
+    this.scenery.setWeather(session().weather?.id ?? 'sunny');
     // A pop-up booth on event days, the trailer otherwise.
     const ev = session().event;
     this.truck = ev ? null : new Truck(this, 0, 0);
@@ -158,6 +164,32 @@ export class LobbyScene extends Phaser.Scene {
 
     listen(this, session().events, 'changed', () => this.sync(false));
     listen(this, session().events, 'friend', (e) => this.friendVisit(e.line));
+    // A regular who knows you: "the usual!" as they head to the patio.
+    listen(this, session().events, 'usual', (e) => {
+      this.time.delayedCall(60, () => {
+        const view = this.views.get(e.customerId);
+        if (view) this.say(view, `${e.name}: "${e.line}"`);
+      });
+    });
+
+    // mochi sits on the lot: tap for the journal. A badge says when there are new stickers.
+    this.journalButton = this.add.image(0, 0, TextureKeys.Mascot).setDepth(8).setName('btn-journal').setInteractive({ useHandCursor: true });
+    this.journalButton.on(Phaser.Input.Events.POINTER_UP, () => {
+      audio().play('tap');
+      if (!this.scene.isActive(SceneKeys.Journal)) this.scene.launch(SceneKeys.Journal);
+    });
+    this.journalLabel = this.add
+      .text(0, 0, 'journal', { fontFamily: FONT_FAMILY, fontSize: '30px', fontStyle: 'bold', color: CSS.cream, backgroundColor: '#2b2522', padding: { x: 12, y: 4 } })
+      .setOrigin(0.5, 0)
+      .setDepth(8);
+    this.tweens.add({ targets: this.journalButton, angle: { from: -4, to: 4 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.events.on(Phaser.Scenes.Events.WAKE, this.refreshJournalBadge, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.WAKE, this.refreshJournalBadge, this));
+    const tracker = stickers();
+    if (tracker) {
+      const off = tracker.events.on('earned', () => this.refreshJournalBadge());
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
+    }
 
     onLayout(this, (v: Viewport) => {
       const L = LAYOUT[v.orientation];
@@ -181,6 +213,11 @@ export class LobbyScene extends Phaser.Scene {
       this.closeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
       this.sendHomeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
       this.pickupsText.setPosition(c.x + L.pickups.x, c.y + L.pickups.y);
+      // Not on the tutorial day: mochi's busy teaching.
+      const showJournal = !session().isTutorial;
+      this.journalButton.setPosition(c.x + L.journal.x, c.y + L.journal.y).setScale(L.journal.scale).setVisible(showJournal);
+      this.journalLabel.setPosition(c.x + L.journal.x, c.y + L.journal.y + 105 * L.journal.scale).setVisible(showJournal);
+      this.refreshJournalBadge();
       this.sync(true);
     });
   }
@@ -244,6 +281,7 @@ export class LobbyScene extends Phaser.Scene {
       const dough = Number.isFinite(s.dough) ? s.dough : 0;
       const lines = [
         s.event ? `pop-up day: ${s.event.name}!` : 'good morning! before opening:',
+        ...(s.weather ? [`(${s.weather.note})`] : []),
         `• ${dough ? `dough: ${dough} donuts ready` : 'make dough (Dough station)'}`,
       ];
       if (s.pickups.length) lines.push(`• ${s.pickups.length} pickup${s.pickups.length === 1 ? '' : 's'} on the rail`);
@@ -301,11 +339,19 @@ export class LobbyScene extends Phaser.Scene {
 
   private confirmOpen = false;
 
+  /** "journal", or "new sticker!" when there's one you haven't looked at. */
+  private refreshJournalBadge(): void {
+    const j = save().data.journal;
+    const fresh = j.stickers.length > j.seen;
+    this.journalLabel?.setText(fresh ? 'new sticker!' : 'journal').setBackgroundColor(fresh ? '#b0406a' : '#2b2522');
+  }
+
   private sendHome(): void {
     if (session().sendHome() > 0) audio().play('tap');
   }
 
   /** One of Ethan's friends walks up to the window with supplies, says hi, and heads off. */
+  /** One of Ethan's friends walks up with a crate, and waits with their message until you tap it. */
   private friendVisit(line: string): void {
     const v = getViewport(this);
     const L = LAYOUT[v.orientation];
@@ -319,23 +365,39 @@ export class LobbyScene extends Phaser.Scene {
     // Carrying a supply crate.
     const crate = this.add.rectangle(friend.x, y - CUSTOMER_H * scale * 0.42, 110 * scale, 80 * scale, 0xc8955f).setStrokeStyle(5, COLORS.ink).setDepth(8);
     const follow = () => crate.setPosition(friend.x, y - CUSTOMER_H * scale * 0.42);
-    this.tweens.chain({
+    const leave = () => {
+      this.tweens.add({
+        targets: friend,
+        x: -200,
+        duration: Math.max(400, ((friend.x + 200) / WALK_SPEED) * 1000),
+        onComplete: () => (friend.destroy(), crate.destroy()),
+      });
+    };
+    this.tweens.add({
       targets: friend,
-      tweens: [
-        { x, duration: Math.max(400, ((friend.x - x) / WALK_SPEED) * 1000), onUpdate: follow },
-        {
-          x: x - 1,
-          duration: 2600,
-          onStart: () => {
-            crate.setVisible(false);
-            const w = 600;
-            const bx = Phaser.Math.Clamp(x, w / 2 + 20, v.width - w / 2 - 20);
-            const bubble = new SpeechBubble(this, bx, y - CUSTOMER_H * scale - 110, w, line, Phaser.Math.Clamp(x - bx, -200, 200), 36).setDepth(30);
-            this.time.delayedCall(2500, () => bubble.destroy());
-          },
-        },
-        { x: -200, duration: Math.max(400, ((x + 200) / WALK_SPEED) * 1000), onComplete: () => (friend.destroy(), crate.destroy()) },
-      ],
+      x,
+      duration: Math.max(400, ((friend.x - x) / WALK_SPEED) * 1000),
+      onUpdate: follow,
+      onComplete: () => {
+        crate.setVisible(false);
+        const w = 620;
+        const bx = Phaser.Math.Clamp(x, w / 2 + 20, v.width - w / 2 - 20);
+        const bubble = new SpeechBubble(this, bx, y - CUSTOMER_H * scale - 130, w, `${line}\n(tap to say thanks)`, Phaser.Math.Clamp(x - bx, -200, 200), 36)
+          .setDepth(30)
+          .setName('friend-bubble');
+        // Stays until you tap them (or their bubble): then a wave, and off they go.
+        bubble.setSize(w, bubble.getBounds().height).setInteractive({ useHandCursor: true });
+        friend.setInteractive({ useHandCursor: true });
+        const done = () => {
+          if (!bubble.active) return;
+          audio().play('tap');
+          bubble.destroy();
+          friend.disableInteractive();
+          leave();
+        };
+        bubble.on(Phaser.Input.Events.POINTER_UP, done);
+        friend.on(Phaser.Input.Events.POINTER_UP, done);
+      },
     });
   }
 
@@ -350,7 +412,10 @@ export class LobbyScene extends Phaser.Scene {
       this.views.set(cust.id, view);
     }
     // Hidden when empty: an empty Text still draws its background padding.
-    const label = cust.ticketNo !== undefined && cust.state === 'waiting' ? `#${cust.ticketNo}` : '';
+    // Regulars wear their name; waiting customers their ticket number.
+    const reg = session().regularOf(cust);
+    const no = cust.ticketNo !== undefined && cust.state === 'waiting' ? `#${cust.ticketNo}` : '';
+    const label = reg ? (no ? `${reg.name} ${no}` : reg.name) : no;
     view.tag.setText(label).setVisible(label !== '');
 
     const t = view.target;
