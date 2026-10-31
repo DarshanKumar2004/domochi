@@ -601,5 +601,60 @@
     "_note": "Each ordered slot holding its flavour = 1, that flavour in the wrong slot = wrongSpotCredit, minus extraPenalty per extra donut that isn't a real flavour (extra real flavours are gifts, scored in scoring.gift).",
     "wrongSpotCredit": 0.5,
     "extraPenalty": 0.25
+  },
+  "decor": {
+    "_note": "Decorations for the lot, from the supply store (bought once, from unlockDay). Each shows in the Lobby and gives a small perk: patience (× how long customers happily wait, +share), tip (+share of tips), spawn (× the gap between walk-ups: below 1 = more customers).",
+    "items": [
+      {
+        "id": "flowers",
+        "name": "flower boxes",
+        "desc": "customers wait a bit longer",
+        "price": 25,
+        "unlockDay": 45,
+        "effect": {
+          "patience": 0.05
+        }
+      },
+      {
+        "id": "lights",
+        "name": "pink string lights",
+        "desc": "a little more in tips",
+        "price": 35,
+        "unlockDay": 48,
+        "effect": {
+          "tip": 0.03
+        }
+      },
+      {
+        "id": "table",
+        "name": "second picnic table",
+        "desc": "customers wait a bit longer",
+        "price": 50,
+        "unlockDay": 52,
+        "effect": {
+          "patience": 0.05
+        }
+      },
+      {
+        "id": "neon",
+        "name": "neon donut sign",
+        "desc": "more in tips",
+        "price": 70,
+        "unlockDay": 56,
+        "effect": {
+          "tip": 0.05
+        }
+      },
+      {
+        "id": "mural",
+        "name": "mochi mural",
+        "desc": "more people stop by",
+        "price": 90,
+        "unlockDay": 60,
+        "effect": {
+          "spawn": 0.92
+        }
+      }
+    ]
   }
 }

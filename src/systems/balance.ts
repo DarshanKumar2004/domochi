@@ -8,6 +8,16 @@ import { validateScoring, type ScoringBalance } from './score';
 import type { GuideItem, PaymentBalance, SuppliesBalance } from './supplies';
 import type { WeatherBalance } from './weather';
 
+/** A decoration for the lot (bought once at the store), with a small perk. */
+export interface DecorItem {
+  id: string;
+  name: string;
+  desc: string;
+  price: number;
+  unlockDay: number;
+  effect: { patience?: number; tip?: number; spawn?: number };
+}
+
 export interface Range {
   min: number;
   max: number;
@@ -43,6 +53,7 @@ export interface Balance {
   weather: WeatherBalance;
   regulars: { chance: number; usualAt: number; maxLevel: number };
   special: { priceBonus: number; fromDay?: number };
+  decor: { items: DecorItem[] };
   goals: { reward: number; fromDay: number; list: { id: string; text: string; base: number; perDay: number; max: number }[] };
   streak: { tipPerOrder: number; maxBonus: number };
 }

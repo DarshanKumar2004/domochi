@@ -30,6 +30,8 @@ export interface SaveData {
   stock?: Record<string, number>;
   /** Glaze guides bought at the supply store (balance.guides ids). */
   guides: string[];
+  /** Decorations for the lot (balance.decor ids). */
+  decor: string[];
   /** How well each regular knows you (customers.json regulars ids). */
   regulars: Record<string, number>;
   /** The day being played, saved as you go so a reload picks it back up (gone once the day's done). */
@@ -51,6 +53,7 @@ export function defaultSave(): SaveData {
     served: 0,
     bestOrder: 0,
     guides: [],
+    decor: [],
     regulars: {},
     journal: { stickers: [], pages: [], seen: 0 },
     settings: { sound: true, music: true },
@@ -85,6 +88,7 @@ export function sanitizeSave(raw: unknown): SaveData {
     data.stock = stock;
   }
   if (Array.isArray(raw.guides)) data.guides = [...new Set(raw.guides.filter((g): g is string => typeof g === 'string'))];
+  if (Array.isArray(raw.decor)) data.decor = [...new Set(raw.decor.filter((g): g is string => typeof g === 'string'))];
   if (isRecord(raw.regulars)) {
     for (const [k, v] of Object.entries(raw.regulars)) if (typeof v === 'number' && Number.isInteger(v) && v >= 0) data.regulars[k] = v;
   }

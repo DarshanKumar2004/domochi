@@ -122,6 +122,7 @@ export class LobbyScene extends Phaser.Scene {
     this.scenery.setWeather(session().weather?.id ?? 'sunny');
     // Pop-up days are downtown, in front of a (made-up) shop.
     this.scenery.setDowntown(!!session().event);
+    this.scenery.setDecor(session().decor);
     // A pop-up booth on event days, the trailer otherwise.
     const ev = session().event;
     this.truck = ev ? null : new Truck(this, 0, 0);
@@ -370,10 +371,29 @@ export class LobbyScene extends Phaser.Scene {
         const left = Math.max(0, Math.round(s.typeOf(cust).patienceSec - (s.timeMs - t.takenAtMs) / 1000));
         return `#${t.no} ${s.typeOf(cust).name} · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       });
-      this.pickupsText.setText(['pickups (courier):', ...rows].join('\n')).setVisible(true);
+      // A long list shows the first few and how many more.
+      const shown = rows.length > 3 ? [...rows.slice(0, 3), `+${rows.length - 3} more on the rail`] : rows;
+      this.pickupsText.setText(['pickups (courier):', ...shown].join('\n')).setVisible(true);
     } else {
       this.pickupsText.setVisible(false);
     }
+    this.stackPanels();
+  }
+
+  /**
+   * Keep the checklist, its button and the pickups list from overlapping: a
+   * long checklist uses a smaller font, and in portrait the pickups list sits
+   * just under the button.
+   */
+  private stackPanels(): void {
+    const v = getViewport(this);
+    const L = LAYOUT[v.orientation];
+    const lines = this.panelText.text.split('\n').length + Math.floor(this.panelText.text.length / 60);
+    this.panelText.setFontSize(lines > 8 ? 30 : lines > 6 ? 34 : 38);
+    if (v.orientation !== 'portrait') return;
+    const btn = [this.openButton, this.closeButton, this.sendHomeButton].find((b) => b.visible);
+    const top = btn ? btn.y + 85 : v.content.y + L.pickups.y - this.pickupsText.height / 2;
+    this.pickupsText.setOrigin(0.5, 0).setY(top);
   }
 
   private openShop(): void {

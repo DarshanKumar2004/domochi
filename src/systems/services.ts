@@ -88,6 +88,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
           stock: fillStock(saveService?.data.stock, balance.supplies),
           weather,
           regulars: { ...(saveService?.data.regulars ?? {}) },
+          decor: [...(saveService?.data.decor ?? [])],
           ...(event ? { event } : {}),
         }),
   });

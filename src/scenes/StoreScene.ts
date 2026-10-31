@@ -3,6 +3,7 @@ import { audio, balance, menu, save, stickers } from '../systems/services';
 import { flavorsForDay } from '../systems/menu';
 import { fillStock, glazeStockId, priceOn, shopNeeds, shoppingPlan, toppingStockId, type ShopPick, type SupplyItem } from '../systems/supplies';
 import { TextureKeys } from '../assets/keys';
+import type { DecorItem } from '../systems/balance';
 import { Button } from '../ui/Button';
 import { beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -101,6 +102,7 @@ export class StoreScene extends Phaser.Scene {
       sections.push({ label: label(sec.title), tiles });
     }
     sections.push({ label: label('glaze guides: dashed lines that show you where to pour'), tiles: balance.guides.items.map((g) => this.guideTile(g)) });
+    sections.push({ label: label('decorations for the lot (each gives a little perk)'), tiles: balance.decor.items.map((d) => this.decorTile(d, day)) });
 
     // Header and footer sit over the list (and catch taps there), so it scrolls under them.
     const card = this.add.graphics();
@@ -233,6 +235,24 @@ export class StoreScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false);
     tile.box.add([tile.badge, tile.badgeText]);
+    return tile;
+  }
+
+  /** A decoration: bought once, from its day; shows in the lot with a small perk. */
+  private decorTile(d: DecorItem, day: number): Tile {
+    const locked = d.unlockDay > day;
+    const tile = this.makeTile(`store-decor-${d.id}`, d.name, locked ? `day ${d.unlockDay}` : money(d.price), () => {
+      if (locked) return { label: 'comes in later', low: false, can: false, owned: false };
+      const owned = save().data.decor.includes(d.id);
+      return { label: owned ? 'on the lot ✓' : d.desc, low: false, can: !owned && save().data.money >= d.price, owned };
+    }, () => {
+      void save().update((s) => {
+        if (s.decor.includes(d.id)) return;
+        s.decor.push(d.id);
+        s.money = Math.round((s.money - d.price) * 100) / 100;
+      });
+    });
+    if (locked) tile.box.setAlpha(0.5);
     return tile;
   }
 

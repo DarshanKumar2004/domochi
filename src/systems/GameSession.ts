@@ -251,6 +251,8 @@ export interface SessionDeps {
   weather?: WeatherType;
   /** How well each regular knows you (id → level). Without it, no regulars come. */
   regulars?: Record<string, number>;
+  /** Decorations on the lot (balance.decor ids): small perks. */
+  decor?: string[];
 }
 
 export class GameSession {
@@ -500,8 +502,28 @@ export class GameSession {
   patienceHearts(c: Customer): number {
     const t = c.ticketNo !== undefined ? this.ticket(c.ticketNo) : undefined;
     if (!t || t.status !== 'open') return 3;
-    const ws = waitScore((this.now - t.takenAtMs) / 1000, this.typeOf(c).patienceSec * (this.deps.weather?.patience ?? 1), this.deps.balance.scoring);
+    const ws = waitScore((this.now - t.takenAtMs) / 1000, this.typeOf(c).patienceSec * (this.deps.weather?.patience ?? 1) * this.decorPerks.patience, this.deps.balance.scoring);
     return ws >= 100 ? 3 : ws >= 55 ? 2 : ws > 0 ? 1 : 0;
+  }
+
+  /** What the lot's decorations add up to: × patience, × tips, × the gap between walk-ups. */
+  get decorPerks(): { patience: number; tip: number; spawn: number } {
+    const owned = new Set(this.deps.decor ?? []);
+    let patience = 1;
+    let tip = 1;
+    let spawn = 1;
+    for (const d of this.deps.balance.decor?.items ?? []) {
+      if (!owned.has(d.id)) continue;
+      patience += d.effect.patience ?? 0;
+      tip += d.effect.tip ?? 0;
+      spawn *= d.effect.spawn ?? 1;
+    }
+    return { patience, tip, spawn };
+  }
+
+  /** Decorations on the lot today. */
+  get decor(): readonly string[] {
+    return this.deps.decor ?? [];
   }
 
   /** Today's weather, if the day has any. */
@@ -796,7 +818,7 @@ export class GameSession {
     ) {
       this.spawn();
       const gap = this.deps.rng.int(spawn.intervalSec.min * 1000, spawn.intervalSec.max * 1000);
-      this.nextSpawnAtMs = this.now + gap * (this.deps.event?.spawnFactor ?? 1) * (this.deps.weather?.spawnFactor ?? 1);
+      this.nextSpawnAtMs = this.now + gap * (this.deps.event?.spawnFactor ?? 1) * (this.deps.weather?.spawnFactor ?? 1) * this.decorPerks.spawn;
     }
   }
 
@@ -1477,7 +1499,7 @@ export class GameSession {
     const score = scoreOrder(
       { fry: t.results.fry!.score, glaze: t.results.glaze!.score, toppings: t.results.toppings!.score, box: t.results.box!.score },
       waitMs / 1000,
-      this.typeOf(c).patienceSec * (this.deps.weather?.patience ?? 1),
+      this.typeOf(c).patienceSec * (this.deps.weather?.patience ?? 1) * this.decorPerks.patience,
       needed,
       balance.scoring,
       t.results.box!.gifts,
@@ -1486,6 +1508,9 @@ export class GameSession {
     if (this.deps.event) score.tip = Math.round(score.tip * this.deps.event.tipMultiplier * 100) / 100;
     // Rainy-day customers are grateful you're open.
     if (this.deps.weather && this.deps.weather.tip !== 1) score.tip = Math.round(score.tip * this.deps.weather.tip * 100) / 100;
+    // A nicely decorated lot tips a little more.
+    const decorTip = this.decorPerks.tip;
+    if (decorTip !== 1 && score.tip > 0) score.tip = Math.round(score.tip * decorTip * 100) / 100;
     // A poor order pays less (and no tip); an awful one pays nothing and takes some back out of the tip jar.
     // The special sells for a little more.
     const special = this.special;

@@ -60,6 +60,12 @@ export class LobbyScenery {
   private sceneryLayout: SceneryLayout | null = null;
   private viewport: Viewport | null = null;
   private time: keyof typeof SKIES = 'day';
+  /** Decorations on the lot (balance.decor ids). */
+  private decor = new Set<string>();
+  private readonly decorArt: Phaser.GameObjects.Graphics;
+  private readonly table2: Phaser.GameObjects.Image;
+  private readonly planters: Phaser.GameObjects.Image[];
+  private readonly neon: Phaser.GameObjects.Text;
   private weather = 'sunny';
   /** Pop-up days: a downtown storefront behind the booth instead of the oaks. */
   private downtown = false;
@@ -82,6 +88,16 @@ export class LobbyScenery {
     this.table = scene.add.image(0, 0, TextureKeys.PatioTable).setOrigin(0.5, 1).setDepth(-12);
     this.planter = scene.add.image(0, 0, TextureKeys.Planter).setOrigin(0.5, 1).setDepth(-2);
     this.rain = scene.add.graphics().setDepth(9).setVisible(false);
+    this.decorArt = scene.add.graphics().setDepth(-12.5);
+    this.table2 = scene.add.image(0, 0, TextureKeys.PatioTable).setOrigin(0.5, 1).setDepth(-11.9).setVisible(false);
+    this.planters = [0, 1].map(() => scene.add.image(0, 0, TextureKeys.Planter).setOrigin(0.5, 1).setDepth(-11.8).setVisible(false));
+    this.neon = scene.add
+      .text(0, 0, 'mochi donuts', { fontFamily: FONT_FAMILY, fontSize: '46px', fontStyle: 'bold', color: '#ffe3ef', stroke: '#ff5fa2', strokeThickness: 6 })
+      .setOrigin(0.5)
+      .setDepth(-13)
+      .setShadow(0, 0, '#ff5fa2', 18, true, true)
+      .setVisible(false)
+      .setName('decor-neon');
     this.storefront = scene.add.graphics().setDepth(-16.5).setVisible(false);
     this.storeSign = scene.add
       .text(0, 0, 'Gator & Co.', { fontFamily: FONT_FAMILY, fontSize: '54px', fontStyle: 'bold', color: '#fbf6ec' })
@@ -160,6 +176,53 @@ export class LobbyScenery {
     this.storeSign.setPosition(v.width / 2, signY).setScale(L ? 0.85 : 1);
   }
 
+  /** Show the lot's decorations (balance.decor ids). */
+  setDecor(ids: readonly string[]): void {
+    this.decor = new Set(ids);
+    if (this.viewport && this.sceneryLayout) this.layoutDecor(this.viewport, this.sceneryLayout);
+    this.drawSkyAndLights();
+  }
+
+  private layoutDecor(v: Viewport, l: SceneryLayout): void {
+    const L = v.orientation === 'landscape';
+    const p = l.patio;
+    const has = (id: string) => this.decor.has(id);
+    // A second picnic table at the front of the patio.
+    this.table2.setVisible(has('table')).setPosition(p.x, p.y + p.h / 2 - (L ? 20 : 40)).setScale(L ? 0.4 : 0.6);
+    // Flower boxes at the patio's front corners.
+    this.planters.forEach((pl, i) =>
+      pl
+        .setVisible(has('flowers'))
+        .setPosition(p.x + (i ? 1 : -1) * (p.w / 2 - (L ? 40 : 55)), p.y + p.h / 2 + (L ? 14 : 18))
+        .setScale(L ? 0.5 : 0.65),
+    );
+    // A neon sign glowing above the trailer (in landscape there's no room up there: over the patio).
+    const t = l.truck;
+    if (L) this.neon.setVisible(has('neon')).setPosition(p.x, p.y - p.h / 2 - 34).setScale(0.8);
+    else this.neon.setVisible(has('neon')).setPosition(t.x + 140 * t.scale, t.y - 345 * t.scale).setScale(t.scale * 1.1);
+    // A mochi mural painted on the patio deck.
+    const g = this.decorArt;
+    g.clear();
+    if (has('mural')) {
+      // mochi, painted on the deck: eight pink balls with ink outlines, and a smile.
+      const r = Math.min(p.w, p.h) * 0.13;
+      const cx = p.x + p.w * 0.27;
+      const cy = p.y + p.h * (L ? 0.05 : 0.1);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const bx = cx + Math.cos(a) * r;
+        const by = cy + Math.sin(a) * r * 0.7;
+        g.fillStyle(0xf4a6c0, 0.85);
+        g.fillCircle(bx, by, r * 0.45);
+        g.lineStyle(3, 0x1f1a17, 0.6);
+        g.strokeCircle(bx, by, r * 0.45);
+      }
+      g.fillStyle(0x1f1a17, 0.7);
+      g.fillCircle(cx - r * 0.25, cy + r * 0.62, 3);
+      g.fillCircle(cx + r * 0.25, cy + r * 0.62, 3);
+    }
+  }
+
   /** Today's weather: the sky, the sun and clouds, and rain. */
   setWeather(id: string): void {
     this.weather = WEATHER_LOOK[id] ? id : 'sunny';
@@ -176,6 +239,7 @@ export class LobbyScenery {
     this.sceneryLayout = l;
     this.drops.forEach((d, i) => ((d.x = ((i * 0.618) % 1) * v.width), (d.y = ((i * 0.381) % 1) * v.height)));
     this.drawStorefront(v, l);
+    this.layoutDecor(v, l);
     const L = v.orientation === 'landscape';
     const gy = l.groundY;
 
@@ -292,8 +356,9 @@ export class LobbyScenery {
       const y = ys(x) + 12;
       g.fillStyle(0xffe08a, s.glow * 0.35);
       g.fillCircle(x, y, 20);
-      g.fillStyle(0xfff3c4, 0.5 + 0.5 * s.glow);
-      g.fillCircle(x, y, 8);
+      // Pink bulbs once the pink string lights are up.
+      g.fillStyle(this.decor.has('lights') ? 0xff9ec6 : 0xfff3c4, 0.5 + 0.5 * s.glow);
+      g.fillCircle(x, y, this.decor.has('lights') ? 10 : 8);
       g.lineStyle(2, COLORS.ink, 0.6);
       g.strokeCircle(x, y, 8);
     }
