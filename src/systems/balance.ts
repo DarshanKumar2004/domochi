@@ -3,6 +3,7 @@ import type { FryBalance } from '../stations/fry';
 import type { BoxBalance } from '../stations/box';
 import type { GlazeBalance } from '../stations/glaze';
 import type { ToppingsBalance } from '../stations/toppings';
+import type { DoughBalance } from '../stations/dough';
 import { validateScoring, type ScoringBalance } from './score';
 
 export interface Range {
@@ -28,6 +29,10 @@ export interface Balance {
   toppings: ToppingsBalance;
   box: BoxBalance;
   scoring: ScoringBalance;
+  dough: DoughBalance;
+  deliveries: { byDay: number[]; size: Range };
+  events: { inviteChance: Record<'great' | 'good' | 'okay' | 'bad', number>; giftBonus: number };
+  cleanup: { messDoneAt: number; tidyBonus: number; oilDirtMax: number; wipePerUnit: number };
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */
@@ -98,6 +103,15 @@ export function validateBalance(b: Balance): string[] {
     errors.push('box needs wrongSpotCredit in [0, 1] and extraPenalty >= 0');
   }
   errors.push(...validateScoring(b.scoring));
+  const d = b.dough;
+  if (!(Number.isInteger(d.batchSize) && d.batchSize >= 1 && d.tubCapacity >= d.batchSize && d.stirTurns > 0)) {
+    errors.push('dough needs integer batchSize >= 1, tubCapacity >= batchSize and stirTurns > 0');
+  }
+  for (const id of Object.keys(d.recipe)) if (!d.ingredients.some((i) => i.id === id)) errors.push(`dough.recipe uses unknown ingredient "${id}"`);
+  if (b.deliveries.byDay.length === 0 || badRange(b.deliveries.size, 1)) errors.push('deliveries needs byDay and a size range >= 1');
+  if (!(b.cleanup.messDoneAt >= 0 && b.cleanup.tidyBonus >= 0 && b.cleanup.oilDirtMax > 0 && b.cleanup.wipePerUnit > 0)) {
+    errors.push('cleanup numbers must be >= 0 (oilDirtMax, wipePerUnit > 0)');
+  }
   if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');
   return errors;
 }

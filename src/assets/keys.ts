@@ -16,12 +16,18 @@ export const TextureKeys = {
   FryDispenser: 'fry-dispenser',
   TrashBin: 'trash-bin',
   PointerHand: 'pointer-hand',
+  Mascot: 'mascot',
+  MixingBowl: 'mixing-bowl',
+  IngredientBin: 'ingredient-bin',
+  Sponge: 'sponge',
+  PopupBooth: 'popup-booth',
   DonutFry: 'donut-fry',
   GlazeCup: 'glaze-cup',
   SugarSifter: 'sugar-sifter',
   ToppingJar: 'topping-jar',
   DonutBox: 'donut-box',
   IconLobby: 'icon-lobby',
+  IconDough: 'icon-dough',
   IconFry: 'icon-fry',
   IconGlaze: 'icon-glaze',
   IconToppings: 'icon-toppings',
@@ -36,6 +42,16 @@ export const AnimKeys = {
 
 /** Ethan sprite sheet: frames laid out left to right. */
 export const ETHAN_FRAME = { width: 220, height: 260, count: 4 } as const;
+
+/** Anchor points inside the pop-up booth image (event days), in its own pixels. */
+export const BOOTH_SPEC = {
+  width: 900,
+  height: 620,
+  /** Centre of the blank banner on the canopy (the logo and event name go here). */
+  bannerCenter: { x: 450, y: 150 },
+  /** Ethan stands behind the table; his feet go here. */
+  ethanFeet: { x: 300, y: 470 },
+} as const;
 
 /**
  * Anchor points inside the truck image, in its own pixel coordinates.

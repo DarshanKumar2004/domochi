@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene } from './helpers';
+import { advance, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene, openDay } from './helpers';
 
 interface SessionView {
   day: number;
@@ -47,6 +47,7 @@ test('a whole day: serve everyone, see the summary, bank the money and start day
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
   await pauseClock(page);
+  await openDay(page); // dough made and the window open (helpers)
   const total = await s((x) => x.customersToday);
 
   // Everyone but the last customer is served straight through the session.
@@ -67,7 +68,11 @@ test('a whole day: serve everyone, see the summary, bank the money and start day
   await shot(page, 'day-1-serve-card');
   await tapNamed(page, SceneKeys.Serve, 'btn-serve-done');
 
-  // That was the last customer: the day summary.
+  // That was the last customer: closing time. Close up (skipping the clean-up), then the day summary.
+  await waitForScene(page, SceneKeys.Serve, false);
+  await findNamed(page, SceneKeys.Lobby, 'lobby-checklist');
+  await shot(page, 'day-1b-closing');
+  await tapNamed(page, SceneKeys.Lobby, 'btn-close-up');
   await waitForScene(page, SceneKeys.DaySummary);
   await findNamed(page, SceneKeys.DaySummary, 'summary-total');
   await shot(page, 'day-2-summary');

@@ -302,6 +302,47 @@ function paintFryDispenser(g: G): void {
 }
 
 /** Kitchen trash can with an open lid: drag donuts here to throw them out. */
+/**
+ * "mochi", the tutorial's guide: a strawberry-glazed pon de ring with a happy
+ * face on its bottom balls and rosy cheeks.
+ */
+function paintMascot(g: G): void {
+  const ink = COLORS.ink;
+  const cx = 110;
+  const cy = 104;
+  const balls = ringBallCenters(cx, cy, 64);
+  const r = ringBallRadius(64, balls.length, 1.18);
+  // Dough edge, then glaze, then outlines
+  g.fillStyle(0xe2a85c);
+  for (const p of balls) g.fillCircle(p.x, p.y + 4, r);
+  g.fillStyle(0xf4a6c0);
+  for (const p of balls) g.fillCircle(p.x, p.y, r - 2);
+  g.lineStyle(5, ink);
+  for (const p of balls) g.strokeCircle(p.x, p.y, r - 2);
+  // Gloss
+  g.lineStyle(6, 0xffffff, 0.6);
+  for (const p of balls) {
+    g.beginPath();
+    g.arc(p.x, p.y, r * 0.55, Math.PI * 1.1, Math.PI * 1.45, false);
+    g.strokePath();
+  }
+  // Face across the lower balls: eyes, smile, cheeks.
+  const eyeY = cy + 40;
+  g.fillStyle(ink);
+  g.fillCircle(cx - 34, eyeY, 9);
+  g.fillCircle(cx + 34, eyeY, 9);
+  g.fillStyle(0xffffff);
+  g.fillCircle(cx - 31, eyeY - 3, 3);
+  g.fillCircle(cx + 37, eyeY - 3, 3);
+  g.lineStyle(6, ink);
+  g.beginPath();
+  g.arc(cx, eyeY + 6, 16, Math.PI * 0.15, Math.PI * 0.85, false);
+  g.strokePath();
+  g.fillStyle(0xff6f91, 0.7);
+  g.fillEllipse(cx - 56, eyeY + 14, 22, 12);
+  g.fillEllipse(cx + 56, eyeY + 14, 22, 12);
+}
+
 /** A cartoon hand pointing straight up (fingertip at the top centre); the tutorial rotates it. */
 function paintPointerHand(g: G): void {
   const ink = COLORS.ink;
@@ -325,6 +366,104 @@ function paintPointerHand(g: G): void {
   g.fillRect(28, 140, 72, 18);
   g.lineStyle(6, ink);
   g.strokeRect(28, 140, 72, 18);
+}
+
+/** A steel mixing bowl seen from the front-top: body, rim, and the opening (where the dough shows). */
+function paintMixingBowl(g: G): void {
+  const ink = COLORS.ink;
+  g.fillStyle(0xb9c0c6);
+  g.lineStyle(6, ink);
+  g.beginPath();
+  g.arc(180, 70, 170, 0, Math.PI, false);
+  g.closePath();
+  g.fillPath();
+  g.strokePath();
+  g.fillStyle(0x8f979e);
+  g.fillEllipse(180, 70, 340, 90);
+  g.strokeEllipse(180, 70, 340, 90);
+  g.lineStyle(8, 0xffffff, 0.5);
+  g.beginPath();
+  g.arc(180, 70, 140, Math.PI * 0.65, Math.PI * 0.85, false);
+  g.strokePath();
+}
+
+/** A white canister with a lid (tinted and labelled per ingredient in code). */
+function paintIngredientBin(g: G): void {
+  const ink = COLORS.ink;
+  g.fillStyle(0xffffff);
+  g.lineStyle(6, ink);
+  g.fillRoundedRect(14, 40, 132, 146, 22);
+  g.strokeRoundedRect(14, 40, 132, 146, 22);
+  g.fillStyle(0xdddddd);
+  g.fillRoundedRect(6, 14, 148, 36, 12);
+  g.strokeRoundedRect(6, 14, 148, 36, 12);
+  g.fillStyle(0xffffff, 0.9);
+  g.fillRoundedRect(30, 84, 100, 60, 10);
+}
+
+/** A kitchen sponge: yellow, with a green scrubber on top. */
+function paintSponge(g: G): void {
+  const ink = COLORS.ink;
+  g.lineStyle(5, ink);
+  g.fillStyle(0xffd75e);
+  g.fillRoundedRect(6, 30, 108, 44, 12);
+  g.strokeRoundedRect(6, 30, 108, 44, 12);
+  g.fillStyle(0x4fae6b);
+  g.fillRoundedRect(6, 8, 108, 26, 10);
+  g.strokeRoundedRect(6, 8, 108, 26, 10);
+  g.fillStyle(0xe8b93f);
+  for (let i = 0; i < 6; i++) g.fillCircle(22 + i * 16, 52 + (i % 2) * 8, 4);
+}
+
+/** The pop-up booth for event days: striped canopy with a blank banner, poles, and a table. */
+function paintPopupBooth(g: G): void {
+  const ink = COLORS.ink;
+  // Poles
+  g.fillStyle(0xd7dce0);
+  g.lineStyle(6, ink);
+  for (const x of [70, 830]) {
+    g.fillRect(x - 10, 200, 20, 400);
+    g.strokeRect(x - 10, 200, 20, 400);
+  }
+  // Canopy: stripes, then a scalloped edge
+  const stripes = 10;
+  for (let i = 0; i < stripes; i++) {
+    g.fillStyle(i % 2 ? 0xffffff : COLORS.pink);
+    g.fillRect(30 + (840 / stripes) * i, 60, 840 / stripes, 150);
+  }
+  g.strokeRect(30, 60, 840, 150);
+  for (let i = 0; i < stripes; i++) {
+    g.fillStyle(i % 2 ? 0xffffff : COLORS.pink);
+    g.fillCircle(30 + (840 / stripes) * (i + 0.5), 210, 840 / stripes / 2);
+  }
+  g.lineStyle(6, ink);
+  for (let i = 0; i < stripes; i++) {
+    g.beginPath();
+    g.arc(30 + (840 / stripes) * (i + 0.5), 210, 840 / stripes / 2, 0, Math.PI, false);
+    g.strokePath();
+  }
+  // Blank banner (the logo goes on it in code)
+  g.fillStyle(0xfffaf0);
+  g.fillRoundedRect(250, 85, 400, 130, 18);
+  g.strokeRoundedRect(250, 85, 400, 130, 18);
+  // Table with a cloth
+  g.fillStyle(0xfffaf0);
+  g.fillRect(60, 470, 780, 130);
+  g.strokeRect(60, 470, 780, 130);
+  g.fillStyle(COLORS.pink);
+  g.fillRect(60, 470, 780, 26);
+  g.strokeRect(60, 470, 780, 26);
+}
+
+function paintIconDough(g: G): void {
+  g.fillStyle(COLORS.cream);
+  g.beginPath();
+  g.arc(48, 46, 38, 0, Math.PI, false);
+  g.closePath();
+  g.fillPath();
+  g.fillRect(14, 40, 68, 8);
+  g.lineStyle(7, COLORS.cream);
+  g.lineBetween(62, 40, 84, 8);
 }
 
 function paintTrashBin(g: G): void {
@@ -493,6 +632,12 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.FryGrate]: { width: 690, height: 360, paint: paintFryGrate },
   [TextureKeys.TrashBin]: { width: 160, height: 160, paint: paintTrashBin },
   [TextureKeys.PointerHand]: { width: 120, height: 164, paint: paintPointerHand },
+  [TextureKeys.Mascot]: { width: 220, height: 210, paint: paintMascot },
+  [TextureKeys.MixingBowl]: { width: 360, height: 250, paint: paintMixingBowl },
+  [TextureKeys.IngredientBin]: { width: 160, height: 200, paint: paintIngredientBin },
+  [TextureKeys.Sponge]: { width: 120, height: 84, paint: paintSponge },
+  [TextureKeys.PopupBooth]: { width: 900, height: 620, paint: paintPopupBooth },
+  [TextureKeys.IconDough]: { width: 96, height: 96, paint: paintIconDough },
   [TextureKeys.FryDispenser]: { width: 215, height: 175, paint: paintFryDispenser },
   [TextureKeys.DonutFry]: { width: 160, height: 160, paint: paintDonutFry },
   [TextureKeys.GlazeCup]: { width: 150, height: 160, paint: paintGlazeCup },

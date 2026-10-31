@@ -305,3 +305,46 @@ Kumar's feedback after Phase 5.
   - **The trade-off:** the sale price doesn't change, so a gift costs you a donut's worth of work for goodwill and tips.
   - **Tuning:** the numbers are in `balance.json` `scoring.gift`.
 - **Fix:** the result card's tip line had lost its "$" signs. My edit script ran the text through a JavaScript `replace`, where `$$` in the replacement means a single `$`. Future scripted edits should avoid `$` in replacement strings, or use a function.
+
+## The full day: dough, morning pickups, closing clean-up, pop-up events; fry indicators; mochi the guide (2026-10-31)
+
+Kumar's ideas from the earlier sessions ("opening and closing tasks", "deliveries", "event invites"), plus fry and tutorial feedback.
+
+- **A day has phases** (`GameSession.phase`; on for real days through `dayFlow`, off for the tutorial and most tests):
+  - **prep:** the window shows CLOSED and no walk-ups come. Make dough, and work on any morning pickups. **Open the window** in the Lobby when ready; if there's no dough yet it asks twice.
+  - **open:** walk-ups arrive as before.
+  - **closing:** after the last order goes out, the Lobby shows a clean-up checklist (wipe the glaze tray, wipe the toppings tray, filter the oil) and **Close up**, or **Close anyway**.
+  - **closed:** the day summary. A tidy close earns a **$2 tidy bonus**, shown on the summary.
+- **Dough station (new tab; logic in `stations/dough.ts`):**
+  - **Making a batch:** tap the ingredient canisters to scoop the recipe into the bowl (3 rice flour, 1 tapioca starch, 1 sugar, 2 milk, 1 egg, which is game design, all in `balance.json` `dough`). Then **stir** by dragging round the bowl until it's smooth (5 turns; the lumps fade and a swirl turns), and tip it **into the tub**.
+  - **The tub:** a batch is 12 donuts, and the tub holds 24. Each donut dropped in the fryer uses one, and **Drop is off without dough**, with a hint pointing to the Dough station. You make a second batch whenever you run low.
+  - **Quality:** scoops off the recipe lower the batch's quality, and a donut's fry score is × (1 − 0.3 × (1 − quality)). The tub keeps a mixed quality when batches are added.
+- **Clean-up:**
+  - **Trays:** glaze and topping pieces that miss the donut add to the tray's **mess**, which fades like the art. With no donut on the board, press and drag to **scrub the tray with a sponge** (`ui/TrayWiper.ts`). It wipes the art and the count together, faster the messier the tray is, and clears it completely once it's clean.
+  - **Oil:** every donut fried dirties the oil a little, and the vat visibly darkens. When the vat is empty and the oil is dirty, **Filter oil** replaces Pull all.
+- **Morning pickups** (`balance.json` `deliveries`, by day: none on day 1, then 1–2 orders of 4–6):
+  - **Who orders:** new `customers.json` types with `"delivery": true`, the **campus coffee shop** and the **delivery app**. The names are generic on purpose, since a real café needs to OK being named.
+  - **When:** their tickets are on the rail from the start of the day, tagged **to go**, and the big ticket says "pickup".
+  - **The deadline:** the Lobby lists them with a courier countdown (their patience: 6 and 5 minutes).
+  - **No crowding:** they never stand in line and don't take up a walk-up spot.
+  - **Serving:** the same as any order ("Order #n picked up!"). The summary counts them.
+- **Event invites and pop-up days** (`data/events.json`):
+  - **The invite:** after a served walk-up, there's a chance of an invite: 30% for a great reaction, 15% good, 4% okay, plus 10% if you gave a gift. It's at most one a day, and never on a pop-up day.
+  - **The card:** an **invite card** quotes them ("we're tailgating before the game tomorrow…").
+  - **Saying yes:** it books **tomorrow** as a pop-up day (saved as `event: { id, day }`).
+  - **The pop-up day:** the Lobby shows a striped **pop-up booth** with the logo and event name instead of the trailer. It has more customers (×1.5–2), arriving faster, tips ×1.2–2, and no morning pickups. The summary says "what a pop-up at …!".
+  - **The events:** a birthday party, a campus tailgate, an office party, a farmers market, a wedding reception. They're generic; a real event or venue needs their OK.
+- **Fry feedback (Kumar):**
+  - **The grate:** with it held down, **both sides fry at the same rate** (`topFactorGrate` went from 0.6 to 1).
+  - **Bar colours:** each side's bar is **red (raw) → orange (nearly) → green (perfect) → dark red (overdone)**. The target band is green too.
+  - **Labels:** the bars are labelled **bottom** and **top**.
+  - **Two tones:** each donut shows its **underside as a rim of its own colour** below it, so a flip visibly swaps the cooked and uncooked sides.
+- **Tutorial (Kumar: "it covers up some vital clicking places… maybe instead of Ethan it's a mochi donut"):**
+  - **The guide:** it's now **mochi**, a strawberry-glazed pon de ring with a face (new placeholder `mascot`), who bobs and squishes. It introduces itself and credits Ethan as domochi's founder.
+  - **Smaller:** the bubble is smaller (36 px text).
+  - **Out of the way:** the panel picks **top or bottom, whichever doesn't cover the target and the hand beside it**. If both would, it takes whichever covers less.
+- **New placeholder art:** `mascot`, `mixing-bowl`, `ingredient-bin`, `sponge`, `popup-booth` (anchors in `BOOTH_SPEC`) and `icon-dough`. MANIFEST updated.
+- **Tests:**
+  - **Unit:** dough, phases, the tub, clean-up, pickups, invites and pop-up days (`dayflow.test.ts`).
+  - **Browser:** `dayflow.spec.ts` makes dough by hand, opens the window, closes up after scrubbing both trays and filtering the oil, and checks the pickups, the invite card and the booth.
+  - **Older specs:** they use `openDay()`, which makes dough through the real API and opens the window.

@@ -95,6 +95,11 @@ describe('sanitizeSave', () => {
     expect(sanitizeSave({ served: -1, bestOrder: 140 })).toMatchObject({ served: 0, bestOrder: 0 });
   });
 
+  it('keeps a booked pop-up event, and drops a malformed one', () => {
+    expect(sanitizeSave({ event: { id: 'tailgate', day: 4 } }).event).toEqual({ id: 'tailgate', day: 4 });
+    expect(sanitizeSave({ event: { id: 7, day: 'soon' } }).event).toBeUndefined();
+  });
+
   it.each([null, 5, 'save', [1, 2]])('returns defaults for non-object %p', (raw) => {
     expect(sanitizeSave(raw)).toEqual(defaultSave());
   });

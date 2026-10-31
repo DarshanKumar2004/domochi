@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
 import { paintOnPattern, type GlazeLayer, type GlazeWork, type PourCheck } from '../stations/glaze';
+import { ballAt } from '../stations/toppings';
+import { TrayWiper } from '../ui/TrayWiper';
 import type { Glaze, Stripe } from '../systems/menu';
 import { flavorsForDay } from '../systems/menu';
 import { audio, balance, menu, session } from '../systems/services';
@@ -33,6 +35,8 @@ const CANVAS = 420;
 const CANVAS_KEY = 'glaze-paint';
 /** Glaze that missed the donut, left on the tray. */
 const MESS_KEY = 'glaze-mess';
+/** How much of the tray's mess stays each time a new donut goes on it (the rest fades). */
+const TRAY_KEEP = 0.55;
 /** Drizzle guide when the base glaze isn't a drizzled flavour's: three stripes across. */
 const GENERIC_STRIPES: readonly Stripe[] = [-0.6, 0, 0.6].map((y) => ({ x0: -Math.sqrt(0.64 - y * y), y0: y, x1: Math.sqrt(0.64 - y * y), y1: y }));
 const SLOTS = 6;
@@ -101,6 +105,8 @@ export class GlazeScene extends StationScene {
   private guideDrizzle!: Phaser.GameObjects.Graphics;
   /** The finger that's pouring, read every frame (its events can go to the rail or tab bar if it strays there). */
   private pourPointer: Phaser.Input.Pointer | null = null;
+  /** Scrubbing the empty tray (with no donut on it). */
+  private wiper!: TrayWiper;
   private nextPourSound = 0;
   private trayBg!: Phaser.GameObjects.Graphics;
   private trayLabel!: Phaser.GameObjects.Text;
@@ -200,6 +206,11 @@ export class GlazeScene extends StationScene {
       this.fingerY = p.worldY;
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, () => this.stopPour());
+    this.wiper = new TrayWiper(this, 'glaze', () => this.mess, () => this.boardPos, () => {
+      audio().play('ding');
+      this.flash('sparkling clean!');
+      this.refresh();
+    });
     this.events.on(Phaser.Scenes.Events.SLEEP, this.stopPour, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.SLEEP, this.stopPour, this);
@@ -352,7 +363,11 @@ export class GlazeScene extends StationScene {
     }
 
     this.setSubtitle(`rack ${s.rack.length} · glazed shelf ${s.shelf.length}/${balance.glaze.shelfCapacity}`);
-    if (!work) this.instruction.setText(s.rack.length ? 'tap a donut on the rack to glaze it' : 'no fried donuts: fry some first!');
+    if (!work) {
+      const st = session();
+      if (st.phase === 'closing' && st.messOn('glaze') > 0) this.instruction.setText('closing time: scrub the tray clean');
+      else this.instruction.setText((s.rack.length ? 'tap a donut on the rack to glaze it' : 'no fried donuts: fry some first!') + (st.messOn('glaze') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : ''));
+    }
     else if (!work.hasGlaze) this.instruction.setText('pick a cup, then pour over the donut');
     else this.instruction.setText('add a drizzle, or tap Done');
     this.refreshControls();
@@ -405,7 +420,9 @@ export class GlazeScene extends StationScene {
   private startPour(p: Phaser.Input.Pointer): void {
     const work = session().glazeWork;
     if (!work) {
-      this.flash(session().rack.length ? 'take a donut from the rack first' : 'fry some donuts first');
+      // No donut on the board: scrub the tray if it's messy.
+      if (this.wiper.dirty) this.wiper.start(p);
+      else this.flash(session().rack.length ? 'take a donut from the rack first' : 'fry some donuts first');
       return;
     }
     if (!this.selected) {
@@ -435,6 +452,7 @@ export class GlazeScene extends StationScene {
   }
 
   private stopPour(): void {
+    this.wiper?.stop();
     if (!this.pouring) return;
     this.pouring = false;
     this.pourPointer = null;
@@ -466,6 +484,7 @@ export class GlazeScene extends StationScene {
 
     // Follow the pouring finger directly: if it strays over the ticket rail or tab
     // bar, those scenes get its move/up events, but the pointer itself is still current.
+    this.wiper.update(time);
     const pp = this.pourPointer;
     if (this.pouring && pp) {
       if (!pp.isDown) this.stopPour();
@@ -544,6 +563,8 @@ export class GlazeScene extends StationScene {
     drawGlazeSegment(ctx, CANVAS, d.glazeId, x0, y0, nx, ny, seed);
     ctx.restore();
     drawOnTray(this.mess.context, (m, size) => drawGlazeSegment(m, size, d.glazeId, x0, y0, nx, ny, seed));
+    // Glaze that missed the donut is mess on the tray (to wipe at closing).
+    if (ballAt(nx, ny, balance.glaze, balance.glaze.edgeMargin) < 0) session().addMess('glaze', 1);
     this.dirty = true;
     this.messDirty = true;
     if (layer.segments.length === 4) this.refresh(); // first glaze on this donut: update the instruction
@@ -679,7 +700,8 @@ export class GlazeScene extends StationScene {
     const from = { x: img.x, y: img.y, size: img.displayWidth, tint: img.tintTopLeft };
     if (!s.startGlazing(i)) return;
     // A new donut on the tray: the old mess fades a bit.
-    fadeTray(this.mess.context);
+    fadeTray(this.mess.context, TRAY_KEEP);
+    s.fadeMess('glaze', TRAY_KEEP);
     this.mess.refresh();
     // Slide it from the tray onto the board.
     const ghost = this.add.image(from.x, from.y, TextureKeys.DonutFry).setDisplaySize(from.size, from.size).setTint(from.tint).setDepth(15);

@@ -7,6 +7,7 @@ export const SceneKeys = {
   Hud: 'HudScene',
   Lobby: 'LobbyScene',
   Order: 'OrderScene',
+  Dough: 'DoughScene',
   Fry: 'FryScene',
   Glaze: 'GlazeScene',
   Toppings: 'ToppingsScene',
@@ -15,6 +16,7 @@ export const SceneKeys = {
   Settings: 'SettingsScene',
   TicketView: 'TicketViewScene',
   DaySummary: 'DaySummaryScene',
+  Invite: 'InviteScene',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

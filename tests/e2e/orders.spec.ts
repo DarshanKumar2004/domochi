@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, doubleTapNamed, findNamed, seedTutorialDone, shot, tapGame, tapNamed, waitForScene } from './helpers';
+import { advance, doubleTapNamed, findNamed, seedTutorialDone, shot, tapGame, tapNamed, waitForScene, openDay } from './helpers';
 
 /** Glaze a donut through the session and put it in the open box (packing by hand is pack.spec's job). */
 async function packOne(page: Page): Promise<void> {
@@ -34,6 +34,7 @@ async function twoOrders(page: Page): Promise<void> {
   await page.goto('/?seed=7');
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
+  await openDay(page); // dough made and the window open (helpers)
   await takeFrontOrder(page, 1);
   await advance(page, 20_000); // next customer arrives
   await takeFrontOrder(page, 2);

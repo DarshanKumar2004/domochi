@@ -23,10 +23,13 @@ import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
+import { TrayWiper } from '../ui/TrayWiper';
 
 const CANVAS_KEY = 'toppings-board';
 /** Pieces that missed the donut, left on the tray. */
 const MESS_KEY = 'toppings-mess';
+/** How much of the tray's mess stays each time a new donut goes on it (the rest fades). */
+const TRAY_KEEP = 0.55;
 /** Where a whole cookie should sit (normalised y of its centre): across the top of the ring. */
 const COOKIE_SPOT_Y = -0.42;
 /** Copy of the board flying into the trash on Redo. */
@@ -94,6 +97,8 @@ export class ToppingsScene extends StationScene {
   private guideSpot!: Phaser.GameObjects.Graphics;
   /** The shaking finger, read every frame (its events can go to the rail or tab bar if it strays there). */
   private shakePointer: Phaser.Input.Pointer | null = null;
+  /** Scrubbing the empty tray (with no donut on it). */
+  private wiper!: TrayWiper;
   private nextShakeSound = 0;
   private shelfBg!: Phaser.GameObjects.Graphics;
   private shelfLabel!: Phaser.GameObjects.Text;
@@ -197,6 +202,11 @@ export class ToppingsScene extends StationScene {
       this.fingerY = p.worldY;
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, () => this.stopShake());
+    this.wiper = new TrayWiper(this, 'toppings', () => this.mess, () => this.boardPos, () => {
+      audio().play('ding');
+      this.flash('sparkling clean!');
+      this.refresh();
+    });
     this.events.on(Phaser.Scenes.Events.SLEEP, this.stopShake, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.SLEEP, this.stopShake, this);
@@ -345,7 +355,11 @@ export class ToppingsScene extends StationScene {
 
     this.setSubtitle(`shelf ${s.shelf.length}/${balance.glaze.shelfCapacity}${work ? ' · 1 on the board' : ''}`);
     const t = this.selectedTopping();
-    if (!work) this.instruction.setText(s.shelf.length ? 'tap a glazed donut to top it' : 'no glazed donuts: glaze some first!');
+    if (!work) {
+      const st = session();
+      if (st.phase === 'closing' && st.messOn('toppings') > 0) this.instruction.setText('closing time: scrub the tray clean');
+      else this.instruction.setText((s.shelf.length ? 'tap a glazed donut to top it' : 'no glazed donuts: glaze some first!') + (st.messOn('toppings') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : ''));
+    }
     else if (!this.jars.length) this.instruction.setText("nothing on today's menu needs toppings");
     else if (!t) this.instruction.setText('pick a jar');
     else this.instruction.setText(t.style === 'piece' ? `tap the donut to place a ${t.name}` : `shake ${t.name} over the donut`);
@@ -446,7 +460,9 @@ export class ToppingsScene extends StationScene {
   private startShake(p: Phaser.Input.Pointer): void {
     const s = session();
     if (!s.toppingWork) {
-      this.flash(s.shelf.length ? 'take a donut from the shelf first' : 'glaze some donuts first');
+      // No donut on the board: scrub the tray if it's messy.
+      if (this.wiper.dirty) this.wiper.start(p);
+      else this.flash(s.shelf.length ? 'take a donut from the shelf first' : 'glaze some donuts first');
       return;
     }
     const t = this.selectedTopping();
@@ -477,6 +493,7 @@ export class ToppingsScene extends StationScene {
   }
 
   private stopShake(): void {
+    this.wiper?.stop();
     if (!this.shaking) return;
     this.shaking = false;
     this.shakePointer = null;
@@ -508,6 +525,7 @@ export class ToppingsScene extends StationScene {
     const tb = balance.toppings;
 
     // Follow the shaking finger directly (its events may go to the rail or tab bar if it strays there).
+    this.wiper.update(time);
     const sp = this.shakePointer;
     if (this.shaking && sp) {
       if (!sp.isDown) this.stopShake();
@@ -574,6 +592,7 @@ export class ToppingsScene extends StationScene {
       if (piece.on) drawToppingPiece(this.canvas.context, ART_SIZE, piece, t);
       else {
         drawOnTray(this.mess.context, (m, size) => drawToppingPiece(m, size, piece, t));
+        session().addMess('toppings', 1);
         this.messDirty = true;
       }
     }
@@ -592,7 +611,8 @@ export class ToppingsScene extends StationScene {
     const from = { x: img.x, y: img.y, size: img.displayWidth, key: img.texture.key };
     if (!s.startToppings(i)) return;
     // A new donut on the tray: the old mess fades a bit.
-    fadeTray(this.mess.context);
+    fadeTray(this.mess.context, TRAY_KEEP);
+    s.fadeMess('toppings', TRAY_KEEP);
     this.mess.refresh();
     if (!this.selected && this.jars.length === 1) this.selected = this.jars[0]!.topping.id;
     const ghost = this.add.image(from.x, from.y, from.key).setDisplaySize(from.size, from.size).setDepth(15);

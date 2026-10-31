@@ -127,7 +127,7 @@ describe('cooking a donut', () => {
     expect(d.temperature).toBe(1);
   });
 
-  it('floating tops creep along slowly; the grate cooks them much faster', () => {
+  it('floating tops creep along slowly; held under the grate, both sides fry at the same rate', () => {
     const floating = hotFryer(350);
     floating.drop();
     run(floating, 2);
@@ -137,6 +137,8 @@ describe('cooking a donut', () => {
     run(pressed, 2);
     expect(floating.slots[0]!.up).toBeCloseTo((2 / B.secondsPerSide) * B.topFactorFloating, 2);
     expect(pressed.slots[0]!.up).toBeCloseTo((2 / B.secondsPerSide) * B.topFactorGrate, 2);
+    expect(B.topFactorGrate).toBe(1);
+    expect(pressed.slots[0]!.up).toBeCloseTo(pressed.slots[0]!.down, 5);
   });
 
   it('flipping one donut leaves the others alone', () => {

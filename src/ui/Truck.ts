@@ -5,6 +5,8 @@ import { CSS, FONT_FAMILY } from './theme';
 
 /** domochi's trailer with Ethan waving in the window, centred on (x, y). */
 export class Truck extends Phaser.GameObjects.Container {
+  private readonly sign: Phaser.GameObjects.Text;
+
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
     const left = -TRUCK_SPEC.width / 2;
@@ -33,13 +35,14 @@ export class Truck extends Phaser.GameObjects.Container {
         )
         .setOrigin(0.5);
 
-    this.add([
-      truck,
-      ethan,
-      logo,
-      text(TRUCK_SPEC.openSignCenter, 'OPEN', 38, CSS.pink, true),
-      text(TRUCK_SPEC.handleCenter, brand.instagram, 30, CSS.ink),
-    ]);
+    this.sign = text(TRUCK_SPEC.openSignCenter, 'OPEN', 38, CSS.pink, true);
+    this.add([truck, ethan, logo, this.sign, text(TRUCK_SPEC.handleCenter, brand.instagram, 30, CSS.ink)]);
     scene.add.existing(this);
+  }
+
+  /** The window sign: OPEN (pink) or CLOSED (before opening and after closing). */
+  setOpen(open: boolean): this {
+    this.sign.setText(open ? 'OPEN' : 'CLOSED').setFontSize(open ? 38 : 30).setColor(open ? CSS.pink : CSS.cream);
+    return this;
   }
 }

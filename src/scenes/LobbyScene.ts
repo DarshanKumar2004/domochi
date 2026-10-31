@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { Customer } from '../systems/GameSession';
-import { session } from '../systems/services';
+import { audio, session } from '../systems/services';
+import { Booth } from '../ui/Booth';
+import { Button } from '../ui/Button';
 import type { Viewport } from '../ui/layout';
 import { SpeechBubble } from '../ui/SpeechBubble';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -23,6 +25,8 @@ const LAYOUT = {
     truck: { x: 540, y: 470, scale: 0.9 },
     sign: { x: 120, feetY: 850, scale: 0.7 },
     line: { x: [600, 760, 920, 1080], feetY: 1300, scale: 0.85 },
+    panel: { x: 780, y: 1060, buttonY: 1330, width: 540 },
+    pickups: { x: 780, y: 1500 },
     waiting: {
       x: 250,
       y: 1185,
@@ -43,6 +47,8 @@ const LAYOUT = {
     truck: { x: 420, y: 205, scale: 0.65 },
     sign: { x: 820, feetY: 470, scale: 0.6 },
     line: { x: [980, 1130, 1280, 1430], feetY: 700, scale: 0.8 },
+    panel: { x: 1205, y: 420, buttonY: 680, width: 600 },
+    pickups: { x: 1730, y: 215 },
     waiting: {
       x: 1730,
       y: 500,
@@ -75,6 +81,12 @@ export class LobbyScene extends Phaser.Scene {
   private frontTag!: Phaser.GameObjects.Text;
   private doneText!: Phaser.GameObjects.Text;
   private bubble: SpeechBubble | null = null;
+  private truck: Truck | null = null;
+  /** Morning prep / closing time: a checklist and a button (open the window, close up). */
+  private panelText!: Phaser.GameObjects.Text;
+  private openButton!: Button;
+  private closeButton!: Button;
+  private pickupsText!: Phaser.GameObjects.Text;
 
   constructor() {
     super(SceneKeys.Lobby);
@@ -83,9 +95,13 @@ export class LobbyScene extends Phaser.Scene {
   create(): void {
     this.views = new Map();
     this.bubble = null;
+    this.confirmOpen = false;
     this.cameras.main.setBackgroundColor(COLORS.sky);
     const ground = this.add.graphics();
-    const truck = new Truck(this, 0, 0);
+    // A pop-up booth on event days, the trailer otherwise.
+    const ev = session().event;
+    this.truck = ev ? null : new Truck(this, 0, 0);
+    const truck: Phaser.GameObjects.Container = this.truck ?? new Booth(this, 0, 0, ev!.name);
     const sign = this.add.image(0, 0, TextureKeys.SignAFrame).setOrigin(0.5, 1);
     const waiting = this.add.rectangle(0, 0, 1, 1, 0xffffff, 0.25).setStrokeStyle(6, COLORS.ink, 0.35);
     const waitingLabel = this.add
@@ -117,6 +133,21 @@ export class LobbyScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(20);
 
+    this.panelText = this.add
+      .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '38px', color: CSS.ink, backgroundColor: CSS.cream, padding: { x: 24, y: 16 }, align: 'left', lineSpacing: 6 })
+      .setOrigin(0.5)
+      .setDepth(20)
+      .setName('lobby-checklist');
+    this.openButton = new Button(this, 0, 0, 'Open the window', () => this.openShop(), { width: 520, name: 'btn-open' }).setDepth(21);
+    this.closeButton = new Button(this, 0, 0, 'Close up', () => this.closeUp(), { width: 520, name: 'btn-close-up' }).setDepth(21);
+    this.pickupsText = this.add
+      .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '32px', color: CSS.ink, backgroundColor: '#fffaf0cc', padding: { x: 18, y: 12 }, align: 'left' })
+      .setOrigin(0.5)
+      .setDepth(8)
+      .setName('lobby-pickups');
+    // Pickup countdowns tick every second.
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.syncPanels() });
+
     listen(this, session().events, 'changed', () => this.sync(false));
 
     onLayout(this, (v: Viewport) => {
@@ -136,6 +167,10 @@ export class LobbyScene extends Phaser.Scene {
       waiting.setPosition(c.x + L.waiting.x, c.y + L.waiting.y).setSize(L.waiting.w, L.waiting.h);
       waitingLabel.setPosition(c.x + L.waiting.x, c.y + L.waiting.labelY);
       this.doneText.setPosition(c.x + c.width / 2, c.y + (v.orientation === 'landscape' ? 160 : 230));
+      this.panelText.setPosition(c.x + L.panel.x, c.y + L.panel.y).setWordWrapWidth(L.panel.width);
+      this.openButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
+      this.closeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
+      this.pickupsText.setPosition(c.x + L.pickups.x, c.y + L.pickups.y);
       this.sync(true);
     });
   }
@@ -176,7 +211,76 @@ export class LobbyScene extends Phaser.Scene {
       this.frontTag.setPosition(frontView.image.x, frontView.image.y - CUSTOMER_H * frontView.image.scale - 50);
     }
 
-    this.doneText.setVisible(s.isDayComplete);
+    this.doneText.setVisible(s.isDayComplete && s.phase === 'open');
+    this.syncPanels();
+  }
+
+  /** The prep / closing checklist and button, the sign, and the pickups list. */
+  private syncPanels(): void {
+    const s = session();
+    this.truck?.setOpen(s.phase === 'open');
+    const prep = s.phase === 'prep';
+    const closing = s.phase === 'closing';
+    this.openButton.setVisible(prep);
+    this.closeButton.setVisible(closing);
+    if (prep) {
+      const dough = Number.isFinite(s.dough) ? s.dough : 0;
+      const lines = [
+        s.event ? `pop-up day: ${s.event.name}!` : 'good morning! before opening:',
+        `• ${dough ? `dough: ${dough} donuts ready` : 'make dough (Dough station)'}`,
+      ];
+      if (s.pickups.length) lines.push(`• ${s.pickups.length} pickup${s.pickups.length === 1 ? '' : 's'} on the rail`);
+      lines.push('then open the window!');
+      this.panelText.setText(lines.join('\n')).setVisible(true);
+    } else if (closing) {
+      const c = s.cleanup;
+      const tick = (done: boolean) => (done ? '(done)' : '');
+      this.panelText
+        .setText(
+          [
+            'closing time! clean up:',
+            `• wipe the glaze tray ${tick(c.glazeTray)}`,
+            `• wipe the toppings tray ${tick(c.toppingsTray)}`,
+            `• filter the fryer oil ${tick(c.oil)}`,
+          ].join('\n'),
+        )
+        .setVisible(true);
+      this.closeButton.setLabel(c.glazeTray && c.toppingsTray && c.oil ? 'Close up' : 'Close anyway');
+    } else {
+      this.panelText.setVisible(false);
+    }
+
+    // Pickups waiting for a courier, with how long until they're late.
+    const pickups = s.pickups;
+    if (pickups.length) {
+      const rows = pickups.map((cust) => {
+        const t = s.ticket(cust.ticketNo!)!;
+        const left = Math.max(0, Math.round(s.typeOf(cust).patienceSec - (s.timeMs - t.takenAtMs) / 1000));
+        return `#${t.no} ${s.typeOf(cust).name} · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      });
+      this.pickupsText.setText(['pickups (courier):', ...rows].join('\n')).setVisible(true);
+    } else {
+      this.pickupsText.setVisible(false);
+    }
+  }
+
+  private openShop(): void {
+    const s = session();
+    if (Number.isFinite(s.dough) && s.dough === 0) {
+      // Allowed, but worth a nudge.
+      this.panelText.setText('no dough yet! make a batch at the Dough station first\n(or open anyway: tap again)');
+      if (!this.confirmOpen) {
+        this.confirmOpen = true;
+        return;
+      }
+    }
+    if (s.openShop()) audio().play('chime');
+  }
+
+  private confirmOpen = false;
+
+  private closeUp(): void {
+    if (session().closeUp()) this.scene.launch(SceneKeys.DaySummary);
   }
 
   private place(cust: Customer, target: { x: number; y: number; scale: number }, name: string, snap: boolean, v: Viewport): void {

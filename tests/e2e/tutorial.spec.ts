@@ -33,7 +33,7 @@ async function cookUntil(page: Page, ok: (d: NonNullable<Slot>) => boolean): Pro
   throw new Error('never got there');
 }
 
-test('the guided first order: Ethan walks you through every station', async ({ page }) => {
+test('the guided first order: mochi the donut walks you through every station', async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -46,7 +46,8 @@ test('the guided first order: Ethan walks you through every station', async ({ p
   await waitForScene(page, SceneKeys.Lobby);
   await pauseClock(page);
   expect(await s((x) => x.isTutorial)).toBe(true);
-  expect(await line(page)).toContain("I'm Ethan");
+  expect(await line(page)).toContain("I'm mochi");
+  expect(await isVisibleNamed(page, SceneKeys.Tutorial, 'tutorial-mascot')).toBe(true);
   for (let i = 0; i < 3; i++) await tapNamed(page, SceneKeys.Tutorial, 'btn-tutorial-next');
 
   // The scripted customer arrives; the hand points at them.

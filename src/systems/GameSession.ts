@@ -6,6 +6,7 @@
 // toppings board and back, and the Box station packs shelf donuts into the
 // selected order's box. Closing the lid hands it straight to that customer.
 import { identifyFlavor, matchDonuts, scoreBox, type BoxResult } from '../stations/box';
+import { DoughWork } from '../stations/dough';
 import { Fryer, fryResultFromDonuts, type FriedDonut, type FryResult } from '../stations/fry';
 import { GlazeWork, glazeScoreFor, ringMask, type MaskTemplate } from '../stations/glaze';
 import { ToppingWork, toppingScoreFor, type FinishedDonut } from '../stations/toppings';
@@ -26,6 +27,25 @@ export interface Customer {
   arrivedAtMs: number;
   /** Set once their order is taken. */
   ticketNo?: number;
+  /** A morning pickup (a courier collects it); never stands in line. */
+  delivery?: boolean;
+}
+
+/**
+ * The shape of a day (with dayFlow): morning prep (make dough, work on
+ * pickups) with the window closed; open (walk-ups come); closing (clean up)
+ * once everyone's served; closed (the day summary).
+ */
+export type DayPhase = 'prep' | 'open' | 'closing' | 'closed';
+
+/** A pop-up booth day (events.json). */
+export interface PopupEvent {
+  id: string;
+  name: string;
+  invite: string;
+  customersMultiplier: number;
+  spawnFactor: number;
+  tipMultiplier: number;
 }
 
 export type TicketStatus = 'open' | 'served';
@@ -51,6 +71,8 @@ export interface Ticket {
   servedAtMs?: number;
   /** The box picked at the Box station (else the one that fits the order). */
   packBoxId?: string;
+  /** A morning pickup order. */
+  delivery?: boolean;
   /** Filled in when the box is closed and served. */
   results: {
     fry?: FryResult;
@@ -64,6 +86,8 @@ export interface Ticket {
     score?: OrderScore;
     /** What the order sold for (dollars). */
     sale?: number;
+    /** The customer invited domochi to this event (an events.json id). */
+    invite?: string;
   };
 }
 
@@ -90,6 +114,15 @@ export interface DaySummary {
   tiers: Record<'great' | 'good' | 'okay' | 'bad', number>;
   /** Extra donuts given away as gifts. */
   gifts: number;
+  /** Morning pickups done. */
+  pickups: number;
+  /** Today's pop-up event, if it was one. */
+  event?: string;
+  /** Tomorrow's pop-up (an invite you accepted today). */
+  nextEvent?: string;
+  /** Cleaned up before closing (null if the day has no closing). */
+  tidy: boolean | null;
+  tidyBonus: number;
 }
 
 export interface SessionEvents extends Record<string, unknown> {
@@ -99,6 +132,8 @@ export interface SessionEvents extends Record<string, unknown> {
   /** Donuts that burnt and were thrown out automatically. */
   burnt: { slots: number[] };
   dayComplete: undefined;
+  /** The day moved on (prep → open → closing → closed). */
+  phase: DayPhase;
 }
 
 export interface SessionDeps {
@@ -112,12 +147,26 @@ export interface SessionDeps {
    * arriving quickly. No day summary at the end.
    */
   script?: { orders: Order[] };
+  /**
+   * The full day: morning prep with the window closed, dough to make, morning
+   * pickups, and clean-up at closing. Without it (tests, the tutorial) the
+   * window is open from the start, dough never runs out and the day ends when
+   * everyone's served.
+   */
+  dayFlow?: boolean;
+  /** Today is a pop-up booth day. */
+  event?: PopupEvent;
+  /** Events a happy customer might invite you to. */
+  events?: PopupEvent[];
 }
 
 export class GameSession {
   readonly events = new Emitter<SessionEvents>();
   readonly day: number;
+  /** Everyone to serve today: walk-ups plus morning pickups. */
   readonly customersToday: number;
+  /** Walk-up customers today. */
+  readonly walkUpsToday: number;
   /** A scripted tutorial day (see SessionDeps.script). */
   readonly isTutorial: boolean;
   /** The fryer keeps running (heating, cooking) whichever station you're at. */
@@ -140,14 +189,56 @@ export class GameSession {
   private readonly glazeMask: MaskTemplate;
   /** Donuts thrown away today (burnt or trashed), for the day summary. */
   private trashedCount = 0;
+  private dayPhase: DayPhase;
+  /** Donuts' worth of dough in the tub, and the quality of what's in it. */
+  private doughLeft: number;
+  private doughQ = 1;
+  private doughWork: DoughWork | null = null;
+  /** Glaze and toppings that missed the donut and are sitting on each tray. */
+  private readonly trayMess = { glaze: 0, toppings: 0 };
+  private dirt = 0;
+  /** Today's invite (one a day), and whether you said yes. */
+  private inviteId: string | null = null;
+  private inviteAccepted = false;
+  private tidyClose: boolean | null = null;
 
   constructor(private readonly deps: SessionDeps) {
     this.day = deps.day;
     this.isTutorial = !!deps.script;
-    this.customersToday = deps.script ? deps.script.orders.length : forDay(deps.balance.customersPerDay, deps.day);
+    const base = deps.script ? deps.script.orders.length : forDay(deps.balance.customersPerDay, deps.day);
+    this.walkUpsToday = deps.event ? Math.round(base * deps.event.customersMultiplier) : base;
+    const pickups = deps.dayFlow && !deps.event ? forDay(deps.balance.deliveries.byDay, deps.day) : 0;
+    this.customersToday = this.walkUpsToday + pickups;
     this.nextSpawnAtMs = deps.balance.spawn.firstDelaySec * 1000;
     this.fryer = new Fryer(deps.balance.fry);
     this.glazeMask = ringMask(deps.balance.glaze);
+    this.dayPhase = deps.dayFlow ? 'prep' : 'open';
+    this.doughLeft = deps.dayFlow ? 0 : Infinity;
+    for (let i = 0; i < pickups; i++) this.addPickup();
+  }
+
+  /** A morning pickup order: on the rail from the start, collected by a courier. */
+  private addPickup(): void {
+    const { menu, balance, rng, customers } = this.deps;
+    const types = customers.types.filter((t) => t.delivery);
+    if (!types.length) return;
+    const type = rng.pick(types);
+    const customer: Customer = { id: this.nextCustomerId++, typeId: type.id, state: 'waiting', arrivedAtMs: this.now, delivery: true };
+    const order = generateOrder(menu, this.day, orderSizeRange(balance.deliveries.size, type.orderSize), type.favorites, balance.favoriteWeight, rng);
+    const ticket: Ticket = {
+      no: this.nextTicketNo++,
+      customerId: customer.id,
+      order,
+      line: pickLine(type.lines.order, rng, { order: describeOrder(menu, order) }),
+      status: 'open',
+      takenAtMs: this.now,
+      results: {},
+      delivery: true,
+    };
+    customer.ticketNo = ticket.no;
+    this.allCustomers.push(customer);
+    this.allTickets.push(ticket);
+    if (this.activeNo === null) this.activeNo = ticket.no;
   }
 
   // ---- Queries ---------------------------------------------------------------
@@ -161,9 +252,23 @@ export class GameSession {
     return this.allCustomers.filter((c) => c.state === 'inLine' || c.state === 'ordering');
   }
 
-  /** Customers who have ordered and are waiting, in ticket order. */
+  /** Walk-up customers who have ordered and are waiting, in ticket order. */
   get waiting(): Customer[] {
-    return this.allCustomers.filter((c) => c.state === 'waiting');
+    return this.allCustomers.filter((c) => c.state === 'waiting' && !c.delivery);
+  }
+
+  /** Morning pickup orders not collected yet, in ticket order. */
+  get pickups(): Customer[] {
+    return this.allCustomers.filter((c) => c.delivery && c.state !== 'served');
+  }
+
+  get phase(): DayPhase {
+    return this.dayPhase;
+  }
+
+  /** Today's pop-up event, if it is one. */
+  get event(): PopupEvent | undefined {
+    return this.deps.event;
   }
 
   /** Tickets not yet served, oldest first. */
@@ -185,10 +290,10 @@ export class GameSession {
     return this.trashedCount;
   }
 
-  /** Customers here now: in line, ordering or waiting. */
+  /** Walk-up customers here now: in line, ordering or waiting (pickups don't count). */
   get activeCustomers(): number {
     let n = 0;
-    for (const c of this.allCustomers) if (c.state !== 'served') n++;
+    for (const c of this.allCustomers) if (c.state !== 'served' && !c.delivery) n++;
     return n;
   }
 
@@ -203,8 +308,14 @@ export class GameSession {
     return this.allCustomers.filter((c) => c.state === 'served').length;
   }
 
+  /** Every walk-up has come and everyone (pickups too) has been served. */
+  get allServed(): boolean {
+    return this.spawned === this.walkUpsToday && this.allCustomers.every((c) => c.state === 'served');
+  }
+
+  /** The day is over: closed up (with dayFlow), or everyone served. */
   get isDayComplete(): boolean {
-    return this.spawned === this.customersToday && this.allCustomers.every((c) => c.state === 'served');
+    return this.deps.dayFlow ? this.dayPhase === 'closed' : this.allServed;
   }
 
   customer(id: number): Customer | undefined {
@@ -245,20 +356,139 @@ export class GameSession {
     // If the line is full (or enough people are already here), the next customer
     // arrives as soon as there's room; serving someone pushes that a little later.
     if (
-      this.spawned < this.customersToday &&
+      this.dayPhase === 'open' &&
+      this.spawned < this.walkUpsToday &&
       this.now >= this.nextSpawnAtMs &&
       this.lineLength < spawn.maxInLine &&
       this.activeCustomers < forDay(this.deps.balance.maxActiveByDay, this.day)
     ) {
       this.spawn();
-      this.nextSpawnAtMs = this.now + this.deps.rng.int(spawn.intervalSec.min * 1000, spawn.intervalSec.max * 1000);
+      const gap = this.deps.rng.int(spawn.intervalSec.min * 1000, spawn.intervalSec.max * 1000);
+      this.nextSpawnAtMs = this.now + gap * (this.deps.event?.spawnFactor ?? 1);
     }
   }
 
   private spawn(): void {
-    const type = this.deps.rng.pick(this.deps.customers.types);
+    const type = this.deps.rng.pick(this.deps.customers.types.filter((t) => !t.delivery));
     this.allCustomers.push({ id: this.nextCustomerId++, typeId: type.id, state: 'inLine', arrivedAtMs: this.now });
     this.spawned++;
+    this.events.emit('changed', undefined);
+  }
+
+  // ---- The day ---------------------------------------------------------------
+
+  /** Open the window: walk-up customers start coming. */
+  openShop(): boolean {
+    if (this.dayPhase !== 'prep') return false;
+    this.dayPhase = 'open';
+    this.nextSpawnAtMs = this.now + this.deps.balance.spawn.firstDelaySec * 1000;
+    this.events.emit('phase', this.dayPhase);
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
+  /** What still needs cleaning before closing (true = done). */
+  get cleanup(): { glazeTray: boolean; toppingsTray: boolean; oil: boolean } {
+    const at = this.deps.balance.cleanup.messDoneAt;
+    return { glazeTray: this.trayMess.glaze <= at, toppingsTray: this.trayMess.toppings <= at, oil: this.dirt === 0 };
+  }
+
+  /** Close up after the last customer (clean or not): the day is done. */
+  closeUp(): boolean {
+    if (this.dayPhase !== 'closing') return false;
+    const c = this.cleanup;
+    this.tidyClose = c.glazeTray && c.toppingsTray && c.oil;
+    this.dayPhase = 'closed';
+    this.events.emit('phase', this.dayPhase);
+    this.events.emit('changed', undefined);
+    this.events.emit('dayComplete', undefined);
+    return true;
+  }
+
+  // ---- Dough ------------------------------------------------------------------
+
+  /** Donuts' worth of dough in the tub (Infinity when the day doesn't track dough). */
+  get dough(): number {
+    return this.doughLeft;
+  }
+
+  get doughQuality(): number {
+    return this.doughQ;
+  }
+
+  /** The batch in the bowl at the Dough station, if any. */
+  get doughBatch(): DoughWork | null {
+    return this.doughWork;
+  }
+
+  get tubFull(): boolean {
+    return this.doughLeft + this.deps.balance.dough.batchSize > this.deps.balance.dough.tubCapacity;
+  }
+
+  /** Start a batch in the bowl (one at a time). */
+  startDough(): DoughWork | null {
+    if (this.doughWork) return this.doughWork;
+    this.doughWork = new DoughWork(this.deps.balance.dough);
+    this.events.emit('changed', undefined);
+    return this.doughWork;
+  }
+
+  /** The stirred batch goes in the tub. Null if it isn't ready or the tub can't take it. */
+  finishDough(): { quality: number; added: number } | null {
+    const w = this.doughWork;
+    if (!w || w.stage !== 'ready' || this.tubFull) return null;
+    const added = this.deps.balance.dough.batchSize;
+    const left = Number.isFinite(this.doughLeft) ? this.doughLeft : 0;
+    // The tub's quality is the mix of what's left and the new batch.
+    this.doughQ = (this.doughQ * left + w.quality * added) / (left + added);
+    if (Number.isFinite(this.doughLeft)) this.doughLeft += added;
+    this.doughWork = null;
+    this.events.emit('changed', undefined);
+    return { quality: w.quality, added };
+  }
+
+  /** Throw the batch in the bowl away. */
+  trashDough(): boolean {
+    if (!this.doughWork) return false;
+    this.doughWork = null;
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
+  // ---- Clean-up -----------------------------------------------------------------
+
+  /** Mess on a tray (glaze or toppings that missed the donut). */
+  messOn(tray: 'glaze' | 'toppings'): number {
+    return this.trayMess[tray];
+  }
+
+  addMess(tray: 'glaze' | 'toppings', units: number): void {
+    this.trayMess[tray] += units;
+  }
+
+  /** Older mess fades as new donuts go on the tray (it matches the art). */
+  fadeMess(tray: 'glaze' | 'toppings', keep: number): void {
+    this.trayMess[tray] *= keep;
+  }
+
+  /** Scrub a tray. Returns true once it's clean. */
+  wipe(tray: 'glaze' | 'toppings', amount: number): boolean {
+    const was = this.trayMess[tray];
+    this.trayMess[tray] = Math.max(0, was - amount);
+    const clean = this.trayMess[tray] <= this.deps.balance.cleanup.messDoneAt;
+    if (clean) this.trayMess[tray] = 0;
+    if (was !== this.trayMess[tray]) this.events.emit('changed', undefined);
+    return clean;
+  }
+
+  /** How dirty the fryer oil is (donuts fried since it was last filtered). */
+  get oilDirt(): number {
+    return this.dirt;
+  }
+
+  filterOil(): void {
+    if (this.dirt === 0) return;
+    this.dirt = 0;
     this.events.emit('changed', undefined);
   }
 
@@ -323,10 +553,17 @@ export class GameSession {
     return this.rackDonuts.length >= this.deps.balance.fry.rackCapacity;
   }
 
-  /** Drop one raw donut into the vat. Returns its slot, or -1 if it can't. */
+  /** Drop one raw donut into the vat. Returns its slot, or -1 if it can't (full, no oil or no dough). */
   dropDonut(): number {
+    if (this.doughLeft < 1) return -1;
     const slot = this.fryer.drop();
-    if (slot >= 0) this.events.emit('changed', undefined);
+    if (slot < 0) return slot;
+    if (Number.isFinite(this.doughLeft)) {
+      this.doughLeft--;
+      this.fryer.slots[slot]!.dough = this.doughQ;
+      this.dirt++;
+    }
+    this.events.emit('changed', undefined);
     return slot;
   }
 
@@ -630,14 +867,49 @@ export class GameSession {
       balance.scoring,
       t.results.box!.gifts,
     );
+    // A pop-up crowd tips more.
+    if (this.deps.event) score.tip = Math.round(score.tip * this.deps.event.tipMultiplier * 100) / 100;
     const sale = orderPrice(menu, t.order);
     t.results.score = score;
+    // A happy walk-up customer may invite you to their event (one invite a day).
+    if (this.deps.dayFlow && !c.delivery && !this.deps.event && !this.inviteId && this.deps.events?.length) {
+      const chance = balance.events.inviteChance[score.tier] + (score.gifts > 0 ? balance.events.giftBonus : 0);
+      if (this.deps.rng.next() < chance) {
+        this.inviteId = this.deps.rng.pick(this.deps.events).id;
+        t.results.invite = this.inviteId;
+      }
+    }
     t.results.sale = sale;
     const event: ServedEvent = { customer: c, ticket: t, waitMs, score, sale };
     this.events.emit('served', event);
     this.events.emit('changed', undefined);
-    if (this.isDayComplete) this.events.emit('dayComplete', undefined);
+    if (this.allServed) {
+      if (this.deps.dayFlow) {
+        // Last order out: time to clean up and close.
+        this.dayPhase = 'closing';
+        this.events.emit('phase', this.dayPhase);
+        this.events.emit('changed', undefined);
+      } else {
+        this.events.emit('dayComplete', undefined);
+      }
+    }
     return event;
+  }
+
+  /** The invite a customer made today (an events.json event), if any. */
+  get invite(): PopupEvent | undefined {
+    return this.inviteId ? this.deps.events?.find((e) => e.id === this.inviteId) : undefined;
+  }
+
+  get inviteWasAccepted(): boolean {
+    return this.inviteAccepted;
+  }
+
+  /** Say yes (or no) to today's invite: yes makes tomorrow a pop-up day. */
+  answerInvite(accept: boolean): void {
+    if (!this.inviteId) return;
+    this.inviteAccepted = accept;
+    this.events.emit('changed', undefined);
   }
 
   /** Totals for the day so far (the summary at the end of the day). */
@@ -668,6 +940,11 @@ export class GameSession {
       trashed: this.trashedCount,
       tiers,
       gifts,
+      pickups: served.filter((t) => t.delivery).length,
+      ...(this.deps.event ? { event: this.deps.event.name } : {}),
+      ...(this.inviteAccepted && this.invite ? { nextEvent: this.invite.name } : {}),
+      tidy: this.tidyClose,
+      tidyBonus: this.tidyClose ? this.deps.balance.cleanup.tidyBonus : 0,
     };
   }
 

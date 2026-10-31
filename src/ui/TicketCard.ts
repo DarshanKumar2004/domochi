@@ -75,7 +75,7 @@ export class TicketCard extends Phaser.GameObjects.Container {
     const box = menu.boxes.find((b) => b.id === ticket.order.boxId);
     const n = ticket.order.flavors.length;
     text(left + PAD, top + HEADER / 2 - 6, `#${ticket.no}`, 52, true);
-    text(-left - PAD, top + HEADER / 2 - 6, `${n} donut${n === 1 ? '' : 's'}`, 34, false, 1);
+    text(-left - PAD, top + HEADER / 2 - 6, `${ticket.delivery ? 'pickup · ' : ''}${n} donut${n === 1 ? '' : 's'}`, 34, false, 1);
 
     groups.forEach(({ flavorId, count }, i) => {
       const rowY = top + HEADER + row * i + row / 2;

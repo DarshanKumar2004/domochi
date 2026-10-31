@@ -1,0 +1,45 @@
+{
+  "_note": "Pop-up booth days. A customer invites domochi; if you accept, the next day is this event: more customers (customersMultiplier), arriving faster (spawnFactor < 1 = shorter gaps), tipping more (tipMultiplier). No morning deliveries on event days. Names are generic (a real event or venue needs their OK first).",
+  "events": [
+    {
+      "id": "birthday",
+      "name": "a birthday party",
+      "invite": "my daughter's birthday party is tomorrow. would domochi pop up?",
+      "customersMultiplier": 1.5,
+      "spawnFactor": 0.7,
+      "tipMultiplier": 1.5
+    },
+    {
+      "id": "tailgate",
+      "name": "a campus tailgate",
+      "invite": "we're tailgating before the game tomorrow. you HAVE to bring the donuts!",
+      "customersMultiplier": 2,
+      "spawnFactor": 0.6,
+      "tipMultiplier": 1.3
+    },
+    {
+      "id": "office-party",
+      "name": "an office party",
+      "invite": "our office party is tomorrow. could domochi set up a booth for us?",
+      "customersMultiplier": 1.5,
+      "spawnFactor": 0.75,
+      "tipMultiplier": 1.4
+    },
+    {
+      "id": "farmers-market",
+      "name": "a farmers market",
+      "invite": "I run a farmers market stall. want a spot next to us tomorrow?",
+      "customersMultiplier": 1.75,
+      "spawnFactor": 0.65,
+      "tipMultiplier": 1.2
+    },
+    {
+      "id": "wedding",
+      "name": "a wedding reception",
+      "invite": "we're getting married tomorrow! would you do a mochi donut bar?",
+      "customersMultiplier": 1.5,
+      "spawnFactor": 0.7,
+      "tipMultiplier": 2
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, doubleTapNamed, dragFromNamed, dragNamedOnto, holdNamed, pauseClock, seedTutorialDone, shot, tapNamed, isVisibleNamed, waitForScene } from './helpers';
+import { advance, doubleTapNamed, dragFromNamed, dragNamedOnto, holdNamed, pauseClock, seedTutorialDone, shot, tapNamed, isVisibleNamed, waitForScene, openDay } from './helpers';
 
 interface SlotView {
   down: number;
@@ -30,6 +30,7 @@ async function startAtFryer(page: Page): Promise<void> {
   await page.goto('/?seed=7');
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
+  await openDay(page); // dough made and the window open (helpers)
   await pauseClock(page); // the test drives time, so slow screenshots can't burn anything
   await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
   await waitForScene(page, SceneKeys.Fry);

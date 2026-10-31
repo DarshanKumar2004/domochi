@@ -11,6 +11,7 @@ import {
   shot,
   tapNamed,
   waitForScene,
+  openDay,
 } from './helpers';
 
 // Runs once per Playwright project: phone portrait, phone landscape, desktop.
@@ -39,6 +40,10 @@ test('full scene flow', async ({ page }) => {
   await waitForScene(page, SceneKeys.Tutorial, false);
   await waitForScene(page, SceneKeys.Lobby);
   await waitForScene(page, SceneKeys.Hud);
+  // Morning prep: the window starts closed.
+  await findNamed(page, SceneKeys.Lobby, 'btn-open');
+  await shot(page, '04a-lobby-prep');
+  await openDay(page); // dough made and the window open (helpers)
 
   // The first customer walks up to the window
   await findNamed(page, SceneKeys.Lobby, 'customer-front');
@@ -148,6 +153,7 @@ test('rotating the phone switches layout without losing state', async ({ page },
   await page.goto('/');
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
+  await openDay(page); // dough made and the window open (helpers)
 
   // Go to a station and open nothing else, then rotate.
   await tapNamed(page, SceneKeys.Hud, 'tab-Glaze');

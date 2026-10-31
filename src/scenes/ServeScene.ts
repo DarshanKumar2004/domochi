@@ -38,7 +38,7 @@ export class ServeScene extends Phaser.Scene {
     const card = this.add.container(0, 0, [addCard(this, CARD_W, CARD_H)]);
     const text = (x: number, y: number, str: string, size: number, opts: Partial<Phaser.Types.GameObjects.Text.TextStyle> = {}) =>
       this.add.text(x, y, str, { fontFamily: FONT_FAMILY, fontSize: `${size}px`, color: CSS.ink, ...opts });
-    card.add(text(0, -425, `Order #${this.ticketNo} served!`, 68, { fontStyle: 'bold' }).setOrigin(0.5));
+    card.add(text(0, -425, `Order #${this.ticketNo} ${ticket?.delivery ? 'picked up!' : 'served!'}`, 68, { fontStyle: 'bold' }).setOrigin(0.5));
     card.add(text(0, -335, `"${thanks}"`, 40, { fontStyle: 'italic', align: 'center', wordWrap: { width: CARD_W - 120 } }).setOrigin(0.5).setName('serve-thanks'));
 
     const val = (x: { score: number } | undefined) => (x ? String(x.score) : '—');
@@ -82,9 +82,11 @@ export class ServeScene extends Phaser.Scene {
     });
   }
 
-  /** Back to the lobby; if that was the last customer, the day is done. */
+  /** Back to the lobby (via an invite, if they made one); if that was the last customer, the day is done. */
   private close(): void {
-    if (session().isDayComplete && !session().isTutorial) this.scene.launch(SceneKeys.DaySummary);
+    const s = session();
+    if (s.ticket(this.ticketNo)?.results.invite) this.scene.launch(SceneKeys.Invite);
+    else if (s.isDayComplete && !s.isTutorial) this.scene.launch(SceneKeys.DaySummary);
     this.scene.stop();
   }
 }

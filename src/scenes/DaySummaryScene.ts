@@ -29,7 +29,7 @@ export class DaySummaryScene extends Phaser.Scene {
     const s = session();
     const sum = s.summary();
     const bank = save().data.money;
-    const today = sum.sales + sum.tips;
+    const today = sum.sales + sum.tips + sum.tidyBonus;
     const known = new Set(flavorsForDay(menu, sum.day).map((f) => f.id));
     const fresh = flavorsForDay(menu, sum.day + 1).filter((f) => !known.has(f.id));
 
@@ -38,7 +38,7 @@ export class DaySummaryScene extends Phaser.Scene {
       this.add.text(x, y, str, { fontFamily: FONT_FAMILY, fontSize: `${size}px`, color: CSS.ink, ...opts });
 
     card.add(text(0, -510, `day ${sum.day} done!`, 76, { fontStyle: 'bold' }).setOrigin(0.5));
-    card.add(text(0, -435, brand.tagline, 34, { fontStyle: 'italic', color: '#6b5d52' }).setOrigin(0.5));
+    card.add(text(0, -435, sum.event ? `what a pop-up at ${sum.event}!` : brand.tagline, 34, { fontStyle: 'italic', color: '#6b5d52' }).setOrigin(0.5));
 
     const rows: [string, string, string][] = [
       ['customers served', `${sum.served}`, 'served'],
@@ -47,11 +47,13 @@ export class DaySummaryScene extends Phaser.Scene {
       ['reactions', `${sum.tiers.great} great · ${sum.tiers.good} good · ${sum.tiers.okay + sum.tiers.bad} meh`, 'reactions'],
       ['donuts thrown away', `${sum.trashed}`, 'trashed'],
       ['donuts gifted', `${sum.gifts}`, 'gifts'],
+      ...(sum.pickups ? [['pickups done', `${sum.pickups}`, 'pickups'] as [string, string, string]] : []),
+      ...(sum.tidy === null ? [] : [['clean-up', sum.tidy ? `tidy! +${money(sum.tidyBonus)}` : 'skipped', 'cleanup'] as [string, string, string]]),
       ['sales', money(sum.sales), 'sales'],
       ['tips', money(sum.tips), 'tips'],
     ];
     rows.forEach(([label, value, name], i) => {
-      const y = -350 + i * 64;
+      const y = -365 + i * (rows.length > 9 ? 54 : 60);
       card.add(text(-360, y, label, 40).setOrigin(0, 0.5));
       card.add(text(360, y, value, 40, { fontStyle: 'bold' }).setOrigin(1, 0.5).setName(`summary-${name}`));
     });
@@ -61,9 +63,9 @@ export class DaySummaryScene extends Phaser.Scene {
     card.add(line);
     card.add(text(0, 225, `today ${money(today)}   ·   total ${money(bank + today)}`, 44, { fontStyle: 'bold' }).setOrigin(0.5).setName('summary-total'));
     card.add(
-      text(0, 315, fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!` : 'same menu tomorrow', 40, {
-        color: fresh.length ? '#b0406a' : '#6b5d52',
-        fontStyle: fresh.length ? 'bold' : 'normal',
+      text(0, 315, [sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '', fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!` : sum.nextEvent ? '' : 'same menu tomorrow'].filter(Boolean).join('\n'), 38, {
+        color: fresh.length || sum.nextEvent ? '#b0406a' : '#6b5d52',
+        fontStyle: fresh.length || sum.nextEvent ? 'bold' : 'normal',
         align: 'center',
         wordWrap: { width: CARD_W - 100 },
       })
@@ -80,10 +82,15 @@ export class DaySummaryScene extends Phaser.Scene {
 
   /** Bank today's money, save, and start the next day fresh. */
   private nextDay(): void {
-    const sum = session().summary();
+    const s = session();
+    const sum = s.summary();
+    const invite = s.inviteWasAccepted ? s.invite : undefined;
     void save().update((d) => {
       d.day = sum.day + 1;
-      d.money = Math.round((d.money + sum.sales + sum.tips) * 100) / 100;
+      d.money = Math.round((d.money + sum.sales + sum.tips + sum.tidyBonus) * 100) / 100;
+      // Book tomorrow's pop-up (or drop a booking that's been and gone).
+      if (invite) d.event = { id: invite.id, day: sum.day + 1 };
+      else if (d.event && d.event.day <= sum.day) delete d.event;
       d.served += sum.served;
       d.bestOrder = Math.max(d.bestOrder, sum.bestScore);
     });

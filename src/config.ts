@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { BoxScene } from './scenes/BoxScene';
 import { DaySummaryScene } from './scenes/DaySummaryScene';
+import { DoughScene } from './scenes/DoughScene';
+import { InviteScene } from './scenes/InviteScene';
 import { FryScene } from './scenes/FryScene';
 import { GlazeScene } from './scenes/GlazeScene';
 import { HudScene } from './scenes/HudScene';
@@ -38,6 +40,7 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       PreloadScene,
       TutorialScene,
       LobbyScene,
+      DoughScene,
       FryScene,
       GlazeScene,
       ToppingsScene,
@@ -48,6 +51,7 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       SettingsScene,
       TicketViewScene,
       DaySummaryScene,
+      InviteScene,
     ],
   };
 }

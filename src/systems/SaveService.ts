@@ -22,6 +22,8 @@ export interface SaveData {
   served: number;
   /** Best single order score so far (0–100). */
   bestOrder: number;
+  /** A pop-up event you accepted, and the day it's on. */
+  event?: { id: string; day: number };
   settings: {
     sound: boolean;
     music: boolean;
@@ -58,6 +60,9 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (typeof raw.money === 'number' && Number.isFinite(raw.money) && raw.money >= 0) data.money = raw.money;
   if (typeof raw.served === 'number' && Number.isInteger(raw.served) && raw.served >= 0) data.served = raw.served;
   if (typeof raw.bestOrder === 'number' && raw.bestOrder >= 0 && raw.bestOrder <= 100) data.bestOrder = raw.bestOrder;
+  if (isRecord(raw.event) && typeof raw.event.id === 'string' && typeof raw.event.day === 'number' && Number.isInteger(raw.event.day)) {
+    data.event = { id: raw.event.id, day: raw.event.day };
+  }
 
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;

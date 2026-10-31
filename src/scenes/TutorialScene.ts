@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { AnimKeys, TextureKeys } from '../assets/keys';
+import { TextureKeys } from '../assets/keys';
 import tutorial from '../data/tutorial.json';
 import { menu, save, session } from '../systems/services';
 import { Button } from '../ui/Button';
@@ -23,7 +23,7 @@ interface Target {
 
 interface Step {
   id: StepId;
-  /** Station the step happens at (if you're elsewhere, Ethan sends you there first). */
+  /** Station the step happens at (if you're elsewhere, mochi sends you there first). */
   station?: StationKey;
   target?: Target;
 }
@@ -32,24 +32,29 @@ interface Step {
 type Stage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 const LINES = tutorial.steps as Record<string, string>;
-/** Ethan's bubble, before scaling to the screen. */
-const BUBBLE_W = 760;
+/** mochi's bubble, before scaling to the screen. */
+const BUBBLE_W = 680;
+/** Room the pointing hand takes beside its target (so the bubble doesn't cover it either). */
+const HAND_ROOM = 180;
 const FLAVOR = tutorial.order[0]!;
 /** The training order's base glaze and topping (cookies & cream: its glaze, crushed cookies). */
 const recipe = menu.flavors.find((f) => f.id === FLAVOR)!;
 const TOPPING = recipe.toppings[0];
 
 /**
- * The guided first day, drawn over the real game: Ethan explains each step,
+ * The guided first day, drawn over the real game: mochi (a donut buddy) explains each step,
  * a hand points at what to tap, and the next step comes when you've done it.
  *
  * Steps are worked out from the game's state every frame rather than ticked
  * off, so they cope with anything: if the donut burns, it's back to "drop";
- * if you wander to another station, Ethan points you back.
+ * if you wander to another station, mochi points you back. The bubble goes
+ * wherever it won't cover what it's pointing at.
  */
 export class TutorialScene extends Phaser.Scene {
   private bubble!: SpeechBubble;
-  private ethan!: Phaser.GameObjects.Sprite;
+  private mascot!: Phaser.GameObjects.Image;
+  /** The bubble's height at its current message and scale. */
+  private bubbleH = 0;
   private hand!: Phaser.GameObjects.Image;
   private ring!: Phaser.GameObjects.Graphics;
   private next!: Button;
@@ -75,8 +80,10 @@ export class TutorialScene extends Phaser.Scene {
 
     this.ring = this.add.graphics().setDepth(1);
     this.hand = this.add.image(0, 0, TextureKeys.PointerHand).setOrigin(0.5, 0.05).setDepth(3).setVisible(false).setName('tutorial-hand');
-    this.ethan = this.add.sprite(0, 0, TextureKeys.Ethan).setOrigin(0.5, 1).setScale(0.75).setDepth(4).play(AnimKeys.EthanWave);
-    this.bubble = new SpeechBubble(this, 0, 0, BUBBLE_W, '', -BUBBLE_W / 2 + 60, 40).setDepth(4).setName('tutorial-bubble');
+    this.mascot = this.add.image(0, 0, TextureKeys.Mascot).setOrigin(0.5, 1).setScale(0.75).setDepth(4).setName('tutorial-mascot');
+    // mochi bobs and squishes a little while it talks.
+    this.tweens.add({ targets: this.mascot, scaleY: 0.7, scaleX: 0.8, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.bubble = new SpeechBubble(this, 0, 0, BUBBLE_W, '', -BUBBLE_W / 2 + 60, 36).setDepth(4).setName('tutorial-bubble');
     this.next = new Button(this, 0, 0, 'Next', () => this.advance(), { width: 280, height: 120, fontSize: 46, name: 'btn-tutorial-next' }).setDepth(5);
     this.skip = this.add
       .text(0, 0, 'skip tutorial', { fontFamily: FONT_FAMILY, fontSize: '34px', color: CSS.cream, backgroundColor: '#1f1a17cc', padding: { x: 18, y: 12 } })
@@ -202,14 +209,18 @@ export class TutorialScene extends Phaser.Scene {
   private place(line: string, id: StepId, b: Phaser.Geom.Rectangle | null): void {
     const v = getViewport(this);
     const talking = id === 'intro' || id === 'outro';
-    // The panel sits away from what it's pointing at: at the top if the target is low, and vice versa.
-    const top = b ? b.centerY > v.height * 0.5 : true;
+    if (!this.shownKey.startsWith(`${line}|`)) {
+      this.bubble.setMessage(line);
+      this.layoutPanel(v, talking, this.panelTop);
+      this.bubbleH = this.bubble.getBounds().height;
+    }
+    // The panel goes top or bottom, whichever doesn't cover the target (and the hand beside it).
+    const top = this.chooseTop(v, talking, b);
     const key = `${line}|${top}|${v.width}x${v.height}`;
     if (key !== this.shownKey) {
       this.shownKey = key;
       this.panelTop = top;
-      this.bubble.setMessage(line);
-      this.layoutPanel(v, talking);
+      this.layoutPanel(v, talking, top);
     }
 
     this.ring.clear();
@@ -228,19 +239,44 @@ export class TutorialScene extends Phaser.Scene {
     this.hand.setVisible(true);
   }
 
-  private layoutPanel(v: Viewport, talking: boolean): void {
+  /** Panel geometry: mochi on the left, the bubble to its right. */
+  private panelBox(v: Viewport, talking: boolean, top: boolean, h: number): { left: number; w: number; y: number; rect: Phaser.Geom.Rectangle } {
     const L = v.orientation === 'landscape';
-    // Ethan on the left, his bubble to his right; below the rail (top) or above the tab bar (bottom).
-    const left = L ? v.safe.x + 520 : 220;
-    const w = L ? 820 : v.width - left - 20;
+    const left = L ? v.safe.x + 560 : 190;
+    const w = L ? 720 : Math.min(760, v.width - left - 20);
+    const y = top ? v.railHeight + 24 + h / 2 : v.height - v.tabBarHeight - 60 - h / 2 - (talking ? 130 : 0);
+    // Everything the panel covers: mochi, the bubble, and the skip / Next buttons.
+    const rect = new Phaser.Geom.Rectangle(left - 190, y - h / 2 - (top ? 0 : 80), w + 190, h + 80 + (talking ? 130 : 0));
+    return { left, w, y, rect };
+  }
+
+  /** Top unless that covers the target (or its hand); if both do, whichever covers less. */
+  private chooseTop(v: Viewport, talking: boolean, b: Phaser.Geom.Rectangle | null): boolean {
+    if (!b) return true;
+    const h = this.bubbleH || 200;
+    const target = new Phaser.Geom.Rectangle(b.x - 20, b.y - 20, b.width + 40 + HAND_ROOM * 0.6, b.height + 40 + HAND_ROOM);
+    const cover = (top: boolean) => {
+      const r = Phaser.Geom.Rectangle.Intersection(this.panelBox(v, talking, top, h).rect, target);
+      return r.width > 0 && r.height > 0 ? r.width * r.height : 0;
+    };
+    const a = cover(true);
+    if (a === 0) return true;
+    const bot = cover(false);
+    if (bot === 0) return false;
+    return a <= bot;
+  }
+
+  private layoutPanel(v: Viewport, talking: boolean, top: boolean): void {
+    const L = v.orientation === 'landscape';
+    const { w } = this.panelBox(v, talking, top, 0);
     this.bubble.setScale(w / BUBBLE_W);
     const h = this.bubble.getBounds().height;
+    const { left, y } = this.panelBox(v, talking, top, h);
     const cx = left + w / 2;
-    const y = this.panelTop ? v.railHeight + 30 + h / 2 : v.height - v.tabBarHeight - 70 - h / 2 - (talking ? 140 : 0);
     this.bubble.setPosition(cx, y);
-    this.ethan.setPosition(left - 110, y + h / 2);
-    this.next.setVisible(talking).setPosition(cx + w / 2 - 160, y + h / 2 + 85);
-    this.skip.setPosition(left + 130, this.panelTop ? y + h / 2 + 55 : y - h / 2 - 50);
+    this.mascot.setPosition(left - 100, y + h / 2 + (L ? 0 : 10));
+    this.next.setVisible(talking).setPosition(cx + w / 2 - 160, y + h / 2 + 80);
+    this.skip.setPosition(left + 120, top ? y + h / 2 + 50 : y - h / 2 - 45);
   }
 
   // ---- Actions -------------------------------------------------------------------

@@ -30,7 +30,7 @@
     "cookRate": { "zeroAtF": 250, "oneAtF": 350, "max": 1.8 },
     "secondsPerSide": 9,
     "topFactorFloating": 0.15,
-    "topFactorGrate": 0.6,
+    "topFactorGrate": 1,
     "dropCoolPerDonutF": 5,
     "oil": { "start": 1, "perDonut": 0.04, "topUp": 0.25, "lowThreshold": 0.35, "minToFry": 0.05 },
     "unevenAtEmpty": 0.5,
@@ -39,6 +39,8 @@
     "evennessZeroAtStdDev": 0.25,
     "slots": 6,
     "rackCapacity": 6,
+    "_dough": "A donut's fry score × (1 − doughEffect × (1 − its dough batch's quality)).",
+    "doughEffect": 0.3,
     "scoreWeights": { "doneness": 0.6, "temperature": 0.25, "evenness": 0.15 }
   },
   "glaze": {
@@ -82,6 +84,39 @@
     "tip": { "perDonut": 0.75, "curve": [[0, 0], [40, 0.2], [70, 0.7], [90, 1], [100, 1.25]] },
     "_gift": "An extra donut (a real menu flavour) beyond the order is a gift: +tipPerDonut each (up to max), and the customer's reaction goes up tierBoost levels.",
     "gift": { "tipPerDonut": 0.75, "max": 3, "tierBoost": 1 }
+  },
+  "dough": {
+    "_note": "Morning prep: scoop the recipe into the bowl, stir, and the batch fills the dough tub (batchSize donuts). Quality = 1 − scoopPenalty × (scoops off the recipe), at least qualityFloor. Each donut dropped in the fryer uses one.",
+    "batchSize": 12,
+    "tubCapacity": 24,
+    "stirTurns": 5,
+    "scoopPenalty": 0.15,
+    "qualityFloor": 0.3,
+    "ingredients": [
+      { "id": "rice-flour", "name": "rice flour", "color": "#f6f1e7" },
+      { "id": "tapioca", "name": "tapioca starch", "color": "#fbfbf8" },
+      { "id": "sugar", "name": "sugar", "color": "#fffdf6" },
+      { "id": "milk", "name": "milk", "color": "#eef3f7" },
+      { "id": "egg", "name": "egg", "color": "#f7d36b" }
+    ],
+    "recipe": { "rice-flour": 3, "tapioca": 1, "sugar": 1, "milk": 2, "egg": 1 }
+  },
+  "deliveries": {
+    "_note": "By day: morning batch orders for couriers (a coffee shop, a delivery app). They're on the rail from the start of the day; pickup patience is the delivery customer type's patienceSec.",
+    "byDay": [0, 1, 1, 2, 2, 2],
+    "size": { "min": 4, "max": 6 }
+  },
+  "events": {
+    "_note": "A served walk-up customer may invite domochi to their event (chance by reaction tier, plus giftBonus if you gave them a gift). Accepting makes tomorrow a pop-up day (see events.json). At most one invite a day.",
+    "inviteChance": { "great": 0.3, "good": 0.15, "okay": 0.04, "bad": 0 },
+    "giftBonus": 0.1
+  },
+  "cleanup": {
+    "_note": "Closing time: wipe both trays (mess at or below messDoneAt) and filter the oil. A tidy close earns tidyBonus. Oil dirt +1 per donut fried; the vat looks fully dirty at oilDirtMax.",
+    "messDoneAt": 2,
+    "tidyBonus": 2,
+    "oilDirtMax": 30,
+    "wipePerUnit": 0.35
   },
   "box": {
     "_note": "Each ordered slot holding its flavour = 1, that flavour in the wrong slot = wrongSpotCredit, minus extraPenalty per extra donut that isn't a real flavour (extra real flavours are gifts, scored in scoring.gift).",

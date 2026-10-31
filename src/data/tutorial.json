@@ -1,18 +1,20 @@
 {
-  "_note": "The guided first day. Ethan's lines, by step id. The steps themselves (what to point at and when each is done) are in TutorialScene; they follow the game's state, so a burnt donut sends you back to 'drop'. {station} is replaced with a station name.",
-  "order": ["cookies-and-cream"],
+  "_note": "The guided first day. mochi's lines (the donut guide), by step id. The steps themselves (what to point at and when each is done) are in TutorialScene; they follow the game's state, so a burnt donut sends you back to 'drop'. {station} is replaced with a station name.",
+  "order": [
+    "cookies-and-cream"
+  ],
   "intro": [
-    "hey there! I'm Ethan, founder of domochi, Lafayette's first mochi donut shop.",
-    "mochi donuts are made with rice flour and shaped into a ring of little pull-apart bubbles. light and crispy outside, soft and chewy inside!",
-    "let's make your first order together. I'll show you each station."
+    "hi! I'm mochi, domochi's donut buddy. Ethan, who started domochi (Lafayette's first mochi donut shop!), asked me to show you around.",
+    "mochi donuts are made with rice flour and shaped into a ring of little pull-apart bubbles, like me! light and crispy outside, soft and chewy inside.",
+    "let's make your first order together. I'll point at each thing to tap."
   ],
   "steps": {
     "customer": "here comes a customer! tap them to take their order.",
     "take": "tap Take order. their ticket goes up on the rail at the top.",
     "goTo": "head to the {station} station (down at the bottom).",
     "drop": "tap Drop to put a donut in the oil.",
-    "flip": "watch its little meter. when the bottom bar reaches the gold band, the donut hops. tap it to flip!",
-    "pull": "now the top side. when it starts steaming it's golden on both sides: drag it onto the rack.",
+    "flip": "watch its meter: the bottom bar goes red, orange, then green. at green it hops: tap it to flip!",
+    "pull": "now the top. when that bar is green too and it starts steaming, drag it onto the rack.",
     "tray": "tap the fried donut (or drag it) onto the tray.",
     "cup": "cookies & cream gets our white cookies & cream glaze. tap that cup.",
     "pour": "press on the donut and pour, following the dashed loops all the way round.",

@@ -7,6 +7,7 @@ import { SceneKeys, type SceneKey } from './sceneKeys';
 const MAIN_GAME_SCENES: readonly SceneKey[] = [
   SceneKeys.Tutorial,
   SceneKeys.Lobby,
+  SceneKeys.Dough,
   SceneKeys.Fry,
   SceneKeys.Glaze,
   SceneKeys.Toppings,
@@ -17,6 +18,7 @@ const MAIN_GAME_SCENES: readonly SceneKey[] = [
   SceneKeys.Settings,
   SceneKeys.TicketView,
   SceneKeys.DaySummary,
+  SceneKeys.Invite,
 ];
 
 /**

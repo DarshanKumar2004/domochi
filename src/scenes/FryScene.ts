@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { fryColor } from '../stations/fry';
-import { audio, session } from '../systems/services';
+import { audio, balance, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { HoldButton } from '../ui/HoldButton';
 import type { Viewport } from '../ui/layout';
@@ -32,7 +32,20 @@ const ROWS = 2;
 const COOL = 0x6ec6ff;
 const HOT = 0xe85d4a;
 const GOOD = 0x7fd1ae;
-const GOLD = 0xf2c14e;
+/** Side meter colours: raw, nearly there, perfect, overdone. */
+const SIDE_RAW = 0xe0574f;
+const SIDE_NEAR = 0xf0a23a;
+const SIDE_PERFECT = 0x5cc46a;
+const SIDE_OVER = 0x7a2a22;
+/** Below this doneness a side is still raw (red); from here to the gold band it's nearly there (orange). */
+const NEAR_FROM = 0.65;
+
+/** A side's meter colour for its doneness. */
+function sideColor(d: number, perfectWithin: number): number {
+  if (d > 1 + perfectWithin) return SIDE_OVER;
+  if (d >= 1 - perfectWithin) return SIDE_PERFECT;
+  return d >= NEAR_FROM ? SIDE_NEAR : SIDE_RAW;
+}
 
 interface Meter {
   label: Phaser.GameObjects.Text;
@@ -46,7 +59,12 @@ interface Meter {
 /** One vat slot: the donut image, its little two-bar meter, and animation/drag state. */
 interface SlotView {
   img: Phaser.GameObjects.Image;
+  /** The underside peeking out below the donut, in its own colour (so a flip visibly swaps them). */
+  rim: Phaser.GameObjects.Image;
   meterBg: Phaser.GameObjects.Rectangle;
+  /** "bottom" / "top" next to the two bars. */
+  underLabel: Phaser.GameObjects.Text;
+  topLabel: Phaser.GameObjects.Text;
   /** Gold zone on the meter: when a bar ends inside it, that side is golden. */
   band: Phaser.GameObjects.Rectangle;
   under: Phaser.GameObjects.Rectangle;
@@ -68,7 +86,7 @@ interface SlotView {
   dragY: number;
 }
 
-type HintKey = 'empty' | 'noOil' | 'rackFull' | 'oilLow' | 'drift' | 'cool' | 'hot' | 'cooking';
+type HintKey = 'empty' | 'noOil' | 'noDough' | 'filter' | 'rackFull' | 'oilLow' | 'drift' | 'cool' | 'hot' | 'cooking';
 
 interface Area {
   x: number;
@@ -141,6 +159,9 @@ export class FryScene extends StationScene {
   private shownTarget = NaN;
   private shownHint: HintKey | null = null;
   private vatPos = { x: 0, y: 0, scale: 1 };
+  private dirtOverlay!: Phaser.GameObjects.Rectangle;
+  private shownDirt = -1;
+  private filterButton!: Button;
   private rackArea: Area = { x: 0, y: 0, w: 0, h: 0 };
   private rackMini = { x: 0, y: 0, step: 0, size: 0 };
   /** Reused by slotPosition() so the per-frame loop doesn't allocate. */
@@ -169,6 +190,9 @@ export class FryScene extends StationScene {
     this.input.dragDistanceThreshold = 16;
 
     this.vat = this.add.image(0, 0, TextureKeys.Fryer);
+    // Dirty oil darkens (filter it at closing).
+    this.dirtOverlay = this.add.rectangle(0, 0, 1, 1, 0x4a2f14).setAlpha(0).setDepth(1);
+    this.shownDirt = -1;
     this.rackTray = this.add.graphics();
     this.trashBin = this.add.image(0, 0, TextureKeys.TrashBin).setName('fry-trash');
     this.buildRackHandle();
@@ -205,6 +229,7 @@ export class FryScene extends StationScene {
     this.grateButton = new HoldButton(this, 0, 0, 'Hold\ngrate', (held) => session().fryer.setGrate(held), 300, 150, 'btn-grate');
     this.dropButton = new Button(this, 0, 0, 'Drop', () => this.drop(), { width: 260, height: 150, fontSize: 52, name: 'btn-drop' });
     this.pullAllButton = new Button(this, 0, 0, 'Pull all', () => this.pullAll(), { width: 300, height: 150, fontSize: 48, name: 'btn-pull-all' });
+    this.filterButton = new Button(this, 0, 0, 'Filter oil', () => this.filterOil(), { width: 300, height: 150, fontSize: 46, fill: COLORS.dough, name: 'btn-filter-oil' }).setVisible(false);
     this.oilButton = new Button(this, 0, 0, '+ oil', () => session().fryer.addOil(), {
       width: 200,
       height: 120,
@@ -227,10 +252,19 @@ export class FryScene extends StationScene {
 
   private makeSlot(i: number): SlotView {
     const img = this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false).setName(`fry-donut-${i}`).setDepth(2);
+    const meterLabel = (s: string) =>
+      this.add
+        .text(0, 0, s, { fontFamily: FONT_FAMILY, fontSize: '17px', fontStyle: 'bold', color: CSS.cream, backgroundColor: '#1f1a17dd', padding: { x: 5, y: 1 } })
+        .setOrigin(1, 0.5)
+        .setDepth(4)
+        .setVisible(false);
     const view: SlotView = {
       img,
+      rim: this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false).setDepth(1.9),
+      underLabel: meterLabel('bottom'),
+      topLabel: meterLabel('top'),
       meterBg: this.add.rectangle(0, 0, 1, 30, 0x1f1a17, 0.85).setDepth(4).setVisible(false),
-      band: this.add.rectangle(0, 0, 1, 30, GOLD, 0.55).setOrigin(0, 0.5).setDepth(4).setVisible(false),
+      band: this.add.rectangle(0, 0, 1, 30, SIDE_PERFECT, 0.35).setOrigin(0, 0.5).setDepth(4).setVisible(false),
       under: this.add.rectangle(0, 0, 1, 10, 0xffffff).setOrigin(0, 0.5).setDepth(4).setVisible(false),
       top: this.add.rectangle(0, 0, 1, 10, 0xffffff).setOrigin(0, 0.5).setDepth(4).setVisible(false),
       dx: 0,
@@ -455,6 +489,7 @@ export class FryScene extends StationScene {
     const c = v.content;
     this.vatPos = { x: c.x + L.vat.x, y: c.y + L.vat.y, scale: L.vat.scale };
     this.vat.setPosition(this.vatPos.x, this.vatPos.y).setScale(L.vat.scale);
+    this.dirtOverlay.setPosition(this.vatPos.x, this.vatPos.y).setSize(600 * L.vat.scale, 290 * L.vat.scale);
     this.grate.setScale(L.vat.scale);
     this.dispenser.setPosition(c.x + L.dispenser.x, c.y + L.dispenser.y).setScale(L.dispenser.scale);
 
@@ -487,6 +522,7 @@ export class FryScene extends StationScene {
     this.grateButton.setPosition(c.x + L.buttons.x[0], c.y + L.buttons.y).setScale(L.buttons.scale);
     this.dropButton.setPosition(c.x + L.buttons.x[1], c.y + L.buttons.y).setScale(L.buttons.scale);
     this.pullAllButton.setPosition(c.x + L.buttons.x[2], c.y + L.buttons.y).setScale(L.buttons.scale);
+    this.filterButton.setPosition(c.x + L.buttons.x[2], c.y + L.buttons.y).setScale(L.buttons.scale);
     this.hintText.setPosition(c.x + L.hint.x, c.y + L.hint.y);
     this.resultText.setPosition(this.vatPos.x, this.vatPos.y);
   }
@@ -540,6 +576,9 @@ export class FryScene extends StationScene {
       const d = f.slots[i];
       if (!d) {
         v.img.setVisible(false);
+        v.rim.setVisible(false);
+        v.underLabel.setVisible(false);
+        v.topLabel.setVisible(false);
         v.meterBg.setVisible(false);
         v.band.setVisible(false);
         v.under.setVisible(false);
@@ -573,6 +612,13 @@ export class FryScene extends StationScene {
         .setDisplaySize(size, size * v.squash)
         .setTint(fryColor(d.up))
         .setAlpha(f.grateHeld && !v.dragging ? 0.85 : 1);
+      // The underside shows as a rim below the donut, in its own colour.
+      v.rim
+        .setVisible(v.squash > 0.5)
+        .setPosition(x, y + size * 0.08 * v.squash)
+        .setDisplaySize(size, size * v.squash)
+        .setTint(fryColor(d.down))
+        .setAlpha(v.img.alpha);
 
       const mw = slot.size * 0.95;
       const my = slot.y + slot.size * 0.5 + 2;
@@ -587,19 +633,29 @@ export class FryScene extends StationScene {
         .setVisible(showMeter)
         .setPosition(slot.x - mw / 2, my - 7)
         .setSize(mw * Math.min(d.down / METER_MAX, 1), 10);
-      v.under.fillColor = Math.abs(d.down - 1) <= fb.doneness.perfectWithin ? GOLD : fryColor(d.down);
+      v.under.fillColor = sideColor(d.down, pw);
+      v.underLabel.setVisible(showMeter).setPosition(slot.x - mw / 2 - 2, my - 8);
       v.top
         .setVisible(showMeter)
         .setPosition(slot.x - mw / 2, my + 7)
         .setSize(mw * Math.min(d.up / METER_MAX, 1), 10);
-      v.top.fillColor = Math.abs(d.up - 1) <= fb.doneness.perfectWithin ? GOLD : fryColor(d.up);
+      v.top.fillColor = sideColor(d.up, pw);
+      v.topLabel.setVisible(showMeter).setPosition(slot.x - mw / 2 - 2, my + 9);
     }
     this.grate.setPosition(this.vatPos.x, this.vatPos.y + (f.grateHeld ? sink : -20 * this.vatPos.scale)).setAlpha(f.count ? 1 : 0.6);
 
     // Buttons
     this.grateButton.setEnabled(f.count > 0);
-    this.dropButton.setEnabled(f.canDrop);
-    this.pullAllButton.setEnabled(f.count > 0 && !s.rackFull);
+    this.dropButton.setEnabled(f.canDrop && s.dough >= 1);
+    // With the vat empty and the oil dirty, "Pull all" makes way for "Filter oil".
+    const filter = f.count === 0 && s.oilDirt > 0;
+    this.pullAllButton.setVisible(!filter).setEnabled(f.count > 0 && !s.rackFull);
+    this.filterButton.setVisible(filter);
+    const dirt = Math.min(1, s.oilDirt / balance.cleanup.oilDirtMax);
+    if (dirt !== this.shownDirt) {
+      this.shownDirt = dirt;
+      this.dirtOverlay.setAlpha(dirt * 0.45);
+    }
     this.oilButton.setEnabled(f.oil < 1);
     this.updateHint();
   }
@@ -610,6 +666,8 @@ export class FryScene extends StationScene {
     const fb = f.balance;
     let key: HintKey;
     if (f.oil < fb.oil.minToFry) key = 'noOil';
+    else if (f.count === 0 && s.phase === 'closing' && s.oilDirt > 0) key = 'filter';
+    else if (f.count === 0 && s.dough < 1) key = 'noDough';
     else if (f.count === 0) key = s.rackFull ? 'rackFull' : 'empty';
     else if (s.rackFull) key = 'rackFull';
     else if (f.oilLow) key = 'oilLow';
@@ -622,6 +680,8 @@ export class FryScene extends StationScene {
     const HINTS: Record<HintKey, string> = {
       empty: 'drop donuts in one at a time',
       noOil: 'the vat is nearly empty: add oil',
+      noDough: 'out of dough! make a batch at the Dough station',
+      filter: 'closing time: filter the oil',
       rackFull: 'the rack is full: glaze some,\nor double-tap the trash to empty it',
       oilLow: 'oil is low: frying unevenly!',
       drift: 'less oil runs hotter: dial it back down',
@@ -635,7 +695,8 @@ export class FryScene extends StationScene {
   /** Subtitle, rack row and rack button: on session changes only. */
   private refresh(): void {
     const s = session();
-    this.setSubtitle(`${s.rack.length} of ${s.fryer.balance.rackCapacity} on the rack · ${s.fryer.count} in the oil`);
+    const dough = Number.isFinite(s.dough) ? ` · dough ${s.dough}` : '';
+    this.setSubtitle(`${s.rack.length} of ${s.fryer.balance.rackCapacity} on the rack · ${s.fryer.count} in the oil${dough}`);
 
     const rack = s.rack;
     this.rackMinis.forEach((m, i) => {
@@ -695,6 +756,17 @@ export class FryScene extends StationScene {
     v.dx = x - home.x;
     v.dy = y - home.y;
     this.tweens.add({ targets: v, dx: 0, dy: 0, duration: 220, ease: 'Back.Out' });
+  }
+
+  /** Filter the oil: it drains and comes back clean. */
+  private filterOil(): void {
+    const s = session();
+    if (!s.oilDirt) return;
+    audio().play('pour');
+    this.tweens.add({ targets: this.dirtOverlay, alpha: 0, duration: 600 });
+    this.time.delayedCall(300, () => audio().play('ding'));
+    s.filterOil();
+    this.flash('oil filtered: nice and clean');
   }
 
   private pullAll(): void {

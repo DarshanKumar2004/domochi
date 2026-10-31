@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, dragNamedOnto, drawPath, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene } from './helpers';
+import { advance, boundsNamed, dragNamedOnto, drawPath, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene, openDay } from './helpers';
 
 interface SessionView {
   rack: unknown[];
@@ -24,6 +24,7 @@ async function rackThenGlaze(page: Page, n: number): Promise<void> {
   await page.goto('/?seed=7');
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
+  await openDay(page); // dough made and the window open (helpers)
   await pauseClock(page);
   await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
   await waitForScene(page, SceneKeys.Fry);

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, dragNamedOnto, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene } from './helpers';
+import { advance, boundsNamed, dragNamedOnto, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene, openDay } from './helpers';
 
 type Donut = { id: number };
 interface SessionView {
@@ -84,6 +84,7 @@ test('toppings by hand, then pack the box in the ticket order and close the lid'
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
   await pauseClock(page);
+  await openDay(page); // dough made and the window open (helpers)
   await advance(page, 2000);
   await tapNamed(page, SceneKeys.Lobby, 'customer-front');
   await waitForScene(page, SceneKeys.Order);

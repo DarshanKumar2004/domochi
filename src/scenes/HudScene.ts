@@ -39,7 +39,7 @@ export class HudScene extends Phaser.Scene {
       },
       () => {
         const today = session().summary();
-        return save().data.money + today.sales + today.tips;
+        return save().data.money + today.sales + today.tips + today.tidyBonus;
       },
     );
     const settings = new Button(this, 0, 0, 'Settings', () => this.openSettings(), {

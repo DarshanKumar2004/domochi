@@ -111,6 +111,14 @@ export class TicketRail extends Phaser.GameObjects.Container {
       .text({ x: 14, y: 26, text: `#${t.no}`, style: { fontFamily: FONT_FAMILY, fontSize: '34px', fontStyle: 'bold', color: CSS.ink } }, false)
       .setOrigin(0, 0.5);
     c.add(label);
+    // Pickup orders are marked "to go".
+    if (t.delivery) {
+      c.add(
+        this.scene.make
+          .text({ x: TICKET_W - 10, y: 26, text: 'to go', style: { fontFamily: FONT_FAMILY, fontSize: '22px', fontStyle: 'bold', color: CSS.cream, backgroundColor: '#b0406a', padding: { x: 6, y: 2 } } }, false)
+          .setOrigin(1, 0.5),
+      );
+    }
     // Up to 6 mini donuts, 3 per row.
     const size = Math.min(42, (h - 50) / 2);
     t.order.flavors.slice(0, 6).forEach((f, i) => {

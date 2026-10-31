@@ -19,6 +19,8 @@ export interface CustomerType {
   favorites: string[];
   orderSize: Range;
   patienceSec: number;
+  /** A morning pickup order (coffee shop, delivery app): never stands in line. */
+  delivery?: boolean;
   lines: CustomerLines;
 }
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import balanceJson from '../../src/data/balance.json' with { type: 'json' };
 
 // Helpers that drive the game through window.__game (exposed in src/main.ts).
 
@@ -277,5 +278,31 @@ export async function isVisibleNamed(page: Page, sceneKey: string, name: string)
       return false;
     },
     [sceneKey, name] as const,
+  );
+}
+
+/**
+ * Morning prep the quick way, through the game's own session API: make
+ * `batches` of dough exactly to the recipe (each batch fills the tub with a
+ * dozen donuts' worth) and open the window. Station tests use this so they
+ * can start frying and taking orders straight away.
+ */
+export async function openDay(page: Page, batches = 2): Promise<void> {
+  const { recipe, stirTurns } = balanceJson.dough;
+  await page.evaluate(
+    ([rec, turns, n]) => {
+      type W = { scoop(id: string): boolean; stir(r: number): void };
+      const s = (window as unknown as {
+        __session: { phase: string; startDough(): W; finishDough(): unknown; openShop(): boolean };
+      }).__session;
+      for (let b = 0; b < n; b++) {
+        const w = s.startDough();
+        for (const [id, k] of Object.entries(rec)) for (let i = 0; i < k; i++) w.scoop(id);
+        w.stir(Math.PI * 2 * turns);
+        s.finishDough();
+      }
+      if (s.phase === 'prep') s.openShop();
+    },
+    [recipe as Record<string, number>, stirTurns, batches] as const,
   );
 }

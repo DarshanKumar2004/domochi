@@ -28,6 +28,12 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `fry-grate` | `public/assets/fry-grate.png` | 690×360 | 1 | Placeholder (code) | Pressing grate laid over the oil; moves down while held. Mostly transparent between the bars. |
 | `fry-dispenser` | `public/assets/fry-dispenser.png` | 215×175 | 1 | Placeholder (code) | Mochi donut depositor over the vat. Donuts drop from its nozzle at the bottom centre (100, 170). |
 | `trash-bin` | `public/assets/trash-bin.png` | 160×160 | 1 | Placeholder (code) | Trash can at the Fry station: drag donuts here to throw them out; burnt donuts fly here on their own. |
+| `mixing-bowl` | `public/assets/mixing-bowl.png` | 360×250 | 1 | Placeholder (code) | Dough station bowl, front-top view. The opening is an ellipse centred ≈ (180, 70), 340×90: the dough is drawn there in code. |
+| `ingredient-bin` | `public/assets/ingredient-bin.png` | 160×200 | 1 | Placeholder (code) | Dough station ingredient canister (white; tinted and labelled per ingredient in code). |
+| `sponge` | `public/assets/sponge.png` | 120×84 | 1 | Placeholder (code) | Wiping the glaze and toppings trays at closing (follows your finger). |
+| `popup-booth` | `public/assets/popup-booth.png` | 900×620 | 1 | Placeholder (code) | Event days: a striped pop-up canopy with a blank banner (≈ 400×130 centred at (450, 150); the logo and event name go there in code) and a table. Anchors in `BOOTH_SPEC`. |
+| `icon-dough` | `public/assets/icons/dough.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
+| `mascot` | `public/assets/mascot.png` | 220×210 | 1 | Placeholder (code) | "mochi", the tutorial guide: a strawberry-glazed pon de ring with a face. Bobs and squishes in code. |
 | `pointer-hand` | `public/assets/pointer-hand.png` | 120×164 | 1 | Placeholder (code) | Tutorial pointing hand. Fingertip at the top centre (≈ 59, 8); the tutorial rotates it to point at things. |
 | `donut-fry` | `public/assets/donut-fry.png` | 160×160 | 1 | Placeholder (code) | **Must be white or greyscale:** it's tinted at runtime from raw (pale) to golden to burnt by `fryColor()`. Plain pon de ring, no glaze. |
 | `glaze-cup` | `public/assets/glaze-cup.png` | 150×160 | 1 | Placeholder (code) | Pouring cup for the Glaze station. **Draw it white/light grey:** it's tinted per glaze at runtime, which makes the coloured cups. Spout at the top left (about 6, 26); the stream falls from there. |
