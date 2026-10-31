@@ -284,3 +284,24 @@ Kumar's feedback after Phase 5.
   - **Icons:** made by `npm run icons` from the logo on cream (see MANIFEST.md).
   - **Production check:** I tested the production build (`vite preview`) in Chromium on phone and desktop sizes: no errors, and the tutorial starts over the lobby.
 - **The site address:** Netlify's free `*.netlify.app` address for now. A custom subdomain (for example `games.domochitreats.com`) can be added later in Netlify plus one DNS record, with no code changes.
+
+## GitHub Pages instead of Netlify; pick the box; gift donuts (2026-10-30)
+
+- **Hosting moved to GitHub Pages.** On the free plan, Netlify injected its own script into every page (`/.netlify/scripts/hud?variant=public`), which drew a Netlify panel over the station tab bar. There was no setting to turn it off, and hiding it with code would be fragile and likely against Netlify's terms.
+  - At Kumar's request, the Netlify site was **deleted**, along with `netlify.toml`.
+  - **`.github/workflows/pages.yml`** now runs on every push to `main`: typecheck, unit tests, build, then publish `dist/` to Pages. The repo (`DarshanKumar2004/domochi`) was already public.
+  - **One-time setup:** repo Settings → Pages → Source: "GitHub Actions".
+  - The address is `https://darshankumar2004.github.io/domochi/`. The relative build paths (`base: './'`) work under that `/domochi/` path unchanged.
+  - Pages can't set cache headers; the hashed bundle in `build/` is still safe to cache by name.
+- **You pick the box at the Box station** (Kumar: "1, 3, or 6").
+  - **The box row:** a row of buttons sits above the box (**1 single · 3 trio · 6 flight**). The dozen only appears for orders bigger than 6. The ticket still shows the box the customer would like.
+  - **The single:** a new "single" box (one donut at the shop's single price, $4) was added to `menu.json`, as a game addition, so 1-donut orders get a single by default.
+  - **Box too small:** if the chosen box can't hold the order, the instruction turns red and says so, and missing donuts score 0 as before.
+  - **Box too big:** the spare slots show a **+**, for gifts.
+- **Gift donuts** (Kumar: "when you give them an extra donut or a few they like you more and leave more tip").
+  - **What counts:** a real menu flavour boxed beyond the order is a **gift**, not a mistake. A donut that isn't any flavour still costs box points.
+  - **The effect:** gifts don't change the order score, but the customer's reaction goes **up one level**, they say a gift line (`customers.json` `giftLines`), and they tip **$0.75 more per gift** (up to 3).
+  - **Where it shows:** the result card shows the gift part of the tip, and the day summary counts donuts gifted.
+  - **The trade-off:** the sale price doesn't change, so a gift costs you a donut's worth of work for goodwill and tips.
+  - **Tuning:** the numbers are in `balance.json` `scoring.gift`.
+- **Fix:** the result card's tip line had lost its "$" signs. My edit script ran the text through a JavaScript `replace`, where `$$` in the replacement means a single `$`. Future scripted edits should avoid `$` in replacement strings, or use a function.

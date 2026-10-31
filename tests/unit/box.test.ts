@@ -39,7 +39,7 @@ describe('scoreBox', () => {
   const order = ['strawberry', 'strawberry', 'beignet'];
 
   it('everything in its slot is 100', () => {
-    expect(scoreBox(order, order, B)).toEqual({ score: 100, correct: 3, misplaced: 0, empty: 0, extras: 0 });
+    expect(scoreBox(order, order, B)).toEqual({ score: 100, correct: 3, misplaced: 0, empty: 0, extras: 0, gifts: 0 });
   });
 
   it('the right flavours in the wrong slots get partial credit', () => {
@@ -48,14 +48,18 @@ describe('scoreBox', () => {
     expect(r.score).toBe(Math.round(((1 + 2 * B.wrongSpotCredit) / 3) * 100));
   });
 
-  it('empty slots and unknown donuts score nothing; extras cost points', () => {
+  it('empty slots and unknown donuts score nothing; a botched extra donut costs points', () => {
     expect(scoreBox(order, ['strawberry', undefined, null], B)).toMatchObject({ correct: 1, empty: 1, score: 33 });
-    const extra = scoreBox(order, [...order, 'beignet'], B);
-    expect(extra).toMatchObject({ extras: 1, score: Math.round((1 - B.extraPenalty) * 100) });
+    const extra = scoreBox(order, [...order, null], B);
+    expect(extra).toMatchObject({ extras: 1, gifts: 0, score: Math.round((1 - B.extraPenalty) * 100) });
+  });
+
+  it('an extra real flavour is a gift, not a mistake', () => {
+    expect(scoreBox(order, [...order, 'beignet', 'strawberry'], B)).toMatchObject({ score: 100, extras: 0, gifts: 2 });
   });
 
   it('never goes below 0', () => {
-    expect(scoreBox(['beignet'], [undefined, 'beignet', 'beignet', 'beignet', 'beignet', 'beignet'], B).score).toBe(0);
+    expect(scoreBox(['beignet'], ['beignet', null, null, null, null, null], B).score).toBe(0);
   });
 });
 

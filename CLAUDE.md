@@ -30,7 +30,7 @@ Defer the Android SDK and Capacitor until Phase 8.
 | Build / dev | Vite |
 | Tests | Vitest (logic), Playwright (scene flow plus screenshots) |
 | Android | Capacitor (Phase 8) |
-| Web hosting | Netlify or GitHub Pages (Phase 7) |
+| Web hosting | GitHub Pages, deployed by `.github/workflows/pages.yml` on every push to main (Phase 7) |
 | Save data | `localStorage` behind a `SaveService` wrapper, so it can be swapped for Capacitor Preferences later |
 
 Keep dependencies minimal. Ask before adding any new library.

@@ -52,6 +52,7 @@ describe('data files', () => {
         types: [
           { ...t, sprite: 'nope', favorites: ['pizza'], lines: { ...t.lines, order: ['hi'], notMine: ['no'] } },
         ],
+        giftLines: ['yay'],
       },
       menu,
       Object.values(TextureKeys),
@@ -72,7 +73,8 @@ describe('data files', () => {
 
 describe('orders', () => {
   it('boxFor picks the smallest box that fits', () => {
-    expect(boxFor(menu, 1).id).toBe('trio');
+    expect(boxFor(menu, 1).id).toBe('single');
+    expect(boxFor(menu, 2).id).toBe('trio');
     expect(boxFor(menu, 3).id).toBe('trio');
     expect(boxFor(menu, 4).id).toBe('flight');
     expect(boxFor(menu, 12).id).toBe('domochi-box');

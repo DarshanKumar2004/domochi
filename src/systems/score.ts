@@ -11,6 +11,8 @@ export interface ScoringBalance {
   tiers: { great: number; good: number; okay: number };
   /** Tip = perDonut × donuts × curve(order score). Curve: [score, multiplier] points, straight lines between. */
   tip: { perDonut: number; curve: number[][] };
+  /** Extra donuts as gifts: tip per gift (up to max), and the reaction goes up tierBoost levels. */
+  gift: { tipPerDonut: number; max: number; tierBoost: number };
 }
 
 export interface StationScores {
@@ -25,8 +27,11 @@ export interface OrderScore extends StationScores {
   /** Weighted overall score, 0–100. */
   total: number;
   tier: ThanksTier;
-  /** Dollars, rounded to cents. */
+  /** Dollars, rounded to cents (including the gift bonus). */
   tip: number;
+  /** Extra donuts given away, and the part of the tip they earned. */
+  gifts: number;
+  giftTip: number;
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -66,15 +71,25 @@ export function tipFor(score: number, donuts: number, b: ScoringBalance): number
   return Math.round(b.tip.perDonut * donuts * tipMultiplier(score, b) * 100) / 100;
 }
 
-/** Everything about how an order went: the weighted score, reaction tier and tip. */
-export function scoreOrder(stations: StationScores, waitSec: number, patienceSec: number, donuts: number, b: ScoringBalance): OrderScore {
+const TIERS: ThanksTier[] = ['bad', 'okay', 'good', 'great'];
+
+/**
+ * Everything about how an order went: the weighted score, reaction tier and
+ * tip. Gift donuts don't change the score, but the customer likes you more
+ * (their reaction goes up a level) and tips extra.
+ */
+export function scoreOrder(stations: StationScores, waitSec: number, patienceSec: number, donuts: number, b: ScoringBalance, gifts = 0): OrderScore {
   const wait = waitScore(waitSec, patienceSec, b);
   const w = b.weights;
   const sum = w.fry + w.glaze + w.toppings + w.box + w.wait;
   const total = Math.round(
     clamp((stations.fry * w.fry + stations.glaze * w.glaze + stations.toppings * w.toppings + stations.box * w.box + wait * w.wait) / sum, 0, 100),
   );
-  return { ...stations, wait, total, tier: tierFor(total, b), tip: tipFor(total, donuts, b) };
+  const counted = Math.min(Math.max(0, gifts), b.gift.max);
+  const giftTip = Math.round(counted * b.gift.tipPerDonut * 100) / 100;
+  let tier = tierFor(total, b);
+  if (counted > 0) tier = TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(tier) + b.gift.tierBoost)]!;
+  return { ...stations, wait, total, tier, tip: Math.round((tipFor(total, donuts, b) + giftTip) * 100) / 100, gifts, giftTip };
 }
 
 /** Problems with the scoring numbers (empty = fine). */
@@ -89,6 +104,9 @@ export function validateScoring(b: ScoringBalance): string[] {
   const c = b.tip.curve;
   if (!(b.tip.perDonut >= 0 && c.length >= 2 && c.every((p, i) => p.length === 2 && (i === 0 || p[0]! > c[i - 1]![0]!)))) {
     errors.push('scoring.tip needs perDonut >= 0 and a curve of 2+ points with rising scores');
+  }
+  if (!(b.gift.tipPerDonut >= 0 && Number.isInteger(b.gift.max) && b.gift.max >= 0 && Number.isInteger(b.gift.tierBoost) && b.gift.tierBoost >= 0)) {
+    errors.push('scoring.gift needs tipPerDonut >= 0 and integer max, tierBoost >= 0');
   }
   return errors;
 }

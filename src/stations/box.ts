@@ -39,20 +39,24 @@ export interface BoxResult {
   misplaced: number;
   /** Ordered slots left empty. */
   empty: number;
-  /** Donuts beyond the order. */
+  /** Donuts beyond the order that aren't a real flavour (mistakes). */
   extras: number;
+  /** Real-flavour donuts beyond the order: gifts for the customer. */
+  gifts: number;
 }
 
 /**
  * Score a packed box. `expected[i]` is the flavour wanted in slot i; `packed[i]`
  * is the flavour that's there (identified, or null if it matches nothing, or
- * undefined if the slot is empty). Slots past expected.length are extras.
+ * undefined if the slot is empty). Slots past expected.length are gifts (a real
+ * flavour) or extras (a donut that isn't any flavour, which costs points).
  */
 export function scoreBox(expected: readonly string[], packed: readonly (string | null | undefined)[], b: BoxBalance): BoxResult {
   const n = expected.length;
   let correct = 0;
   let empty = 0;
   let extras = 0;
+  let gifts = 0;
   // Ordered flavours not yet accounted for, and donuts in ordered slots that are in the wrong spot.
   const missing = new Map<string, number>();
   const strays: string[] = [];
@@ -60,7 +64,8 @@ export function scoreBox(expected: readonly string[], packed: readonly (string |
     const want = expected[i];
     const got = packed[i];
     if (want === undefined) {
-      if (got !== undefined) extras++;
+      if (got === null) extras++;
+      else if (got !== undefined) gifts++;
       continue;
     }
     if (got === want) {
@@ -80,7 +85,7 @@ export function scoreBox(expected: readonly string[], packed: readonly (string |
     }
   }
   const raw = n ? (correct + misplaced * b.wrongSpotCredit) / n - extras * b.extraPenalty : 0;
-  return { score: Math.round(clamp01(raw) * 100), correct, misplaced, empty, extras };
+  return { score: Math.round(clamp01(raw) * 100), correct, misplaced, empty, extras, gifts };
 }
 
 function clamp01(v: number): number {

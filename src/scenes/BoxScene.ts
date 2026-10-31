@@ -19,14 +19,16 @@ const MAX_SLOTS = 12;
 const LAYOUT = {
   portrait: {
     shelf: { x: 40, y: 230, w: 1000, h: 140, size: 110 },
-    box: { x: 540, y: 690, w: 960, h: 500, wideCols: 4 },
-    card: { x: 540, y: 1200, scale: 0.85 },
+    sizes: { x: 540, y: 448, step: 300, scale: 1 },
+    box: { x: 540, y: 755, w: 960, h: 440, wideCols: 4 },
+    card: { x: 540, y: 1200, scale: 0.8 },
     hint: { x: 540, y: 1200 },
     serve: { x: 540, y: 1470, scale: 1 },
   },
   landscape: {
     shelf: { x: 1000, y: 160, w: 880, h: 120, size: 92 },
-    box: { x: 520, y: 430, w: 920, h: 580, wideCols: 4 },
+    sizes: { x: 520, y: 78, step: 280, scale: 0.85 },
+    box: { x: 520, y: 465, w: 920, h: 560, wideCols: 4 },
     card: { x: 1440, y: 470, scale: 0.75 },
     hint: { x: 1440, y: 470 },
     serve: { x: 1440, y: 705, scale: 0.85 },
@@ -48,6 +50,10 @@ export class BoxScene extends StationScene {
   private lid!: Phaser.GameObjects.Container;
   private lidImg!: Phaser.GameObjects.Image;
   private serveButton!: Button;
+  /** Pick the box: single, trio, flight (and bigger, for big orders). */
+  private sizeButtons: { id: string; size: number; button: Button }[] = [];
+  private sizeRing!: Phaser.GameObjects.Graphics;
+  private sizesPos = { x: 0, y: 0, step: 0, scale: 1 };
   private hint!: Phaser.GameObjects.Text;
   private instruction!: Phaser.GameObjects.Text;
   private flashText!: Phaser.GameObjects.Text;
@@ -103,6 +109,20 @@ export class BoxScene extends StationScene {
     this.instruction = text(34, CSS.muted).setName('box-instruction');
     this.flashText = text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(40).setVisible(false).setName('box-flash');
     this.serveButton = new Button(this, 0, 0, 'Close lid & serve', () => this.serve(), { width: 640, name: 'btn-serve' });
+    this.sizeRing = this.add.graphics();
+    this.sizeButtons = [...menu.boxes]
+      .sort((a, b) => a.size - b.size)
+      .map((b) => ({
+        id: b.id,
+        size: b.size,
+        button: new Button(this, 0, 0, `${b.size}  ${b.name.replace(/^the /, '')}`, () => this.pickBox(b.id), {
+          width: 270,
+          height: 120,
+          fontSize: 40,
+          fill: COLORS.dough,
+          name: `box-size-${b.id}`,
+        }),
+      }));
     listen(this, session().events, 'changed', () => this.refresh());
   }
 
@@ -166,6 +186,7 @@ export class BoxScene extends StationScene {
     this.shelfPos = { x: c.x + sh.x + 70 + sh.size / 2, y: c.y + sh.y + sh.h / 2, step: Math.min(sh.size * 1.35, (sh.w - 160) / (SHELF_SLOTS - 1)), size: sh.size };
     this.shelfLabel.setPosition(c.x + sh.x + 30, c.y + sh.y + sh.h / 2);
     this.boxArea = { x: c.x + L.box.x, y: c.y + L.box.y, w: L.box.w, h: L.box.h };
+    this.sizesPos = { x: c.x + L.sizes.x, y: c.y + L.sizes.y, step: L.sizes.step, scale: L.sizes.scale };
     this.hint.setPosition(c.x + L.hint.x, c.y + L.hint.y);
     this.serveButton.setPosition(c.x + L.serve.x, c.y + L.serve.y).setScale(L.serve.scale);
     this.shownLayout = '';
@@ -204,7 +225,7 @@ export class BoxScene extends StationScene {
     g.lineStyle(7, COLORS.ink);
     g.strokeRoundedRect(a.x - bw / 2, a.y - bh / 2, bw, bh, 26);
     this.slots.forEach((s, i) => {
-      // Slots past the order are dimmer: nothing should go there.
+      // Slots past the order are dimmer: they're for gifts.
       g.fillStyle(i < ordered ? 0xc09a6c : 0xcdb08a);
       g.fillCircle(s.x, s.y, this.slotSize / 2);
       g.lineStyle(3, 0xa47e52, i < ordered ? 1 : 0.4);
@@ -212,8 +233,9 @@ export class BoxScene extends StationScene {
     });
     this.slotNumbers.forEach((t, i) => {
       const s = this.slots[i];
-      t.setVisible(!!s && i < ordered);
-      if (s) t.setPosition(s.x, s.y).setFontSize(Math.round(Math.min(48, this.slotSize * 0.3)));
+      t.setVisible(!!s);
+      // Ordered slots are numbered; spare ones get a "+": room for a gift.
+      if (s) t.setText(i < ordered ? String(i + 1) : '+').setAlpha(i < ordered ? 1 : 0.6).setPosition(s.x, s.y).setFontSize(Math.round(Math.min(48, this.slotSize * 0.3)));
     });
     // The lid covers the whole box.
     this.lidImg.setDisplaySize(bw, bh);
@@ -253,18 +275,50 @@ export class BoxScene extends StationScene {
     } else {
       this.hint.setVisible(false);
       this.card = new TicketCard(this, c.x + L.card.x, c.y + L.card.y, active, menu).setScale(L.card.scale);
-      const box = menu.boxes.find((b) => b.id === active.order.boxId);
+      const box = menu.boxes.find((b) => b.id === s.boxChoice);
       const n = active.order.flavors.length;
+      const spare = size - n;
       // Under the box (portrait) or under the ticket (landscape).
       const below = v.orientation === 'portrait' ? this.boxArea.y + this.boxArea.h / 2 + 40 : c.y + L.card.y + (this.card.cardHeight * L.card.scale) / 2 + 40;
+      const name = box?.name ?? 'the box';
+      const text =
+        spare < 0
+          ? `${name} only holds ${size}: pick a bigger box for ${n} donuts`
+          : spare === 0
+            ? `${name}: ${n === 1 ? 'fill the slot' : `fill slots 1–${n} in the ticket's order`}`
+            : `fill ${n === 1 ? 'slot 1' : `slots 1–${n} in order`} · + slots are for gifts!`;
       this.instruction
-        .setText(`${box?.name ?? 'box'}: fill slots 1–${n} in the ticket's order`)
+        .setText(text)
+        .setColor(spare < 0 ? '#ffb4a8' : CSS.muted)
         .setPosition(v.orientation === 'portrait' ? this.boxArea.x : c.x + L.card.x, below)
         .setVisible(true);
     }
+    this.refreshSizes(active ? active.order.flavors.length : 0);
     const shelfN = s.shelf.length;
     this.setSubtitle(`shelf ${shelfN}/${balance.glaze.shelfCapacity}${active ? ` · ${s.boxCount} in the box` : ''}`);
     this.serveButton.setEnabled(!!active && s.boxCount > 0 && !this.closing);
+  }
+
+  /** The box-size row: single, trio and flight (and bigger boxes if the order needs one); the chosen one ringed. */
+  private refreshSizes(ordered: number): void {
+    const choice = session().boxChoice;
+    // Single, trio and flight; the dozen only when an order needs more than 6.
+    const shown = this.sizeButtons.filter((b) => ordered > 0 && (b.size <= 6 || (ordered > 6 && b.size >= ordered)));
+    const p = this.sizesPos;
+    this.sizeRing.clear();
+    for (const b of this.sizeButtons) b.button.setVisible(shown.includes(b));
+    shown.forEach((b, i) => {
+      b.button.setPosition(p.x + (i - (shown.length - 1) / 2) * p.step * p.scale, p.y).setScale(p.scale);
+      if (b.id === choice) {
+        this.sizeRing.lineStyle(8, COLORS.pink);
+        this.sizeRing.strokeRoundedRect(b.button.x - 145 * p.scale, p.y - 70 * p.scale, 290 * p.scale, 140 * p.scale, 40 * p.scale);
+      }
+    });
+  }
+
+  private pickBox(id: string): void {
+    if (this.closing) return;
+    session().chooseBox(id);
   }
 
   // ---- Actions ----------------------------------------------------------------

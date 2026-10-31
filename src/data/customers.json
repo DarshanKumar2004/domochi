@@ -1,21 +1,45 @@
 {
-  "_note": "Customer types for the order loop. Lines use {order} (e.g. 'a strawberry and two beignet') and {ticket} (the ticket number). 'thanks' tiers are picked by order score (balance.json scoring.tiers). favorites must be menu flavor ids; sprite must be a texture key.",
+  "_note": "Customer types for the order loop. Lines use {order} (e.g. 'a strawberry and two beignet') and {ticket} (the ticket number). 'thanks' tiers are picked by order score (balance.json scoring.tiers). favorites must be menu flavor ids; sprite must be a texture key. giftLines: what a customer says when there are extra donuts in the box.",
   "types": [
     {
       "id": "student",
       "name": "UL student",
       "sprite": "customer-student",
-      "favorites": ["fruity-cereal", "cookies-and-cream"],
-      "orderSize": { "min": 1, "max": 3 },
+      "favorites": [
+        "fruity-cereal",
+        "cookies-and-cream"
+      ],
+      "orderSize": {
+        "min": 1,
+        "max": 3
+      },
       "patienceSec": 120,
       "lines": {
-        "order": ["hey! can I get {order}?", "hi!! {order}, please. need fuel for class", "ooh okay, {order} please!"],
-        "notMine": ["that's not mine, I'm #{ticket}!", "hmm, I think mine is #{ticket}?"],
+        "order": [
+          "hey! can I get {order}?",
+          "hi!! {order}, please. need fuel for class",
+          "ooh okay, {order} please!"
+        ],
+        "notMine": [
+          "that's not mine, I'm #{ticket}!",
+          "hmm, I think mine is #{ticket}?"
+        ],
         "thanks": {
-          "great": ["these look SO good, thank you!!", "okay these are perfect. posting this"],
-          "good": ["thank you! see you next week", "yesss, thank you!"],
-          "okay": ["thanks!", "cool, thank you"],
-          "bad": ["oh... thanks I guess"]
+          "great": [
+            "these look SO good, thank you!!",
+            "okay these are perfect. posting this"
+          ],
+          "good": [
+            "thank you! see you next week",
+            "yesss, thank you!"
+          ],
+          "okay": [
+            "thanks!",
+            "cool, thank you"
+          ],
+          "bad": [
+            "oh... thanks I guess"
+          ]
         }
       }
     },
@@ -23,17 +47,41 @@
       "id": "office",
       "name": "office worker",
       "sprite": "customer-office",
-      "favorites": ["chocolate-hazelnut", "cookie-butter"],
-      "orderSize": { "min": 2, "max": 6 },
+      "favorites": [
+        "chocolate-hazelnut",
+        "cookie-butter"
+      ],
+      "orderSize": {
+        "min": 2,
+        "max": 6
+      },
       "patienceSec": 90,
       "lines": {
-        "order": ["morning! {order} for the office, please.", "hi there, could I get {order}?", "I'll take {order}. the team's going to love these"],
-        "notMine": ["sorry, that's not my order, I'm #{ticket}.", "I'm #{ticket}, I think that one's someone else's"],
+        "order": [
+          "morning! {order} for the office, please.",
+          "hi there, could I get {order}?",
+          "I'll take {order}. the team's going to love these"
+        ],
+        "notMine": [
+          "sorry, that's not my order, I'm #{ticket}.",
+          "I'm #{ticket}, I think that one's someone else's"
+        ],
         "thanks": {
-          "great": ["perfect, the office is going to be thrilled. thank you!", "these are beautiful, thank you!"],
-          "good": ["thanks so much, have a great day!", "great, thank you!"],
-          "okay": ["thanks.", "alright, thank you"],
-          "bad": ["hm. okay, thanks"]
+          "great": [
+            "perfect, the office is going to be thrilled. thank you!",
+            "these are beautiful, thank you!"
+          ],
+          "good": [
+            "thanks so much, have a great day!",
+            "great, thank you!"
+          ],
+          "okay": [
+            "thanks.",
+            "alright, thank you"
+          ],
+          "bad": [
+            "hm. okay, thanks"
+          ]
         }
       }
     },
@@ -41,17 +89,41 @@
       "id": "parent",
       "name": "parent",
       "sprite": "customer-parent",
-      "favorites": ["strawberry", "beignet"],
-      "orderSize": { "min": 2, "max": 6 },
+      "favorites": [
+        "strawberry",
+        "beignet"
+      ],
+      "orderSize": {
+        "min": 2,
+        "max": 6
+      },
       "patienceSec": 100,
       "lines": {
-        "order": ["hi! the kids want {order}, please.", "could we get {order}? it's a treat day!", "{order}, please! they've been asking all week"],
-        "notMine": ["oh, that's not ours, we're #{ticket}.", "we're #{ticket}, sweetie!"],
+        "order": [
+          "hi! the kids want {order}, please.",
+          "could we get {order}? it's a treat day!",
+          "{order}, please! they've been asking all week"
+        ],
+        "notMine": [
+          "oh, that's not ours, we're #{ticket}.",
+          "we're #{ticket}, sweetie!"
+        ],
         "thanks": {
-          "great": ["the kids are going to go wild. thank you!", "these look amazing, thank you so much!"],
-          "good": ["thank you! say thank you, kids!", "lovely, thanks!"],
-          "okay": ["thanks!", "okay, thank you"],
-          "bad": ["oh, okay... thanks"]
+          "great": [
+            "the kids are going to go wild. thank you!",
+            "these look amazing, thank you so much!"
+          ],
+          "good": [
+            "thank you! say thank you, kids!",
+            "lovely, thanks!"
+          ],
+          "okay": [
+            "thanks!",
+            "okay, thank you"
+          ],
+          "bad": [
+            "oh, okay... thanks"
+          ]
         }
       }
     },
@@ -59,19 +131,50 @@
       "id": "regular",
       "name": "regular",
       "sprite": "customer-regular",
-      "favorites": ["cookie-butter", "beignet", "strawberry"],
-      "orderSize": { "min": 1, "max": 3 },
+      "favorites": [
+        "cookie-butter",
+        "beignet",
+        "strawberry"
+      ],
+      "orderSize": {
+        "min": 1,
+        "max": 3
+      },
       "patienceSec": 140,
       "lines": {
-        "order": ["hey Ethan! the usual: {order}.", "back again! {order}, please.", "can't stay away. {order}, please!"],
-        "notMine": ["ha, not mine, I'm #{ticket}!", "nope, I'm #{ticket}. nice try though"],
+        "order": [
+          "hey Ethan! the usual: {order}.",
+          "back again! {order}, please.",
+          "can't stay away. {order}, please!"
+        ],
+        "notMine": [
+          "ha, not mine, I'm #{ticket}!",
+          "nope, I'm #{ticket}. nice try though"
+        ],
         "thanks": {
-          "great": ["perfect as always. see you tomorrow!", "you never miss. thank you!"],
-          "good": ["thanks, see you soon!", "the best. thank you!"],
-          "okay": ["thanks!", "alright, thanks"],
-          "bad": ["off day, huh? thanks anyway"]
+          "great": [
+            "perfect as always. see you tomorrow!",
+            "you never miss. thank you!"
+          ],
+          "good": [
+            "thanks, see you soon!",
+            "the best. thank you!"
+          ],
+          "okay": [
+            "thanks!",
+            "alright, thanks"
+          ],
+          "bad": [
+            "off day, huh? thanks anyway"
+          ]
         }
       }
     }
+  ],
+  "giftLines": [
+    "an extra one?! you're the best!",
+    "wait, for me? aww, thank you!!",
+    "ooh, a little something extra. love it!",
+    "you didn't have to do that! thank you!"
   ]
 }

@@ -46,11 +46,12 @@ export class DaySummaryScene extends Phaser.Scene {
       ['best order', `${sum.bestScore}`, 'best'],
       ['reactions', `${sum.tiers.great} great · ${sum.tiers.good} good · ${sum.tiers.okay + sum.tiers.bad} meh`, 'reactions'],
       ['donuts thrown away', `${sum.trashed}`, 'trashed'],
+      ['donuts gifted', `${sum.gifts}`, 'gifts'],
       ['sales', money(sum.sales), 'sales'],
       ['tips', money(sum.tips), 'tips'],
     ];
     rows.forEach(([label, value, name], i) => {
-      const y = -340 + i * 70;
+      const y = -350 + i * 64;
       card.add(text(-360, y, label, 40).setOrigin(0, 0.5));
       card.add(text(360, y, value, 40, { fontStyle: 'bold' }).setOrigin(1, 0.5).setName(`summary-${name}`));
     });

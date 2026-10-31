@@ -79,10 +79,12 @@
     "weights": { "fry": 0.3, "glaze": 0.25, "toppings": 0.25, "box": 0.1, "wait": 0.1 },
     "wait": { "graceShare": 0.6, "zeroShare": 3 },
     "tiers": { "great": 90, "good": 70, "okay": 45 },
-    "tip": { "perDonut": 0.75, "curve": [[0, 0], [40, 0.2], [70, 0.7], [90, 1], [100, 1.25]] }
+    "tip": { "perDonut": 0.75, "curve": [[0, 0], [40, 0.2], [70, 0.7], [90, 1], [100, 1.25]] },
+    "_gift": "An extra donut (a real menu flavour) beyond the order is a gift: +tipPerDonut each (up to max), and the customer's reaction goes up tierBoost levels.",
+    "gift": { "tipPerDonut": 0.75, "max": 3, "tierBoost": 1 }
   },
   "box": {
-    "_note": "Each ordered slot holding its flavour = 1, that flavour in the wrong slot = wrongSpotCredit, minus extraPenalty per extra donut.",
+    "_note": "Each ordered slot holding its flavour = 1, that flavour in the wrong slot = wrongSpotCredit, minus extraPenalty per extra donut that isn't a real flavour (extra real flavours are gifts, scored in scoring.gift).",
     "wrongSpotCredit": 0.5,
     "extraPenalty": 0.25
   }

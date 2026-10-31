@@ -74,3 +74,18 @@ describe('order price', () => {
     expect(orderPrice(menu, { flavors: Array(6).fill('strawberry'), boxId: 'flight' })).toBe(20);
   });
 });
+
+describe('gift donuts', () => {
+  it("don't change the order score, but raise the reaction a level and add to the tip (up to a max)", () => {
+    const plain = scoreOrder({ ...perfect, glaze: 60, toppings: 60 }, 0, 100, 3, B);
+    const gifted = scoreOrder({ ...perfect, glaze: 60, toppings: 60 }, 0, 100, 3, B, 1);
+    expect(gifted.total).toBe(plain.total);
+    expect(plain.tier).toBe('good');
+    expect(gifted.tier).toBe('great');
+    expect(gifted.giftTip).toBe(B.gift.tipPerDonut);
+    expect(gifted.tip).toBeCloseTo(plain.tip + B.gift.tipPerDonut);
+    const lots = scoreOrder(perfect, 0, 100, 3, B, 10);
+    expect(lots.giftTip).toBeCloseTo(B.gift.tipPerDonut * B.gift.max);
+    expect(lots.tier).toBe('great'); // can't go above great
+  });
+});

@@ -427,6 +427,34 @@ describe('GameSession: box and serving', () => {
     expect(s.shelf).toHaveLength(1);
   });
 
+  it('you can pick the box: a bigger one has room for gifts, which tip extra; a smaller one may not fit', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2], orderSizeByDay: [{ min: 2, max: 2 }] }, 1, 11);
+    s.tick(1000);
+    const { ticket } = orderFront(s);
+    expect(s.boxChoice).toBe('trio');
+    expect(s.chooseBox('nope')).toBe(false);
+    expect(s.chooseBox('flight')).toBe(true);
+    expect(s.boxSize).toBe(6);
+    for (const f of [...ticket.order.flavors, 'strawberry']) makeFlavor(s, f);
+    packInOrder(s, ticket.order.flavors);
+    s.boxDonut(s.shelf.findIndex((d) => s.flavorOf(d) === 'strawberry'), 2); // the gift
+    // Shrinking to a single: the overflow goes back to the shelf.
+    s.chooseBox('single');
+    expect(s.boxSize).toBe(1);
+    expect(s.boxCount).toBe(1);
+    // Back to the flight: refill slot 2 (the order's second donut) and slot 3 (the gift).
+    s.chooseBox('flight');
+    for (let i = 1; i < 3; i++) {
+      const want = i < ticket.order.flavors.length ? ticket.order.flavors[i]! : 'strawberry';
+      s.boxDonut(s.shelf.findIndex((d) => s.flavorOf(d) === want), i);
+    }
+    const e = s.serveActiveTicket();
+    expect(ticket.results.box).toMatchObject({ score: 100, gifts: 1, extras: 0 });
+    expect(e.score.gifts).toBe(1);
+    expect(e.score.giftTip).toBeGreaterThan(0);
+    expect(s.summary().gifts).toBe(1);
+  });
+
   it('nothing can be boxed without an order selected', () => {
     const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
     makeFlavor(s, 'strawberry');

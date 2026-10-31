@@ -7,9 +7,10 @@ interface SessionView {
   shelf: Donut[];
   box: (Donut | undefined)[];
   boxCount: number;
+  boxSize: number;
   toppingWork: { countOn(id: string): number; pieces: unknown[] } | null;
   flavorOf(d: Donut): string | null;
-  ticket(no: number): { status: string; order: { flavors: string[] }; results: { box?: { score: number }; toppings?: { score: number } } } | undefined;
+  ticket(no: number): { status: string; order: { flavors: string[] }; results: { box?: { score: number; gifts: number }; toppings?: { score: number }; score?: { gifts: number; giftTip: number } } } | undefined;
 }
 const session = (page: Page) => <T>(fn: (s: SessionView) => T) =>
   page.evaluate(`(${fn.toString()})(window.__session)`) as Promise<T>;
@@ -139,6 +140,14 @@ test('toppings by hand, then pack the box in the ticket order and close the lid'
   await expect.poll(() => s((x) => x.boxCount)).toBe(flavors.length);
   await shot(page, 'box-2-packed');
 
+  // A bigger box leaves room for a gift: an extra strawberry, on the house.
+  await tapNamed(page, SceneKeys.Box, 'box-size-flight');
+  await expect.poll(() => s((x) => x.boxSize)).toBe(6);
+  await makeGlazed(page, [recipes.strawberry!]);
+  await tapNamed(page, SceneKeys.Box, `box-shelf-${await shelfIndexOf(page, 'strawberry')}`);
+  await expect.poll(() => s((x) => x.boxCount)).toBe(flavors.length + 1);
+  await shot(page, 'box-2b-gift');
+
   await tapNamed(page, SceneKeys.Box, 'btn-serve');
   await page.waitForTimeout(150);
   await shot(page, 'box-3-lid');
@@ -147,6 +156,8 @@ test('toppings by hand, then pack the box in the ticket order and close the lid'
   expect(r.status).toBe('served');
   expect(r.results.box!.score).toBe(100);
   expect(r.results.toppings!.score).toBeGreaterThan(50);
+  expect(r.results.box!.gifts).toBe(1);
+  expect(r.results.score!.giftTip).toBeGreaterThan(0);
   await shot(page, 'box-4-served');
 
   expect(errors).toEqual([]);

@@ -31,7 +31,8 @@ export class ServeScene extends Phaser.Scene {
     const cust = ticket ? s.customer(ticket.customerId) : undefined;
     const r = ticket?.results;
     const score = r?.score;
-    const thanks = cust && score ? s.thanksLine(cust, score.tier) : '';
+    // A gift in the box gets its own happy line.
+    const thanks = cust && score ? (score.gifts > 0 ? s.giftLine() : s.thanksLine(cust, score.tier)) : '';
 
     // Everything lives in one container centred on the screen, laid out relative to the card centre.
     const card = this.add.container(0, 0, [addCard(this, CARD_W, CARD_H)]);
@@ -61,7 +62,13 @@ export class ServeScene extends Phaser.Scene {
     if (score) {
       card.add(text(0, 160, `${score.total}  ·  ${orderVerdict(score.total, balance.scoring)}`, 64, { fontStyle: 'bold' }).setOrigin(0.5).setName('serve-total'));
       card.add(
-        text(0, 245, `tip $${score.tip.toFixed(2)}   ·   sold for $${(r?.sale ?? 0).toFixed(2)}`, 40, { color: '#6b5d52' })
+        text(
+          0,
+          245,
+          `tip $${score.tip.toFixed(2)}${score.giftTip > 0 ? ` (+$${score.giftTip.toFixed(2)} for the gift)` : ''}   ·   sold for $${(r?.sale ?? 0).toFixed(2)}`,
+          score.giftTip > 0 ? 34 : 40,
+          { color: '#6b5d52' },
+        )
           .setOrigin(0.5)
           .setName('serve-tip'),
       );

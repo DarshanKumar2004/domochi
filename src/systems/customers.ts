@@ -24,6 +24,8 @@ export interface CustomerType {
 
 export interface CustomersData {
   types: CustomerType[];
+  /** What a customer says when you put extra donuts in their box. */
+  giftLines: string[];
 }
 
 /** Replace {name} placeholders. Unknown placeholders are left as-is so typos are visible. */
@@ -42,6 +44,7 @@ export function validateCustomers(data: CustomersData, menu: Menu, textureKeys: 
   const flavorIds = new Set(menu.flavors.map((f) => f.id));
   const seen = new Set<string>();
   if (data.types.length === 0) errors.push('no customer types');
+  if (!data.giftLines?.length) errors.push('no giftLines');
 
   for (const t of data.types) {
     if (seen.has(t.id)) errors.push(`duplicate customer type "${t.id}"`);

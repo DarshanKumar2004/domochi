@@ -49,6 +49,8 @@ export interface Ticket {
   status: TicketStatus;
   takenAtMs: number;
   servedAtMs?: number;
+  /** The box picked at the Box station (else the one that fits the order). */
+  packBoxId?: string;
   /** Filled in when the box is closed and served. */
   results: {
     fry?: FryResult;
@@ -86,6 +88,8 @@ export interface DaySummary {
   trashed: number;
   /** Orders by reaction tier. */
   tiers: Record<'great' | 'good' | 'okay' | 'bad', number>;
+  /** Extra donuts given away as gifts. */
+  gifts: number;
 }
 
 export interface SessionEvents extends Record<string, unknown> {
@@ -215,6 +219,11 @@ export class GameSession {
     const t = this.deps.customers.types.find((x) => x.id === customer.typeId);
     if (!t) throw new Error(`unknown customer type ${customer.typeId}`);
     return t;
+  }
+
+  /** What a customer says when there are gift donuts in the box. */
+  giftLine(): string {
+    return pickLine(this.deps.customers.giftLines, this.deps.rng);
   }
 
   thanksLine(customer: Customer, tier: ThanksTier): string {
@@ -464,10 +473,32 @@ export class GameSession {
 
   // ---- Box --------------------------------------------------------------------
 
+  /** The box being packed for the selected order (null if no order is selected). */
+  get boxChoice(): string | null {
+    const t = this.activeTicket;
+    return t ? (t.packBoxId ?? t.order.boxId) : null;
+  }
+
   /** Slots in the selected order's box (0 if no order is selected). */
   get boxSize(): number {
     const t = this.activeTicket;
-    return t ? (this.deps.menu.boxes.find((b) => b.id === t.order.boxId)?.size ?? t.order.flavors.length) : 0;
+    const id = this.boxChoice;
+    return t ? (this.deps.menu.boxes.find((b) => b.id === id)?.size ?? t.order.flavors.length) : 0;
+  }
+
+  /**
+   * Pack the selected order in a different box (a single, the trio, the
+   * flight…). A bigger box leaves room for gift donuts; a smaller one may not
+   * fit the order. Donuts past a smaller box's end move to free slots or back
+   * to the shelf.
+   */
+  chooseBox(boxId: string): boolean {
+    const t = this.activeTicket;
+    if (!t || !this.deps.menu.boxes.some((b) => b.id === boxId)) return false;
+    t.packBoxId = boxId;
+    this.fitBox();
+    this.events.emit('changed', undefined);
+    return true;
   }
 
   /** What's in the open box, slot by slot. */
@@ -597,6 +628,7 @@ export class GameSession {
       this.typeOf(c).patienceSec,
       needed,
       balance.scoring,
+      t.results.box!.gifts,
     );
     const sale = orderPrice(menu, t.order);
     t.results.score = score;
@@ -616,6 +648,7 @@ export class GameSession {
     let best = 0;
     let sales = 0;
     let tips = 0;
+    let gifts = 0;
     for (const t of served) {
       const s = t.results.score!;
       total += s.total;
@@ -623,6 +656,7 @@ export class GameSession {
       tips += s.tip;
       sales += t.results.sale ?? 0;
       tiers[s.tier]++;
+      gifts += s.gifts;
     }
     return {
       day: this.day,
@@ -633,6 +667,7 @@ export class GameSession {
       tips: Math.round(tips * 100) / 100,
       trashed: this.trashedCount,
       tiers,
+      gifts,
     };
   }
 
