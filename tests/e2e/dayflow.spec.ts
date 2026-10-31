@@ -175,6 +175,7 @@ test('day 2 has morning pickups on the rail; a pop-up day has the booth; invites
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
   expect(await isVisibleNamed(page, SceneKeys.Lobby, 'popup-booth')).toBe(true);
+  await shot(page, 'popup-1-downtown');
   expect(await s((x) => x.pickups.length)).toBe(0);
   await shot(page, 'popup-1-booth');
   expect(errors).toEqual([]);

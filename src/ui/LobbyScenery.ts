@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { DayPhase } from '../systems/GameSession';
 import type { Viewport } from './layout';
-import { COLORS } from './theme';
+import { COLORS, FONT_FAMILY } from './theme';
 
 /** Sky colours (top, bottom), sun colour and string-light glow, by time of day. */
 const SKIES: Record<'morning' | 'day' | 'sunset', { top: number; bottom: number; sun: number; glow: number }> = {
@@ -61,6 +61,12 @@ export class LobbyScenery {
   private viewport: Viewport | null = null;
   private time: keyof typeof SKIES = 'day';
   private weather = 'sunny';
+  /** Pop-up days: a downtown storefront behind the booth instead of the oaks. */
+  private downtown = false;
+  private readonly storefront: Phaser.GameObjects.Graphics;
+  private readonly storeSign: Phaser.GameObjects.Text;
+  /** The sign board (above the string lights, below the booth). */
+  private readonly signBoard: Phaser.GameObjects.Graphics;
   private readonly rain: Phaser.GameObjects.Graphics;
   private readonly drops: { x: number; y: number; speed: number }[] = [];
 
@@ -76,7 +82,82 @@ export class LobbyScenery {
     this.table = scene.add.image(0, 0, TextureKeys.PatioTable).setOrigin(0.5, 1).setDepth(-12);
     this.planter = scene.add.image(0, 0, TextureKeys.Planter).setOrigin(0.5, 1).setDepth(-2);
     this.rain = scene.add.graphics().setDepth(9).setVisible(false);
+    this.storefront = scene.add.graphics().setDepth(-16.5).setVisible(false);
+    this.storeSign = scene.add
+      .text(0, 0, 'Gator & Co.', { fontFamily: FONT_FAMILY, fontSize: '54px', fontStyle: 'bold', color: '#fbf6ec' })
+      .setOrigin(0.5)
+      .setDepth(-15.8)
+      .setVisible(false);
+    this.signBoard = scene.add.graphics().setDepth(-15.9).setVisible(false);
     for (let i = 0; i < RAIN; i++) this.drops.push({ x: 0, y: 0, speed: 900 + ((i * 137) % 500) });
+  }
+
+  /**
+   * A pop-up day downtown: a brick storefront ("Gator & Co.", made up) with a
+   * striped awning and shop windows behind the booth, instead of the oaks.
+   */
+  setDowntown(on: boolean): void {
+    this.downtown = on;
+    for (const t of this.trees) t.setVisible(!on);
+    this.storefront.setVisible(on);
+    this.storeSign.setVisible(on);
+    this.signBoard.setVisible(on);
+    if (this.viewport && this.sceneryLayout) this.drawStorefront(this.viewport, this.sceneryLayout);
+  }
+
+  private drawStorefront(v: Viewport, l: SceneryLayout): void {
+    const g = this.storefront;
+    g.clear();
+    if (!this.downtown) return;
+    const L = v.orientation === 'landscape';
+    const gy = l.groundY;
+    const top = v.content.y + (L ? 40 : 20);
+    const h = gy - top;
+    // Brick, edge to edge, with mortar lines.
+    g.fillStyle(0xa6533c);
+    g.fillRect(0, top, v.width, h);
+    g.lineStyle(2, 0x8a4230, 0.8);
+    for (let y = top + 22, row = 0; y < gy; y += 22, row++) {
+      g.lineBetween(0, y, v.width, y);
+      for (let x = row % 2 ? 0 : 30; x < v.width; x += 60) g.lineBetween(x, y - 22, x, y);
+    }
+    // A cornice along the top.
+    g.fillStyle(0x6e3426);
+    g.fillRect(0, top, v.width, 26);
+    // Shop windows with dark glass and cream frames, every so often.
+    const winW = L ? 230 : 200;
+    const winH = Math.min(h * 0.55, L ? 190 : 260);
+    const winY = gy - winH - 30;
+    for (let x = 40; x + winW < v.width; x += winW + (L ? 120 : 90)) {
+      g.fillStyle(0xfbf6ec);
+      g.fillRect(x - 8, winY - 8, winW + 16, winH + 16);
+      g.fillStyle(0x2f3a40);
+      g.fillRect(x, winY, winW, winH);
+      g.fillStyle(0xffffff, 0.12);
+      g.fillTriangle(x, winY, x + winW * 0.5, winY, x, winY + winH * 0.6);
+      g.lineStyle(4, 0xfbf6ec);
+      g.lineBetween(x + winW / 2, winY, x + winW / 2, winY + winH);
+    }
+    // A striped awning over the windows, scalloped edge.
+    const awY = winY - 70;
+    const stripe = 50;
+    for (let x = 0, i = 0; x < v.width; x += stripe, i++) {
+      g.fillStyle(i % 2 ? 0xfbf6ec : 0xf4a6c0);
+      g.fillRect(x, awY, stripe, 50);
+      g.fillCircle(x + stripe / 2, awY + 50, stripe / 2);
+    }
+    g.lineStyle(4, 0x1f1a17, 0.6);
+    g.lineBetween(0, awY, v.width, awY);
+    // The shop's sign board above the awning.
+    // (In portrait the booth stands in front, so the sign goes up top, clear of it.)
+    const signY = L ? (top + 26 + awY) / 2 : top + 85;
+    const sb = this.signBoard;
+    sb.clear();
+    sb.fillStyle(0x1f1a17);
+    sb.fillRoundedRect(v.width / 2 - 230, signY - 45, 460, 90, 14);
+    sb.lineStyle(4, 0xfbf6ec, 0.8);
+    sb.strokeRoundedRect(v.width / 2 - 222, signY - 37, 444, 74, 10);
+    this.storeSign.setPosition(v.width / 2, signY).setScale(L ? 0.85 : 1);
   }
 
   /** Today's weather: the sky, the sun and clouds, and rain. */
@@ -94,6 +175,7 @@ export class LobbyScenery {
     this.viewport = v;
     this.sceneryLayout = l;
     this.drops.forEach((d, i) => ((d.x = ((i * 0.618) % 1) * v.width), (d.y = ((i * 0.381) % 1) * v.height)));
+    this.drawStorefront(v, l);
     const L = v.orientation === 'landscape';
     const gy = l.groundY;
 

@@ -116,6 +116,8 @@ export class LobbyScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLORS.sky);
     this.scenery = new LobbyScenery(this);
     this.scenery.setWeather(session().weather?.id ?? 'sunny');
+    // Pop-up days are downtown, in front of a (made-up) shop.
+    this.scenery.setDowntown(!!session().event);
     // A pop-up booth on event days, the trailer otherwise.
     const ev = session().event;
     this.truck = ev ? null : new Truck(this, 0, 0);
