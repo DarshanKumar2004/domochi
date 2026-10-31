@@ -13,6 +13,10 @@ import { StationScene } from './StationScene';
 /** Doneness shown on the per-donut meters goes 0 → METER_MAX (golden = 1). */
 const METER_MAX = 1.5;
 const RACK_SHOWN = 6;
+/** Steam puff pool size (golden cues and ready-to-pull steam). */
+const STEAM = 24;
+/** While both sides are golden, a wisp of steam rises this often (ms). */
+const STEAM_EVERY_MS = 380;
 /** Two taps on the trash can this close together (ms) empty the rack. */
 const DOUBLE_TAP_MS = 500;
 const DIAL_R = 120;
@@ -52,6 +56,12 @@ interface SlotView {
   dy: number;
   scale: number;
   squash: number;
+  /** A little hop when the side in the oil turns golden ("flip me" / "pull me"). */
+  hop: number;
+  /** Flip count when we last cued golden, so each side cues once. */
+  cuedFlips: number;
+  /** Next steam puff while both sides are golden (scene time, ms). */
+  nextSteam: number;
   dragging: boolean;
   dragged: boolean;
   dragX: number;
@@ -103,6 +113,8 @@ export class FryScene extends StationScene {
   /** Grab the rack itself (not a donut on it) to slide the whole rack into the trash. */
   private rackHandle!: Phaser.GameObjects.Zone;
   private rackOffset = { dx: 0, dy: 0 };
+  private steam: Phaser.GameObjects.Arc[] = [];
+  private nextSteamPuff = 0;
   private lastTrashTap = 0;
   private slotViews: SlotView[] = [];
   private tempMeter!: Meter;
@@ -162,6 +174,8 @@ export class FryScene extends StationScene {
     this.buildRackHandle();
     for (let i = 0; i < fb.slots; i++) this.slotViews.push(this.makeSlot(i));
     this.grate = this.add.image(0, 0, TextureKeys.FryGrate).setDepth(3);
+    this.steam = [];
+    for (let i = 0; i < STEAM; i++) this.steam.push(this.add.circle(0, 0, 20, 0xffffff, 0.8).setDepth(7).setVisible(false).setName('fry-steam'));
     this.dispenser = this.add.image(0, 0, TextureKeys.FryDispenser).setDepth(6);
 
     const span = fb.dial.maxF - fb.dial.minF;
@@ -223,6 +237,9 @@ export class FryScene extends StationScene {
       dy: 0,
       scale: 1,
       squash: 1,
+      hop: 0,
+      cuedFlips: -1,
+      nextSteam: 0,
       dragging: false,
       dragged: false,
       dragX: 0,
@@ -488,7 +505,7 @@ export class FryScene extends StationScene {
 
   // ---- Per frame: render the fryer. Keep this allocation-free. ---------------
 
-  override update(): void {
+  override update(time: number): void {
     const s = session();
     const f = s.fryer;
     const fb = f.balance;
@@ -525,12 +542,29 @@ export class FryScene extends StationScene {
         v.band.setVisible(false);
         v.under.setVisible(false);
         v.top.setVisible(false);
+        v.cuedFlips = -1;
+        v.hop = 0;
         continue;
       }
       const slot = this.slotPosition(i);
       const size = slot.size * v.scale;
       const x = v.dragging ? v.dragX : slot.x + v.dx;
-      const y = v.dragging ? v.dragY : slot.y + v.dy + sink;
+      const y = v.dragging ? v.dragY : slot.y + v.dy + sink - v.hop;
+
+      // Golden cues: the side in the oil turning golden makes the donut hop with a puff
+      // of steam (time to flip, or to pull); golden on both sides keeps it steaming (ready to pull).
+      const pwCue = fb.doneness.perfectWithin;
+      const downGold = Math.abs(d.down - 1) <= pwCue;
+      if (!v.dragging && downGold && v.cuedFlips !== d.flips) {
+        v.cuedFlips = d.flips;
+        this.goldenHop(v, x, y, size);
+      }
+      // Ready to pull: the side in the oil is golden and the top is at least golden (it keeps
+      // cooking a little while it floats, so it may be just past the band by now).
+      if (!v.dragging && downGold && d.up >= 1 - pwCue && time >= v.nextSteam) {
+        v.nextSteam = time + STEAM_EVERY_MS;
+        this.puff(x + (Math.random() - 0.5) * size * 0.4, y - size * 0.2, size * 0.24);
+      }
       v.img
         .setVisible(true)
         .setPosition(x, y)
@@ -621,6 +655,7 @@ export class FryScene extends StationScene {
     if (!session().flipDonut(slot)) return;
     const v = this.slotViews[slot]!;
     this.tweens.killTweensOf(v);
+    v.hop = 0;
     v.squash = 1;
     this.tweens.add({ targets: v, squash: 0.15, duration: 110, yoyo: true, ease: 'Sine.InOut' });
   }
@@ -682,6 +717,7 @@ export class FryScene extends StationScene {
     const landY = home.y;
     const size = home.size;
     this.tweens.killTweensOf(v);
+    v.hop = 0;
     v.dx = from.x - home.x;
     v.dy = from.y - home.y;
     v.scale = 0.3;
@@ -695,6 +731,29 @@ export class FryScene extends StationScene {
       duration: 600,
       ease: 'Bounce.Out',
       onComplete: () => this.splash(landX, landY, size),
+    });
+  }
+
+  /** The donut hops in the oil with a puff of steam: this side is golden. */
+  private goldenHop(v: SlotView, x: number, y: number, size: number): void {
+    this.tweens.add({ targets: v, hop: size * 0.18, duration: 130, yoyo: true, ease: 'Sine.Out' });
+    for (let k = 0; k < 3; k++) this.puff(x + (k - 1) * size * 0.3, y - size * 0.1, size * 0.28);
+  }
+
+  /** A wisp of steam rising and fading (pooled). */
+  private puff(x: number, y: number, r: number): void {
+    const p = this.steam[this.nextSteamPuff]!;
+    this.nextSteamPuff = (this.nextSteamPuff + 1) % STEAM;
+    this.tweens.killTweensOf(p);
+    p.setPosition(x, y).setRadius(r).setScale(0.6).setAlpha(0.85).setVisible(true);
+    this.tweens.add({
+      targets: p,
+      y: y - r * 5,
+      scale: 1.6,
+      alpha: 0,
+      duration: 750,
+      ease: 'Sine.Out',
+      onComplete: () => p.setVisible(false),
     });
   }
 

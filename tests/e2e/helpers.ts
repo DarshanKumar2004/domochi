@@ -261,3 +261,21 @@ export async function doubleTapNamed(page: Page, sceneKey: string, name: string)
     await page.mouse.click(p.px, p.py, { clickCount: 2 });
   }
 }
+
+/** Is any object with this name currently visible in the scene? (Works for Graphics, which have no bounds.) */
+export async function isVisibleNamed(page: Page, sceneKey: string, name: string): Promise<boolean> {
+  return page.evaluate(
+    ([sk, n]) => {
+      type O = { name?: string; visible?: boolean; list?: O[] };
+      const g = (window as unknown as { __game: { scene: { getScene(k: string): { children: { list: O[] } } } } }).__game;
+      const stack = [...g.scene.getScene(sk).children.list];
+      while (stack.length) {
+        const o = stack.pop()!;
+        if (o.name === n && o.visible !== false) return true;
+        if (o.list) stack.push(...o.list);
+      }
+      return false;
+    },
+    [sceneKey, name] as const,
+  );
+}

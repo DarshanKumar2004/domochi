@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, doubleTapNamed, dragFromNamed, dragNamedOnto, holdNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene } from './helpers';
+import { advance, doubleTapNamed, dragFromNamed, dragNamedOnto, holdNamed, pauseClock, seedTutorialDone, shot, tapNamed, isVisibleNamed, waitForScene } from './helpers';
 
 interface SlotView {
   down: number;
@@ -51,6 +51,8 @@ test('fry one at a time: drop, flip individually, grate, dial, drag to the rack,
 
   // Cook the undersides; the golden band on each meter shows when to flip.
   await advance(page, b.secondsPerSide * 1000);
+  // Golden underside: the donuts hop with a puff of steam (time to flip).
+  await expect.poll(() => isVisibleNamed(page, SceneKeys.Fry, 'fry-steam')).toBe(true);
   await page.waitForTimeout(700);
   await shot(page, 'fry-2-golden-band');
   await tapNamed(page, SceneKeys.Fry, 'fry-donut-0');
@@ -76,6 +78,34 @@ test('fry one at a time: drop, flip individually, grate, dial, drag to the rack,
   await page.waitForTimeout(600);
   await shot(page, 'fry-3-rack');
 
+  expect(errors).toEqual([]);
+});
+
+test('golden cues: a hop and steam when a side is golden, steam while ready to pull', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await startAtFryer(page);
+  await tapNamed(page, SceneKeys.Fry, 'btn-drop');
+  await page.waitForTimeout(700);
+  const golden = (v: number) => Math.abs(v - 1) <= 0.1;
+  /** Cook in small steps until the donut in slot 0 matches. */
+  const cookUntil = async (ok: (d: SlotView) => boolean) => {
+    for (let k = 0; k < 200 && !ok((await fryer(page)).slots[0]!); k++) await advance(page, 100);
+    expect(ok((await fryer(page)).slots[0]!)).toBe(true);
+  };
+
+  // Underside golden: hop + puff (time to flip).
+  await cookUntil((d) => golden(d.down));
+  await expect.poll(() => isVisibleNamed(page, SceneKeys.Fry, 'fry-steam')).toBe(true);
+  await tapNamed(page, SceneKeys.Fry, 'fry-donut-0');
+  await expect.poll(async () => (await fryer(page)).slots[0]?.flips).toBe(1);
+
+  // Second side golden too: it keeps steaming (ready to pull).
+  await cookUntil((d) => golden(d.down) && d.up >= 0.9);
+  await page.waitForTimeout(1000); // longer than one puff lasts: new ones keep coming
+  await expect.poll(() => isVisibleNamed(page, SceneKeys.Fry, 'fry-steam')).toBe(true);
+  await shot(page, 'fry-2b-steaming');
   expect(errors).toEqual([]);
 });
 

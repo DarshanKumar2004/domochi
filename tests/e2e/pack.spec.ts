@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, toPage, waitForScene } from './helpers';
+import { advance, boundsNamed, dragNamedOnto, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene } from './helpers';
 
 type Donut = { id: number };
 interface SessionView {
@@ -106,9 +106,12 @@ test('toppings by hand, then pack the box in the ticket order and close the lid'
     // The plain ones are glazed cookies & cream that don't match a flavour yet.
     const idx = await s((x) => x.shelf.findIndex((d) => x.flavorOf(d) === null));
     expect(idx).toBeGreaterThanOrEqual(0);
-    await tapNamed(page, SceneKeys.Toppings, `toppings-shelf-${idx}`);
+    // Tap it onto the board the first time, drag it there after that.
+    if (n === 0) await tapNamed(page, SceneKeys.Toppings, `toppings-shelf-${idx}`);
+    else await dragNamedOnto(page, SceneKeys.Toppings, `toppings-shelf-${idx}`, 'toppings-board');
     await expect.poll(() => s((x) => !!x.toppingWork)).toBe(true);
     await tapNamed(page, SceneKeys.Toppings, 'jar-crushed-cookies');
+    await expect.poll(() => isVisibleNamed(page, SceneKeys.Toppings, 'toppings-guide-ring')).toBe(true); // where to shake
     await shakeRing(page);
     const on = await s((x) => x.toppingWork!.countOn('crushed-cookies'));
     expect(on).toBeGreaterThanOrEqual(20);

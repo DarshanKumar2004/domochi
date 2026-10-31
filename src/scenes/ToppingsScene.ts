@@ -4,7 +4,20 @@ import type { ToppingWork } from '../stations/toppings';
 import { flavorsForDay, type Topping } from '../systems/menu';
 import { balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
-import { ART_SIZE, donutIcon, drawFinishedDonut, drawToppingPiece, pruneDonutIcons } from '../ui/donutArt';
+import {
+  ART_SIZE,
+  circlePoints,
+  donutIcon,
+  drawDashedPath,
+  drawFinishedDonut,
+  drawOnTray,
+  drawToppingPiece,
+  drawTray,
+  fadeTray,
+  MESS_SIZE,
+  pruneDonutIcons,
+  TRAY_PAD,
+} from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
@@ -12,6 +25,8 @@ import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
 
 const CANVAS_KEY = 'toppings-board';
+/** Pieces that missed the donut, left on the tray. */
+const MESS_KEY = 'toppings-mess';
 /** Copy of the board flying into the trash on Redo. */
 const SNAP_KEY = 'toppings-trash-snap';
 const SLOTS = 6;
@@ -38,8 +53,6 @@ interface Falling {
   fromY: number;
   x: number;
   y: number;
-  /** After landing off the donut it keeps falling and fades. */
-  fellOff: boolean;
   toppingId: string;
   rand: number;
   img: Phaser.GameObjects.Image;
@@ -48,18 +61,18 @@ interface Falling {
 const LAYOUT = {
   portrait: {
     shelf: { x: 40, y: 230, w: 1000, h: 140, size: 110 },
-    board: { x: 540, y: 660, size: 520 },
-    instruction: { x: 540, y: 960 },
-    readout: { x: 540, y: 1012 },
+    board: { x: 540, y: 672, size: 440 },
+    instruction: { x: 540, y: 988 },
+    readout: { x: 540, y: 1032 },
     jars: { x: 470, y: 1220, step: 230, scale: 0.75 },
     trash: { x: 960, y: 1240, size: 130 },
     buttons: { y: 1460, redoX: 270, doneX: 800, scale: 1 },
   },
   landscape: {
     shelf: { x: 1000, y: 160, w: 880, h: 120, size: 92 },
-    board: { x: 480, y: 360, size: 500 },
-    instruction: { x: 480, y: 670 },
-    readout: { x: 480, y: 720 },
+    board: { x: 480, y: 362, size: 460 },
+    instruction: { x: 480, y: 684 },
+    readout: { x: 480, y: 730 },
     jars: { x: 1340, y: 430, step: 200, scale: 0.7 },
     trash: { x: 1800, y: 440, size: 110 },
     buttons: { y: 705, redoX: 1250, doneX: 1620, scale: 0.85 },
@@ -70,6 +83,15 @@ export class ToppingsScene extends StationScene {
   private board!: Phaser.GameObjects.Image;
   private canvas!: Phaser.Textures.CanvasTexture;
   private boardZone!: Phaser.GameObjects.Zone;
+  private boardTray!: Phaser.GameObjects.Graphics;
+  private mess!: Phaser.Textures.CanvasTexture;
+  private messImg!: Phaser.GameObjects.Image;
+  private messDirty = false;
+  /** Where to shake: a dashed loop round the ring (sprinkles), or a spot for a whole cookie. */
+  private guideRing!: Phaser.GameObjects.Graphics;
+  private guideSpot!: Phaser.GameObjects.Graphics;
+  /** The shaking finger, read every frame (its events can go to the rail or tab bar if it strays there). */
+  private shakePointer: Phaser.Input.Pointer | null = null;
   private shelfBg!: Phaser.GameObjects.Graphics;
   private shelfLabel!: Phaser.GameObjects.Text;
   private shelfImgs: Phaser.GameObjects.Image[] = [];
@@ -126,7 +148,13 @@ export class ToppingsScene extends StationScene {
 
     if (this.textures.exists(CANVAS_KEY)) this.textures.remove(CANVAS_KEY);
     this.canvas = this.textures.createCanvas(CANVAS_KEY, ART_SIZE, ART_SIZE)!;
+    this.boardTray = this.add.graphics();
+    if (this.textures.exists(MESS_KEY)) this.textures.remove(MESS_KEY);
+    this.mess = this.textures.createCanvas(MESS_KEY, MESS_SIZE, MESS_SIZE)!;
+    this.messImg = this.add.image(0, 0, MESS_KEY);
     this.board = this.add.image(0, 0, CANVAS_KEY).setName('toppings-donut');
+    this.guideRing = this.add.graphics().setName('toppings-guide-ring');
+    this.guideSpot = this.add.graphics().setName('toppings-guide-spot');
     this.boardZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('toppings-board');
 
     // Jars for every topping used by today's flavours.
@@ -142,7 +170,6 @@ export class ToppingsScene extends StationScene {
         fromY: 0,
         x: 0,
         y: 0,
-        fellOff: false,
         toppingId: '',
         rand: 0,
         img: this.add.image(0, 0, TextureKeys.ToppingJar).setVisible(false).setDepth(19),
@@ -171,6 +198,7 @@ export class ToppingsScene extends StationScene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.SLEEP, this.stopShake, this);
       if (this.textures.exists(CANVAS_KEY)) this.textures.remove(CANVAS_KEY);
+      if (this.textures.exists(MESS_KEY)) this.textures.remove(MESS_KEY);
     });
     listen(this, session().events, 'changed', () => this.refresh());
   }
@@ -193,6 +221,8 @@ export class ToppingsScene extends StationScene {
         const ghost = this.ghostOf(img);
         if (session().trashShelfDonut(i)) this.toTrash(p.worldX, p.worldY, ghost, true);
         else ghost.destroy();
+      } else if (Phaser.Math.Distance.Between(p.worldX, p.worldY, this.boardPos.x, this.boardPos.y) < this.boardPos.size * 0.6) {
+        this.takeFromShelf(i);
       }
       this.refresh();
     });
@@ -254,6 +284,9 @@ export class ToppingsScene extends StationScene {
     this.boardPos = { x: c.x + L.board.x, y: c.y + L.board.y, size: L.board.size };
     const { x, y, size } = this.boardPos;
     this.board.setPosition(x, y).setDisplaySize(size, size);
+    drawTray(this.boardTray, x, y, size);
+    this.messImg.setPosition(x, y).setDisplaySize(size * (1 + 2 * TRAY_PAD), size * (1 + 2 * TRAY_PAD));
+    this.drawGuides();
     // Shaking is accepted a bit outside the donut too (those pieces fall off).
     this.boardZone.setPosition(x, y).setSize(size * 1.3, size * 1.3);
 
@@ -329,6 +362,10 @@ export class ToppingsScene extends StationScene {
       this.jarHighlight.strokeRoundedRect(jar.img.x - w / 2, jar.img.y - 125 * this.jarScale, w, 250 * this.jarScale, 20);
     }
 
+    const t = this.selectedTopping();
+    const n = work && t ? work.countOn(t.id) : 0;
+    this.guideRing.setVisible(!!work && t?.style === 'sprinkle' && n < t.amount.min);
+    this.guideSpot.setVisible(!!work && t?.style === 'piece' && n < t.amount.min);
     if (!work) {
       this.readout.setText('');
       return;
@@ -345,6 +382,23 @@ export class ToppingsScene extends StationScene {
       if (on || off) parts.push(`${j.topping.name}: ${on}${off ? ` (${off} fell off)` : ''}`);
     }
     this.readout.setText(parts.length ? parts.join(' · ') : 'no toppings yet');
+  }
+
+  /** A dashed loop round the middle of the ring, and a target on the top ball for a whole cookie. */
+  private drawGuides(): void {
+    const { x, y, size } = this.boardPos;
+    const half = size / 2;
+    const r = balance.glaze.ringRadius;
+    this.guideRing.clear();
+    this.guideRing.lineStyle(10, COLORS.ink, 0.25);
+    drawDashedPath(this.guideRing, x, y, half, circlePoints(r));
+    this.guideRing.lineStyle(5, COLORS.cream, 0.9);
+    drawDashedPath(this.guideRing, x, y, half, circlePoints(r));
+    this.guideSpot.clear();
+    this.guideSpot.lineStyle(10, COLORS.ink, 0.25);
+    drawDashedPath(this.guideSpot, x, y - r * half, half, circlePoints(0.17, 24), 14, 10);
+    this.guideSpot.lineStyle(5, COLORS.cream, 0.9);
+    drawDashedPath(this.guideSpot, x, y - r * half, half, circlePoints(0.17, 24), 14, 10);
   }
 
   private selectedTopping(): Topping | undefined {
@@ -389,6 +443,7 @@ export class ToppingsScene extends StationScene {
       return;
     }
     this.shaking = true;
+    this.shakePointer = p;
     this.lastEmit = this.time.now - balance.toppings.sprinkleEveryMs;
     this.handJar.setScale(0.6);
     this.handFill.setTexture(this.jarFillTexture(t)).setScale(0.6);
@@ -400,6 +455,7 @@ export class ToppingsScene extends StationScene {
   private stopShake(): void {
     if (!this.shaking) return;
     this.shaking = false;
+    this.shakePointer = null;
     this.tweens.killTweensOf(this.hand);
     this.hand.setVisible(false);
   }
@@ -417,7 +473,6 @@ export class ToppingsScene extends StationScene {
     f.y = y + Math.sin(a) * d;
     f.fromX = x + (f.x - x) * 0.2;
     f.fromY = y - JAR_LIFT + 40;
-    f.fellOff = false;
     f.toppingId = t.id;
     f.rand = Math.random();
     const px = (t.size * this.boardPos.size) / 2 / ((PIECE_TEX_R * PIECE_TEX) / 2);
@@ -427,6 +482,16 @@ export class ToppingsScene extends StationScene {
   override update(time: number): void {
     const work = session().toppingWork;
     const tb = balance.toppings;
+
+    // Follow the shaking finger directly (its events may go to the rail or tab bar if it strays there).
+    const sp = this.shakePointer;
+    if (this.shaking && sp) {
+      if (!sp.isDown) this.stopShake();
+      else {
+        this.fingerX = sp.x;
+        this.fingerY = sp.y;
+      }
+    }
 
     if (this.shaking && work) {
       this.hand.setPosition(this.fingerX, this.fingerY - JAR_LIFT);
@@ -444,15 +509,6 @@ export class ToppingsScene extends StationScene {
     for (const f of this.falling) {
       if (!f.active) continue;
       const k = (time - f.startAt) / tb.fallMs;
-      if (f.fellOff) {
-        // Tumbling off the donut: keep falling and fade out.
-        f.img.setPosition(f.x, f.y + (k - 1) * 220).setAlpha(Math.max(0, 1 - (k - 1) * 2.5));
-        if (k >= 1.4) {
-          f.active = false;
-          f.img.setVisible(false);
-        }
-        continue;
-      }
       if (k >= 1) {
         this.land(f);
         continue;
@@ -465,9 +521,13 @@ export class ToppingsScene extends StationScene {
       this.canvas.refresh();
       this.refreshControls();
     }
+    if (this.messDirty) {
+      this.messDirty = false;
+      this.mess.refresh();
+    }
   }
 
-  /** A piece reaches the donut: it sticks (drawn on the board) or falls off. */
+  /** A piece reaches the donut: it sticks (drawn on the donut), or misses and stays on the tray. */
   private land(f: Falling): void {
     const work = session().toppingWork;
     f.img.setPosition(f.x, f.y);
@@ -479,13 +539,15 @@ export class ToppingsScene extends StationScene {
     const { x, y, size } = this.boardPos;
     const piece = work.add(f.toppingId, (f.x - x) / (size / 2), (f.y - y) / (size / 2), f.rand);
     this.dirty = true;
-    if (piece?.on) {
+    f.active = false;
+    f.img.setVisible(false);
+    if (piece) {
       const t = menu.toppings.find((tp) => tp.id === f.toppingId)!;
-      drawToppingPiece(this.canvas.context, ART_SIZE, piece, t);
-      f.active = false;
-      f.img.setVisible(false);
-    } else {
-      f.fellOff = true;
+      if (piece.on) drawToppingPiece(this.canvas.context, ART_SIZE, piece, t);
+      else {
+        drawOnTray(this.mess.context, (m, size) => drawToppingPiece(m, size, piece, t));
+        this.messDirty = true;
+      }
     }
     if (work.pieces.length === 1) this.refresh();
   }
@@ -501,6 +563,9 @@ export class ToppingsScene extends StationScene {
     const img = this.shelfImgs[i]!;
     const from = { x: img.x, y: img.y, size: img.displayWidth, key: img.texture.key };
     if (!s.startToppings(i)) return;
+    // A new donut on the tray: the old mess fades a bit.
+    fadeTray(this.mess.context);
+    this.mess.refresh();
     if (!this.selected && this.jars.length === 1) this.selected = this.jars[0]!.topping.id;
     const ghost = this.add.image(from.x, from.y, from.key).setDisplaySize(from.size, from.size).setDepth(15);
     this.board.setAlpha(0);

@@ -1,13 +1,27 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
-import type { GlazeWork, PourCheck } from '../stations/glaze';
+import type { GlazeLayer, GlazeWork, PourCheck } from '../stations/glaze';
 import type { Glaze } from '../systems/menu';
 import { flavorsForDay } from '../systems/menu';
 import { balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { hexToNumber } from '../ui/DonutIcon';
-import { donutIcon, drawGlazeLayers, drawGlazeSegment, fryTint, pruneDonutIcons } from '../ui/donutArt';
+import {
+  circlePoints,
+  clipToRing,
+  donutIcon,
+  drawDashedPath,
+  drawGlazeLayers,
+  drawGlazeSegment,
+  drawOnTray,
+  drawTray,
+  fadeTray,
+  fryTint,
+  MESS_SIZE,
+  pruneDonutIcons,
+  TRAY_PAD,
+} from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
@@ -17,6 +31,10 @@ import { StationScene } from './StationScene';
 /** Paint canvas resolution (px per side) for the donut on the board. */
 const CANVAS = 420;
 const CANVAS_KEY = 'glaze-paint';
+/** Glaze that missed the donut, left on the tray. */
+const MESS_KEY = 'glaze-mess';
+/** Drizzle guide stripes (normalised y), matching what scores well with the thick stream. */
+const DRIZZLE_STRIPES = [-0.6, 0, 0.6];
 const SLOTS = 6;
 /** How far above your finger the cup hovers while pouring (game px). */
 const CUP_LIFT = 170;
@@ -48,19 +66,19 @@ interface Drop {
 const LAYOUT = {
   portrait: {
     tray: { x: 40, y: 230, w: 1000, h: 140, size: 110 },
-    board: { x: 540, y: 660, size: 520 },
-    instruction: { x: 540, y: 960 },
-    readout: { x: 540, y: 1010 },
-    cups: { x: 540, y: 1110, step: 140, scale: 0.75 },
-    shelf: { x: 40, y: 1250, w: 820, h: 120, size: 90 },
-    trash: { x: 960, y: 1310, size: 130 },
-    buttons: { y: 1460, redoX: 270, doneX: 800, scale: 1 },
+    board: { x: 540, y: 672, size: 440 },
+    instruction: { x: 540, y: 984 },
+    readout: { x: 540, y: 1026 },
+    cups: { x: 540, y: 1128, step: 140, scale: 0.75 },
+    shelf: { x: 40, y: 1268, w: 820, h: 120, size: 90 },
+    trash: { x: 960, y: 1328, size: 130 },
+    buttons: { y: 1478, redoX: 270, doneX: 800, scale: 1 },
   },
   landscape: {
     tray: { x: 1000, y: 160, w: 880, h: 120, size: 92 },
-    board: { x: 480, y: 360, size: 500 },
-    instruction: { x: 480, y: 670 },
-    readout: { x: 480, y: 720 },
+    board: { x: 480, y: 362, size: 460 },
+    instruction: { x: 480, y: 684 },
+    readout: { x: 480, y: 730 },
     cups: { x: 1440, y: 380, step: 120, scale: 0.65 },
     shelf: { x: 1000, y: 510, w: 700, h: 110, size: 80 },
     trash: { x: 1800, y: 565, size: 110 },
@@ -74,6 +92,15 @@ export class GlazeScene extends StationScene {
   private canvas!: Phaser.Textures.CanvasTexture;
   private bubbles!: Phaser.GameObjects.Graphics;
   private boardZone!: Phaser.GameObjects.Zone;
+  private boardTray!: Phaser.GameObjects.Graphics;
+  private mess!: Phaser.Textures.CanvasTexture;
+  private messImg!: Phaser.GameObjects.Image;
+  private messDirty = false;
+  /** Dashed lines to pour along: round the ring for a base coat, stripes for a drizzle. */
+  private guideBase!: Phaser.GameObjects.Graphics;
+  private guideDrizzle!: Phaser.GameObjects.Graphics;
+  /** The finger that's pouring, read every frame (its events can go to the rail or tab bar if it strays there). */
+  private pourPointer: Phaser.Input.Pointer | null = null;
   private trayBg!: Phaser.GameObjects.Graphics;
   private trayLabel!: Phaser.GameObjects.Text;
   private shelfLabel!: Phaser.GameObjects.Text;
@@ -131,11 +158,17 @@ export class GlazeScene extends StationScene {
     for (let i = 0; i < SLOTS; i++) this.shelfImgs.push(this.makeShelfDonut(i));
     this.trash = this.add.image(0, 0, TextureKeys.TrashBin).setName('glaze-trash');
 
+    this.boardTray = this.add.graphics();
+    if (this.textures.exists(MESS_KEY)) this.textures.remove(MESS_KEY);
+    this.mess = this.textures.createCanvas(MESS_KEY, MESS_SIZE, MESS_SIZE)!;
+    this.messImg = this.add.image(0, 0, MESS_KEY);
     this.board = this.add.image(0, 0, TextureKeys.DonutFry).setName('glaze-donut');
     if (this.textures.exists(CANVAS_KEY)) this.textures.remove(CANVAS_KEY);
     this.canvas = this.textures.createCanvas(CANVAS_KEY, CANVAS, CANVAS)!;
     this.paint = this.add.image(0, 0, CANVAS_KEY);
     this.bubbles = this.add.graphics();
+    this.guideBase = this.add.graphics().setName('glaze-guide-base');
+    this.guideDrizzle = this.add.graphics().setName('glaze-guide-drizzle');
     this.boardZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('glaze-board');
 
     // Cups for every glaze used by today's flavours (base coats first, then drizzles).
@@ -167,6 +200,7 @@ export class GlazeScene extends StationScene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.SLEEP, this.stopPour, this);
       if (this.textures.exists(CANVAS_KEY)) this.textures.remove(CANVAS_KEY);
+      if (this.textures.exists(MESS_KEY)) this.textures.remove(MESS_KEY);
     });
     listen(this, session().events, 'changed', () => this.refresh());
   }
@@ -189,6 +223,8 @@ export class GlazeScene extends StationScene {
         const ghost = this.ghostOf(img);
         if (session().trashRackDonut(i)) this.toTrash(p.worldX, p.worldY, ghost, true);
         else ghost.destroy();
+      } else if (this.overBoard(p.worldX, p.worldY)) {
+        this.takeFromTray(i);
       }
       this.refresh();
     });
@@ -234,6 +270,9 @@ export class GlazeScene extends StationScene {
     const { x, y, size } = this.boardPos;
     this.board.setPosition(x, y).setDisplaySize(size, size);
     this.paint.setPosition(x, y).setDisplaySize(size, size);
+    drawTray(this.boardTray, x, y, size);
+    this.messImg.setPosition(x, y).setDisplaySize(size * (1 + 2 * TRAY_PAD), size * (1 + 2 * TRAY_PAD));
+    this.drawGuides();
     // Pouring is accepted a bit outside the donut too (that's spill).
     this.boardZone.setPosition(x, y).setSize(size * 1.3, size * 1.3);
     this.drawBubbles();
@@ -329,6 +368,7 @@ export class GlazeScene extends StationScene {
       this.cupHighlight.strokeRoundedRect(cup.img.x - w / 2, cup.img.y - 95 * this.cupScale, w, 260 * this.cupScale, 20);
     }
 
+    this.refreshGuides();
     const layer = work?.currentLayer ?? work?.layers[work.layers.length - 1];
     if (!work) this.readout.setText('');
     else if (!layer) this.readout.setText(this.selected ? 'press on the donut to pour' : 'pick a cup');
@@ -364,6 +404,7 @@ export class GlazeScene extends StationScene {
       return;
     }
     this.pouring = true;
+    this.pourPointer = p;
     this.stroke++;
     this.fingerX = p.worldX;
     this.fingerY = p.worldY;
@@ -382,6 +423,7 @@ export class GlazeScene extends StationScene {
   private stopPour(): void {
     if (!this.pouring) return;
     this.pouring = false;
+    this.pourPointer = null;
     this.tweens.killTweensOf(this.handCup);
     this.handCup.setVisible(false);
   }
@@ -407,6 +449,17 @@ export class GlazeScene extends StationScene {
   override update(time: number): void {
     const work = session().glazeWork;
     const fallMs = balance.glaze.fallMs;
+
+    // Follow the pouring finger directly: if it strays over the ticket rail or tab
+    // bar, those scenes get its move/up events, but the pointer itself is still current.
+    const pp = this.pourPointer;
+    if (this.pouring && pp) {
+      if (!pp.isDown) this.stopPour();
+      else {
+        this.fingerX = pp.x;
+        this.fingerY = pp.y;
+      }
+    }
 
     // While pouring, the cup follows the finger (spout right above it) and emits a drop each frame.
     if (this.pouring && work && this.selected) {
@@ -446,6 +499,10 @@ export class GlazeScene extends StationScene {
       this.canvas.refresh();
       this.refreshControls();
     }
+    if (this.messDirty) {
+      this.messDirty = false;
+      this.mess.refresh();
+    }
   }
 
   /** A drop reaches the donut: glaze along the path from the previous drop of this pour. */
@@ -461,8 +518,16 @@ export class GlazeScene extends StationScene {
     this.lastLand.ny = ny;
     if (!work.pour(d.glazeId, x0, y0, nx, ny)) return;
     const layer = work.currentLayer!;
-    drawGlazeSegment(this.canvas.context, CANVAS, d.glazeId, x0, y0, nx, ny, layer.segments.length);
+    const seed = layer.segments.length;
+    // On the donut: clipped to the balls. Whatever missed lands on the tray, and stays there.
+    const ctx = this.canvas.context;
+    ctx.save();
+    clipToRing(ctx, CANVAS);
+    drawGlazeSegment(ctx, CANVAS, d.glazeId, x0, y0, nx, ny, seed);
+    ctx.restore();
+    drawOnTray(this.mess.context, (m, size) => drawGlazeSegment(m, size, d.glazeId, x0, y0, nx, ny, seed));
     this.dirty = true;
+    this.messDirty = true;
     if (layer.segments.length === 4) this.refresh(); // first glaze on this donut: update the instruction
   }
 
@@ -472,8 +537,63 @@ export class GlazeScene extends StationScene {
     const ctx = this.canvas.context;
     ctx.clearRect(0, 0, CANVAS, CANVAS);
     const work = session().glazeWork;
-    if (work) drawGlazeLayers(ctx, CANVAS, work.allLayers);
+    if (work) {
+      ctx.save();
+      clipToRing(ctx, CANVAS);
+      drawGlazeLayers(ctx, CANVAS, work.allLayers);
+      ctx.restore();
+    }
     this.canvas.refresh();
+  }
+
+  /** Dashed guides: two loops round the ring (base coat), three stripes across (drizzle). */
+  private drawGuides(): void {
+    const { x, y, size } = this.boardPos;
+    const half = size / 2;
+    const r = balance.glaze.ringRadius;
+    this.guideBase.clear();
+    this.guideDrizzle.clear();
+    for (const rr of [r - 0.1, r + 0.1]) {
+      this.guideBase.lineStyle(10, COLORS.ink, 0.25);
+      drawDashedPath(this.guideBase, x, y, half, circlePoints(rr));
+      this.guideBase.lineStyle(5, COLORS.cream, 0.9);
+      drawDashedPath(this.guideBase, x, y, half, circlePoints(rr));
+    }
+    for (const sy of DRIZZLE_STRIPES) {
+      const sx = Math.sqrt(0.64 - sy * sy);
+      const pts = [
+        { x: -sx, y: sy },
+        { x: sx, y: sy },
+      ];
+      this.guideDrizzle.lineStyle(10, COLORS.ink, 0.25);
+      drawDashedPath(this.guideDrizzle, x, y, half, pts);
+      this.guideDrizzle.lineStyle(5, 0xffffff, 0.95);
+      drawDashedPath(this.guideDrizzle, x, y, half, pts);
+    }
+  }
+
+  /** Show the guide for the selected cup until that layer is done well enough. */
+  private refreshGuides(): void {
+    const work = session().glazeWork;
+    const g = this.selected ? menu.glazes.find((x) => x.id === this.selected) : undefined;
+    const gb = balance.glaze;
+    // Runs as glaze lands, so it checks the layers in place instead of building a list.
+    const done = (l: GlazeLayer | undefined, kind: 'base' | 'drizzle') =>
+      !!l &&
+      l.kind === kind &&
+      (kind === 'drizzle' ? l.coverage >= gb.drizzleAmount.idealMin : l.style !== 'drizzle' && l.coverage >= gb.goodCoverage[l.style]);
+    let baseDone = false;
+    let drizzleDone = false;
+    if (work) {
+      for (const l of work.layers) {
+        baseDone ||= done(l, 'base');
+        drizzleDone ||= done(l, 'drizzle');
+      }
+      baseDone ||= done(work.currentLayer, 'base');
+      drizzleDone ||= done(work.currentLayer, 'drizzle');
+    }
+    this.guideBase.setVisible(!!work && !!g && g.style !== 'drizzle' && !baseDone);
+    this.guideDrizzle.setVisible(!!work && !!g && g.style === 'drizzle' && !drizzleDone);
   }
 
   /** Outline and gloss on each of the 8 balls (same geometry as the glaze maths). */
@@ -507,6 +627,9 @@ export class GlazeScene extends StationScene {
     const img = this.trayImgs[i]!;
     const from = { x: img.x, y: img.y, size: img.displayWidth, tint: img.tintTopLeft };
     if (!s.startGlazing(i)) return;
+    // A new donut on the tray: the old mess fades a bit.
+    fadeTray(this.mess.context);
+    this.mess.refresh();
     // Slide it from the tray onto the board.
     const ghost = this.add.image(from.x, from.y, TextureKeys.DonutFry).setDisplaySize(from.size, from.size).setTint(from.tint).setDepth(15);
     this.board.setAlpha(0);
@@ -564,6 +687,10 @@ export class GlazeScene extends StationScene {
     const g = this.add.image(img.x, img.y, img.texture.key).setDisplaySize(img.displayWidth, img.displayHeight).setDepth(15);
     if (img.isTinted) g.setTint(img.tintTopLeft);
     return g;
+  }
+
+  private overBoard(x: number, y: number): boolean {
+    return Phaser.Math.Distance.Between(x, y, this.boardPos.x, this.boardPos.y) < this.boardPos.size * 0.6;
   }
 
   private overTrash(x: number, y: number): boolean {

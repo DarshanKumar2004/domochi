@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, dragNamedOnto, drawPath, pauseClock, seedTutorialDone, shot, tapNamed, toPage, waitForScene } from './helpers';
+import { advance, boundsNamed, dragNamedOnto, drawPath, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene } from './helpers';
 
 interface SessionView {
   rack: unknown[];
@@ -70,6 +70,7 @@ test('glaze from the tray: pour with the tilted cup, drizzle, done → shelf; re
   await tapNamed(page, SceneKeys.Glaze, 'glaze-tray-0');
   await expect.poll(s.working).toBe(true);
   await tapNamed(page, SceneKeys.Glaze, 'cup-strawberry');
+  await expect.poll(() => isVisibleNamed(page, SceneKeys.Glaze, 'glaze-guide-base')).toBe(true); // dashed loops to pour along
   // Hold mid-pour for a screenshot of the tilted cup and falling glaze.
   const { cx, cy, half } = await board(page);
   const a = await toPage(page, cx - 0.5 * half, cy - 0.4 * half);
@@ -81,6 +82,7 @@ test('glaze from the tray: pour with the tilted cup, drizzle, done → shelf; re
   await page.mouse.up();
   await pourRing(page);
   await tapNamed(page, SceneKeys.Glaze, 'cup-white-icing');
+  await expect.poll(() => isVisibleNamed(page, SceneKeys.Glaze, 'glaze-guide-drizzle')).toBe(true); // dashed stripes
   await zigzag(page);
   await shot(page, 'glaze-3-drizzled');
   await tapNamed(page, SceneKeys.Glaze, 'btn-glaze-done');
@@ -92,10 +94,21 @@ test('glaze from the tray: pour with the tilted cup, drizzle, done → shelf; re
   ]);
   expect(layers[0]!.coverage).toBeGreaterThan(0.8);
 
-  // Cookies & cream: just the glaze.
-  await tapNamed(page, SceneKeys.Glaze, 'glaze-tray-0');
+  // Cookies & cream, dragged from the rack onto the board this time: just the glaze,
+  // with a slip off the edge that stays on the tray when the donut leaves.
+  await dragNamedOnto(page, SceneKeys.Glaze, 'glaze-tray-0', 'glaze-board');
+  await expect.poll(s.working).toBe(true);
   await tapNamed(page, SceneKeys.Glaze, 'cup-cookies-and-cream');
   await pourRing(page);
+  {
+    const g = await board(page);
+    await drawPath(page, [
+      { x: g.cx + 0.98 * g.half, y: g.cy - 0.9 * g.half },
+      { x: g.cx + 1.12 * g.half, y: g.cy },
+      { x: g.cx + 0.98 * g.half, y: g.cy + 0.9 * g.half },
+    ]);
+    await page.waitForTimeout(400);
+  }
   await shot(page, 'glaze-4-cookies-and-cream');
   await tapNamed(page, SceneKeys.Glaze, 'btn-glaze-done');
   await expect.poll(s.shelf).toBe(2);

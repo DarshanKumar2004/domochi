@@ -97,6 +97,101 @@ export function drawGlazeLayers(ctx: CanvasRenderingContext2D, size: number, lay
   }
 }
 
+/** Path of the 8 balls (their union), in a size×size donut square. */
+function ringPath(ctx: CanvasRenderingContext2D, size: number): void {
+  const gb = balance.glaze;
+  const half = size / 2;
+  const r = ringBallRadius(gb.ringRadius, 8, gb.ballOverlap) * half;
+  ctx.beginPath();
+  for (const p of ringBallCenters(half, half, gb.ringRadius * half)) {
+    ctx.moveTo(p.x + r, p.y);
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  }
+}
+
+/** Clip drawing to the donut: glaze only shows where it's on a ball (call inside save/restore). */
+export function clipToRing(ctx: CanvasRenderingContext2D, size: number): void {
+  ringPath(ctx, size);
+  ctx.clip();
+}
+
+// ---- The tray under the board ----------------------------------------------------
+// Glaze and toppings that miss the donut land on the tray and stay there (they
+// don't leave with the donut). They're drawn on a "mess" canvas under the donut,
+// a little bigger than the donut's square.
+
+/** The tray (and its mess canvas) reaches this share of the donut's size past each side. */
+export const TRAY_PAD = 0.15;
+export const MESS_SIZE = Math.round(ART_SIZE * (1 + 2 * TRAY_PAD));
+
+/**
+ * Draw on the mess canvas in donut coordinates (a ART_SIZE square, like the
+ * board). Whatever lands on the ring is wiped: that part is on the donut.
+ */
+export function drawOnTray(ctx: CanvasRenderingContext2D, draw: (ctx: CanvasRenderingContext2D, size: number) => void): void {
+  const off = ART_SIZE * TRAY_PAD;
+  ctx.save();
+  ctx.translate(off, off);
+  draw(ctx, ART_SIZE);
+  ctx.globalCompositeOperation = 'destination-out';
+  ringPath(ctx, ART_SIZE);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Older mess fades a little each time a new donut goes on the tray. */
+export function fadeTray(ctx: CanvasRenderingContext2D, keep = 0.55): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = `rgba(0,0,0,${1 - keep})`;
+  ctx.fillRect(0, 0, MESS_SIZE, MESS_SIZE);
+  ctx.restore();
+}
+
+/** A steel tray centred on (x, y) for a donut of `size`. */
+export function drawTray(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number): void {
+  const s = size * (1 + 2 * TRAY_PAD);
+  const r = s * 0.08;
+  g.clear();
+  g.fillStyle(0x000000, 0.25);
+  g.fillRoundedRect(x - s / 2 + 8, y - s / 2 + 12, s, s, r);
+  g.fillStyle(0xb9c0c6);
+  g.fillRoundedRect(x - s / 2, y - s / 2, s, s, r);
+  g.fillStyle(0xd7dce0);
+  g.fillRoundedRect(x - s / 2 + 16, y - s / 2 + 16, s - 32, s - 32, r * 0.7);
+  g.lineStyle(5, 0x1f1a17);
+  g.strokeRoundedRect(x - s / 2, y - s / 2, s, s, r);
+  g.lineStyle(3, 0x9aa3ab, 0.8);
+  g.strokeRoundedRect(x - s / 2 + 16, y - s / 2 + 16, s - 32, s - 32, r * 0.7);
+}
+
+/** Dashed guide paths, in donut-normalised coordinates, drawn onto a Graphics. */
+export function drawDashedPath(g: Phaser.GameObjects.Graphics, cx: number, cy: number, half: number, pts: readonly { x: number; y: number }[], dash = 22, gap = 16): void {
+  // The dash pattern carries on across points, so curves made of short segments stay dashed.
+  const period = dash + gap;
+  let along = 0;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const ax = cx + pts[i]!.x * half;
+    const ay = cy + pts[i]!.y * half;
+    const bx = cx + pts[i + 1]!.x * half;
+    const by = cy + pts[i + 1]!.y * half;
+    const len = Math.hypot(bx - ax, by - ay);
+    let t = 0;
+    while (t < len) {
+      const phase = along % period;
+      const step = Math.min(len - t, phase < dash ? dash - phase : period - phase);
+      if (phase < dash) g.lineBetween(ax + ((bx - ax) * t) / len, ay + ((by - ay) * t) / len, ax + ((bx - ax) * (t + step)) / len, ay + ((by - ay) * (t + step)) / len);
+      t += step;
+      along += step;
+    }
+  }
+}
+
+/** Points round a circle of radius r (normalised), for guides. */
+export function circlePoints(r: number, n = 48): { x: number; y: number }[] {
+  return Array.from({ length: n + 1 }, (_, k) => ({ x: Math.cos((k / n) * Math.PI * 2) * r, y: Math.sin((k / n) * Math.PI * 2) * r }));
+}
+
 /** One topping piece (crumb, cereal loop or whole cookie) at its spot. */
 export function drawToppingPiece(ctx: CanvasRenderingContext2D, size: number, p: ToppingPiece, t: Topping): void {
   const half = size / 2;
@@ -182,7 +277,10 @@ export function drawDonutBase(ctx: CanvasRenderingContext2D, size: number, d: { 
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.save();
+  clipToRing(ctx, size);
   drawGlazeLayers(ctx, size, d.layers);
+  ctx.restore();
   ctx.strokeStyle = 'rgba(31,26,23,0.5)';
   ctx.lineWidth = Math.max(2, (size / ART_SIZE) * 5);
   for (const p of balls) {

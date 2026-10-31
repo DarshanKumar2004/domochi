@@ -204,3 +204,24 @@ Kumar's feedback after Phase 4, all in one batch.
   - **Icons of gone donuts are deleted 3 s later, not at once.** Deleting immediately crashed a trash animation that was still drawing that icon (`sourceSize` of null), which the browser tests caught. Trash animations now also copy the image *before* the donut is trashed, since the shelf slot may show the next donut right after.
 - **Placeholder art:** `topping-jar` is now an empty glass jar; each topping's contents are drawn inside it in code. `donut-box` is now the closed lid (plain kraft, logo added in code), because the open box is drawn in code to fit 3, 6 or 12 slots. MANIFEST updated.
 - **Result card:** shows real Toppings and Box scores. The weighted order score and tips are still Phase 6.
+
+## Trays, guides, golden cues, no topping cap (2026-10-30)
+
+Kumar's feedback after Phase 5.
+
+- **A steel tray under the board** at the Glaze and Toppings stations (`drawTray`). Portrait boards shrank from 520 to 440 px so the tray fits between the rack/shelf and the instructions.
+- **Misses stay on the tray, not on the donut** (Kumar: "the glaze that is off the donut stays drawn on instead of it staying in the tray").
+  - Glaze is now **clipped to the 8 balls** everywhere: on the board, in shelf and box icons, and in redraws.
+  - Glaze that misses, and topping pieces that land off the ring, are drawn on a **tray "mess" canvas** under the donut (`drawOnTray`, which wipes the part under the ring). The mess stays when the donut leaves, and **fades by about half each time a new donut goes on**, so it never piles up.
+  - Toppings that miss used to tumble away and vanish; now they sit on the tray.
+- **Guides:**
+  - **Glaze:** two dashed loops round the ring for a base coat (about one stream-width apart, so two passes cover the balls), and three dashed stripes for a drizzle, the pattern that scores well with the thick stream. Each shows while its cup is selected, and hides once that layer is done well enough (good coverage, or the drizzle's minimum).
+  - **Toppings:** a dashed loop for sprinkles (until the minimum amount is on), and a target on the top ball for the cookie.
+- **Golden cues at the fryer:**
+  - When the side in the oil turns golden, the donut **hops with a puff of steam**: time to flip, once per side.
+  - While it's **ready to pull** (the side in the oil golden and the top at least golden), it keeps **steaming**. "Both sides exactly golden" was too strict: the top keeps cooking a little while it floats, so it can drift just past the band before the second side gets there, and "both golden" might never happen at once.
+  - Steam uses a pool of 24 circles.
+- **No practical limit on toppings** (Kumar: they stopped after a limit). `maxPieces` went from 160 to 1500, only as a safety cap; too much is already penalised by the amount score. I found no cap on glaze.
+- **The pouring/shaking finger is read directly every frame** (`pointer.isDown`, `x`, `y`) instead of through move and up events. If the finger strayed onto the ticket rail or tab bar, those scenes got its events, so the cup or jar froze and could stay stuck pouring. This is the likely cause of "the glaze stops too".
+- **Drag or tap:** rack donuts can be dragged onto the glaze board as well as tapped, and the same for shelf donuts onto the toppings board.
+- **Tests:** guides and steam are checked with a new `isVisibleNamed` helper, because Graphics objects have no bounds for `findNamed`. The golden cues get their own fry test at a steady temperature: the main fry test turns the dial up, so its donuts overshoot golden.
