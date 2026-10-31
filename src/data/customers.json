@@ -1,5 +1,5 @@
 {
-  "_note": "Customer types for the order loop. Lines use {order} (e.g. 'a strawberry and two beignet') and {ticket} (the ticket number). 'thanks' tiers are picked by order score (balance.json scoring.tiers). favorites must be menu flavor ids; sprite must be a texture key. giftLines: what a customer says when there are extra donuts in the box. Types with \"delivery\": true are morning pickup orders (a courier collects; they never stand in line). Their names are generic on purpose: a real partner's name (e.g. a specific café) needs their OK first.",
+  "_note": "Customer types for the order loop. Lines use {order} (e.g. 'a strawberry and two beignet') and {ticket} (the ticket number). 'thanks' tiers are picked by order score (balance.json scoring.tiers). favorites must be menu flavor ids; sprite must be a texture key. giftLines: what a customer says when there are extra donuts in the box. Types with \"delivery\": true are morning pickup orders (a courier collects; they never stand in line). Their names are made-up stand-ins (Kumar, 2026-10-31): familiar-sounding, not real businesses. Real names need the partner's OK first.",
   "types": [
     {
       "id": "student",
@@ -172,7 +172,7 @@
     },
     {
       "id": "coffee-shop",
-      "name": "campus coffee shop",
+      "name": "Campus Brews",
       "sprite": "customer-office",
       "delivery": true,
       "favorites": [
@@ -186,8 +186,8 @@
       "patienceSec": 360,
       "lines": {
         "order": [
-          "campus coffee shop: {order}, ready for pickup please!",
-          "campus coffee shop order: {order}. the courier's on the way!"
+          "Campus Brews: {order}, ready for pickup please!",
+          "Campus Brews order: {order}. the courier's on the way!"
         ],
         "notMine": [
           "that one is for another order (#{ticket})"
@@ -213,7 +213,7 @@
     },
     {
       "id": "delivery-app",
-      "name": "delivery app",
+      "name": "Alley Cat Coffee",
       "sprite": "customer-student",
       "delivery": true,
       "favorites": [
@@ -227,8 +227,8 @@
       "patienceSec": 300,
       "lines": {
         "order": [
-          "delivery app: {order}, ready for pickup please!",
-          "delivery app order: {order}. the courier's on the way!"
+          "Alley Cat Coffee: {order}, ready for pickup please!",
+          "Alley Cat Coffee order: {order}. the courier's on the way!"
         ],
         "notMine": [
           "that one is for another order (#{ticket})"
