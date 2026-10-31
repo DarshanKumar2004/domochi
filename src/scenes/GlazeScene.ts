@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { glazeStockId } from '../systems/supplies';
 import { TextureKeys } from '../assets/keys';
 import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
 import { paintOnPattern, type GlazeLayer, type GlazeWork, type PourCheck, topLayers } from '../stations/glaze';
@@ -494,6 +495,14 @@ export class GlazeScene extends StationScene {
 
   private refreshControls(): void {
     const s = session();
+    // Servings left under each cup (when supplies are counted).
+    for (const cup of this.cups) {
+      if (cup.lockedUntil !== null) continue;
+      const n = s.stockOf(glazeStockId(cup.glaze.id));
+      const name = cup.glaze.name.replace(/ glaze$/, '');
+      cup.label.setText(Number.isFinite(n) ? `${name}\n${n} left` : name).setColor(n < 1 ? '#ff9b9b' : CSS.cream);
+      cup.img.setAlpha(n < 1 ? 0.4 : 1);
+    }
     const work = this.work(this.active);
     this.redoButton.setEnabled(this.anyWork);
     this.doneButton.setEnabled(s.glazeBoards.some((w) => w?.hasGlaze) && !s.shelfFull);
@@ -568,6 +577,11 @@ export class GlazeScene extends StationScene {
 
   /** Tap a cup to pick it up; tap it again to put it down (then a finger on the tray wipes it). */
   private select(glazeId: string): void {
+    if (this.selected !== glazeId && session().stockOf(glazeStockId(glazeId)) < 1) {
+      const g = menu.glazes.find((x) => x.id === glazeId);
+      this.flash(`out of ${g?.name ?? 'that'}!\nbuy more at the store`);
+      return;
+    }
     this.selected = this.selected === glazeId ? null : glazeId;
     this.refreshControls();
   }
@@ -725,7 +739,11 @@ export class GlazeScene extends StationScene {
       b.messDirty = true;
       return;
     }
+    // A new layer (a glaze going on this donut) uses a serving; none left, nothing pours.
+    const fresh = work.currentLayer?.glazeId !== d.glazeId;
+    if (fresh && session().stockOf(glazeStockId(d.glazeId)) < 1) return;
     if (!work.pour(d.glazeId, x0, y0, nx, ny)) return;
+    if (fresh) session().useSupply(glazeStockId(d.glazeId));
     const layer = work.currentLayer!;
     const seed = layer.segments.length;
     // On the donut: clipped to the balls. Whatever missed lands on the tray, and stays there.

@@ -164,7 +164,13 @@ test('day 2 has morning pickups on the rail; a pop-up day has the booth; invites
   expect(await s((x) => x.inviteWasAccepted)).toBe(true);
 
   // A booked pop-up day: the booth instead of the trailer, no pickups.
-  await page.evaluate(() => localStorage.setItem('domochi.save', JSON.stringify({ tutorialDone: true, day: 3, event: { id: 'tailgate', day: 3 } })));
+  // (Seeded as the new page loads: leaving the old one saves its day in progress.)
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded-popup')) {
+      sessionStorage.setItem('seeded-popup', '1');
+      localStorage.setItem('domochi.save', JSON.stringify({ tutorialDone: true, day: 3, event: { id: 'tailgate', day: 3 } }));
+    }
+  });
   await page.reload();
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);

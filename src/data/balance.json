@@ -1,21 +1,59 @@
 {
   "_note": "All game tuning numbers live here (CLAUDE.md). Arrays marked 'by day' are indexed from day 1; days past the end reuse the last entry.",
-  "customersPerDay": [4, 5, 6, 7, 8, 9],
+  "customersPerDay": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
   "_maxActive": "by day: most customers in line or waiting at once. A new one only comes once someone is served (after afterServeSec).",
-  "maxActiveByDay": [2, 2, 3, 3, 4, 4],
-  "afterServeSec": { "min": 2, "max": 7 },
+  "maxActiveByDay": [
+    2,
+    2,
+    3,
+    3,
+    4,
+    4
+  ],
+  "afterServeSec": {
+    "min": 2,
+    "max": 7
+  },
   "spawn": {
     "firstDelaySec": 1.5,
-    "intervalSec": { "min": 9, "max": 15 },
+    "intervalSec": {
+      "min": 9,
+      "max": 15
+    },
     "maxInLine": 4
   },
   "orderSizeByDay": [
-    { "min": 1, "max": 2 },
-    { "min": 1, "max": 3 },
-    { "min": 1, "max": 4 },
-    { "min": 2, "max": 6 },
-    { "min": 2, "max": 6 },
-    { "min": 3, "max": 6 }
+    {
+      "min": 1,
+      "max": 2
+    },
+    {
+      "min": 1,
+      "max": 3
+    },
+    {
+      "min": 1,
+      "max": 4
+    },
+    {
+      "min": 2,
+      "max": 6
+    },
+    {
+      "min": 2,
+      "max": 6
+    },
+    {
+      "min": 3,
+      "max": 6
+    }
   ],
   "favoriteWeight": 3,
   "fry": {
@@ -23,25 +61,48 @@
     "roomTempF": 75,
     "startTempF": 300,
     "startTargetF": 350,
-    "dial": { "minF": 250, "maxF": 425 },
+    "dial": {
+      "minF": 250,
+      "maxF": 425
+    },
     "heatLagPerSec": 0.2,
     "oilDriftF": 60,
-    "idealRangeF": { "min": 340, "max": 360 },
-    "cookRate": { "zeroAtF": 250, "oneAtF": 350, "max": 1.8 },
+    "idealRangeF": {
+      "min": 340,
+      "max": 360
+    },
+    "cookRate": {
+      "zeroAtF": 250,
+      "oneAtF": 350,
+      "max": 1.8
+    },
     "secondsPerSide": 9,
     "topFactorFloating": 0.15,
     "topFactorGrate": 1,
     "dropCoolPerDonutF": 5,
-    "oil": { "start": 1, "perDonut": 0.04, "topUp": 0.25, "lowThreshold": 0.35, "minToFry": 0.05 },
+    "oil": {
+      "start": 1,
+      "perDonut": 0.04,
+      "topUp": 0.25,
+      "lowThreshold": 0.35,
+      "minToFry": 0.05
+    },
     "unevenAtEmpty": 0.5,
-    "doneness": { "perfectWithin": 0.1, "zeroAt": 0.6 },
+    "doneness": {
+      "perfectWithin": 0.1,
+      "zeroAt": 0.6
+    },
     "burntAt": 1.75,
     "evennessZeroAtStdDev": 0.25,
     "slots": 6,
     "rackCapacity": 6,
     "_dough": "A donut's fry score × (1 − doughEffect × (1 − its dough batch's quality)).",
     "doughEffect": 0.3,
-    "scoreWeights": { "doneness": 0.6, "temperature": 0.25, "evenness": 0.15 }
+    "scoreWeights": {
+      "doneness": 0.6,
+      "temperature": 0.25,
+      "evenness": 0.15
+    }
   },
   "glaze": {
     "_note": "Coordinates are normalised to the donut (centre 0,0, edges ±1). Base coat: coverage/goodCoverage × (1 − spill/spillZeroAt). Drizzle: right amount × spread over the 8 balls × (1 − spill/spillZeroAt). Wrong glaze × wrongGlazeFactor.",
@@ -49,9 +110,20 @@
     "ringRadius": 0.65,
     "ballOverlap": 1.15,
     "edgeMargin": 0.08,
-    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.045 },
-    "goodCoverage": { "dip": 0.9, "dust": 0.85 },
-    "drizzleAmount": { "idealMin": 0.18, "idealMax": 0.5, "zeroAt": 0.9 },
+    "brushRadius": {
+      "dip": 0.16,
+      "dust": 0.2,
+      "drizzle": 0.045
+    },
+    "goodCoverage": {
+      "dip": 0.9,
+      "dust": 0.85
+    },
+    "drizzleAmount": {
+      "idealMin": 0.18,
+      "idealMax": 0.5,
+      "zeroAt": 0.9
+    },
     "drizzleBallTouched": 0.06,
     "spillZeroAt": 0.6,
     "wrongGlazeFactor": 0.3,
@@ -80,12 +152,53 @@
   },
   "scoring": {
     "_note": "Order score = weighted average of the station scores (0-100) and the wait score. Wait: full marks until patienceSec × graceShare, easing (cosine) to 0 at patienceSec × zeroShare. Tip = tip.perDonut × donuts × curve(order score), the curve is [score, multiplier] points joined by straight lines. Thanks tiers by order score.",
-    "weights": { "fry": 0.3, "glaze": 0.25, "toppings": 0.25, "box": 0.1, "wait": 0.1 },
-    "wait": { "graceShare": 0.6, "zeroShare": 3 },
-    "tiers": { "great": 90, "good": 70, "okay": 45 },
-    "tip": { "perDonut": 0.75, "curve": [[0, 0], [40, 0.2], [70, 0.7], [90, 1], [100, 1.25]] },
+    "weights": {
+      "fry": 0.3,
+      "glaze": 0.25,
+      "toppings": 0.25,
+      "box": 0.1,
+      "wait": 0.1
+    },
+    "wait": {
+      "graceShare": 0.6,
+      "zeroShare": 3
+    },
+    "tiers": {
+      "great": 90,
+      "good": 70,
+      "okay": 45
+    },
+    "tip": {
+      "perDonut": 0.75,
+      "curve": [
+        [
+          0,
+          0
+        ],
+        [
+          40,
+          0.2
+        ],
+        [
+          70,
+          0.7
+        ],
+        [
+          90,
+          1
+        ],
+        [
+          100,
+          1.25
+        ]
+      ]
+    },
     "_gift": "An extra donut (a real menu flavour) beyond the order is a gift: +tipPerDonut each (up to max), and the customer's reaction goes up tierBoost levels.",
-    "gift": { "tipPerDonut": 0.75, "max": 3, "tierBoost": 1 }
+    "gift": {
+      "tipPerDonut": 0.75,
+      "max": 3,
+      "tierBoost": 1
+    }
   },
   "dough": {
     "_note": "Morning prep: scoop the recipe into the bowl, stir, and the batch fills the dough tub. The ingredient you have least of (relative to the recipe) sets how many donuts it makes: batchSize × that share (a double recipe makes twice as many; any missing ingredient makes none). Quality = 1 − scoopPenalty × (scoops off those proportions), at least qualityFloor. Each donut dropped in the fryer uses one.",
@@ -95,22 +208,63 @@
     "scoopPenalty": 0.15,
     "qualityFloor": 0.3,
     "ingredients": [
-      { "id": "rice-flour", "name": "rice flour", "color": "#f6f1e7" },
-      { "id": "tapioca", "name": "tapioca starch", "color": "#fbfbf8" },
-      { "id": "sugar", "name": "sugar", "color": "#fffdf6" },
-      { "id": "milk", "name": "milk", "color": "#eef3f7" },
-      { "id": "egg", "name": "egg", "color": "#f7d36b" }
+      {
+        "id": "rice-flour",
+        "name": "rice flour",
+        "color": "#f6f1e7"
+      },
+      {
+        "id": "tapioca",
+        "name": "tapioca starch",
+        "color": "#fbfbf8"
+      },
+      {
+        "id": "sugar",
+        "name": "sugar",
+        "color": "#fffdf6"
+      },
+      {
+        "id": "milk",
+        "name": "milk",
+        "color": "#eef3f7"
+      },
+      {
+        "id": "egg",
+        "name": "egg",
+        "color": "#f7d36b"
+      }
     ],
-    "recipe": { "rice-flour": 3, "tapioca": 1, "sugar": 1, "milk": 2, "egg": 1 }
+    "recipe": {
+      "rice-flour": 3,
+      "tapioca": 1,
+      "sugar": 1,
+      "milk": 2,
+      "egg": 1
+    }
   },
   "deliveries": {
     "_note": "By day: morning batch orders for couriers (a coffee shop, a delivery app). They're on the rail from the start of the day; pickup patience is the delivery customer type's patienceSec.",
-    "byDay": [0, 1, 1, 2, 2, 2],
-    "size": { "min": 4, "max": 6 }
+    "byDay": [
+      0,
+      1,
+      1,
+      2,
+      2,
+      2
+    ],
+    "size": {
+      "min": 4,
+      "max": 6
+    }
   },
   "events": {
     "_note": "A served walk-up customer may invite domochi to their event (chance by reaction tier, plus giftBonus if you gave them a gift). Accepting makes tomorrow a pop-up day (see events.json). At most one invite a day.",
-    "inviteChance": { "great": 0.08, "good": 0.03, "okay": 0, "bad": 0 },
+    "inviteChance": {
+      "great": 0.08,
+      "good": 0.03,
+      "okay": 0,
+      "bad": 0
+    },
     "giftBonus": 0.1,
     "fromDay": 3
   },
@@ -134,20 +288,175 @@
     "awfulTipJar": 2
   },
   "supplies": {
-    "_note": "Stock: dough ingredients (one per scoop), boxes (one per order served) and oil jugs (one per + oil). Bought in packs at the supply store after each day; prices swing up to priceSwing either way, day to day. start = what a new game begins with. Ethan's friends may drop off a pack of something running low (friendChance per check, every friendCheckSec, at most friendsPerDay).",
+    "_note": "Stock: glazes and toppings (one serving per donut they go on),  dough ingredients (one per scoop), boxes (one per order served) and oil jugs (one per + oil). Bought in packs at the supply store after each day; prices swing up to priceSwing either way, day to day. start = what a new game begins with. Ethan's friends may drop off a pack of something running low (friendChance per check, every friendCheckSec, at most friendsPerDay). Glaze and topping items unlock (in the store) on their unlockDay, with the first flavour that uses them.",
     "items": [
-      { "id": "rice-flour", "name": "rice flour", "kind": "ingredient", "pack": 6, "price": 3 },
-      { "id": "tapioca", "name": "tapioca starch", "kind": "ingredient", "pack": 4, "price": 2 },
-      { "id": "sugar", "name": "sugar", "kind": "ingredient", "pack": 4, "price": 1.5 },
-      { "id": "milk", "name": "milk", "kind": "ingredient", "pack": 6, "price": 2.5 },
-      { "id": "egg", "name": "eggs", "kind": "ingredient", "pack": 4, "price": 2.5 },
-      { "id": "box-single", "name": "single bags", "kind": "box", "pack": 10, "price": 1.5 },
-      { "id": "box-trio", "name": "trio boxes", "kind": "box", "pack": 10, "price": 3 },
-      { "id": "box-flight", "name": "flight boxes", "kind": "box", "pack": 6, "price": 3 },
-      { "id": "box-domochi-box", "name": "domochi boxes", "kind": "box", "pack": 4, "price": 3 },
-      { "id": "oil", "name": "fryer oil", "kind": "oil", "pack": 2, "price": 4 }
+      {
+        "id": "rice-flour",
+        "name": "rice flour",
+        "kind": "ingredient",
+        "pack": 6,
+        "price": 3
+      },
+      {
+        "id": "tapioca",
+        "name": "tapioca starch",
+        "kind": "ingredient",
+        "pack": 4,
+        "price": 2
+      },
+      {
+        "id": "sugar",
+        "name": "sugar",
+        "kind": "ingredient",
+        "pack": 4,
+        "price": 1.5
+      },
+      {
+        "id": "milk",
+        "name": "milk",
+        "kind": "ingredient",
+        "pack": 6,
+        "price": 2.5
+      },
+      {
+        "id": "egg",
+        "name": "eggs",
+        "kind": "ingredient",
+        "pack": 4,
+        "price": 2.5
+      },
+      {
+        "id": "box-single",
+        "name": "single bags",
+        "kind": "box",
+        "pack": 10,
+        "price": 1.5
+      },
+      {
+        "id": "box-trio",
+        "name": "trio boxes",
+        "kind": "box",
+        "pack": 10,
+        "price": 3
+      },
+      {
+        "id": "box-flight",
+        "name": "flight boxes",
+        "kind": "box",
+        "pack": 6,
+        "price": 3
+      },
+      {
+        "id": "box-domochi-box",
+        "name": "domochi boxes",
+        "kind": "box",
+        "pack": 4,
+        "price": 3
+      },
+      {
+        "id": "oil",
+        "name": "fryer oil",
+        "kind": "oil",
+        "pack": 2,
+        "price": 4
+      },
+      {
+        "id": "glaze-strawberry",
+        "name": "strawberry glaze",
+        "kind": "glaze",
+        "pack": 12,
+        "price": 4,
+        "unlockDay": 1
+      },
+      {
+        "id": "glaze-chocolate-hazelnut",
+        "name": "chocolate hazelnut glaze",
+        "kind": "glaze",
+        "pack": 12,
+        "price": 4,
+        "unlockDay": 4
+      },
+      {
+        "id": "glaze-cookie-butter",
+        "name": "cookie butter glaze",
+        "kind": "glaze",
+        "pack": 12,
+        "price": 4,
+        "unlockDay": 12
+      },
+      {
+        "id": "glaze-cookies-and-cream",
+        "name": "cookies & cream glaze",
+        "kind": "glaze",
+        "pack": 12,
+        "price": 4,
+        "unlockDay": 1
+      },
+      {
+        "id": "glaze-sweet",
+        "name": "sweet glaze",
+        "kind": "glaze",
+        "pack": 12,
+        "price": 4,
+        "unlockDay": 8
+      },
+      {
+        "id": "glaze-powdered-sugar",
+        "name": "powdered sugar",
+        "kind": "glaze",
+        "pack": 12,
+        "price": 3,
+        "unlockDay": 16
+      },
+      {
+        "id": "glaze-white-icing",
+        "name": "white icing",
+        "kind": "glaze",
+        "pack": 12,
+        "price": 3,
+        "unlockDay": 1
+      },
+      {
+        "id": "topping-cookie-butter-cookie",
+        "name": "cookie butter cookie",
+        "kind": "topping",
+        "pack": 12,
+        "price": 3,
+        "unlockDay": 12
+      },
+      {
+        "id": "topping-crushed-cookies",
+        "name": "crushed chocolate cookies",
+        "kind": "topping",
+        "pack": 12,
+        "price": 3,
+        "unlockDay": 1
+      },
+      {
+        "id": "topping-fruity-cereal",
+        "name": "fruity cereal",
+        "kind": "topping",
+        "pack": 12,
+        "price": 3,
+        "unlockDay": 8
+      }
     ],
-    "start": { "rice-flour": 12, "tapioca": 4, "sugar": 4, "milk": 8, "egg": 4, "box-single": 6, "box-trio": 6, "box-flight": 3, "box-domochi-box": 1, "oil": 2 },
+    "start": {
+      "rice-flour": 12,
+      "tapioca": 4,
+      "sugar": 4,
+      "milk": 8,
+      "egg": 4,
+      "box-single": 6,
+      "box-trio": 6,
+      "box-flight": 3,
+      "box-domochi-box": 1,
+      "oil": 2,
+      "glaze-strawberry": 12,
+      "glaze-cookies-and-cream": 12,
+      "glaze-white-icing": 12,
+      "topping-crushed-cookies": 12
+    },
     "priceSwing": 0.25,
     "friendCheckSec": 60,
     "friendChance": 0.2,
@@ -158,10 +467,50 @@
     "_note": "Each day's weather (the same for a given day; day 1 is always firstDay), picked by weight. spawnFactor: × the gap between walk-ups (bigger = fewer). extraPickups: more morning delivery orders. heatLag: × how fast the oil reaches the dial. patience: × how long customers happily wait. tip: × tips. note: shown on the morning checklist.",
     "firstDay": "sunny",
     "types": [
-      { "id": "sunny", "name": "sunny", "weight": 4, "spawnFactor": 1, "extraPickups": 0, "heatLag": 1, "patience": 1, "tip": 1, "note": "sunny: a steady crowd" },
-      { "id": "cloudy", "name": "cloudy", "weight": 2, "spawnFactor": 1.1, "extraPickups": 0, "heatLag": 1, "patience": 1.15, "tip": 1, "note": "cloudy and mild: folks are patient" },
-      { "id": "hot", "name": "hot", "weight": 2, "spawnFactor": 0.9, "extraPickups": 0, "heatLag": 1.6, "patience": 0.8, "tip": 1.1, "note": "hot! the oil heats fast and nobody wants to wait" },
-      { "id": "rainy", "name": "rainy", "weight": 2, "spawnFactor": 1.6, "extraPickups": 2, "heatLag": 1, "patience": 1.2, "tip": 1.2, "note": "rainy: fewer walk-ups, more delivery orders" }
+      {
+        "id": "sunny",
+        "name": "sunny",
+        "weight": 4,
+        "spawnFactor": 1,
+        "extraPickups": 0,
+        "heatLag": 1,
+        "patience": 1,
+        "tip": 1,
+        "note": "sunny: a steady crowd"
+      },
+      {
+        "id": "cloudy",
+        "name": "cloudy",
+        "weight": 2,
+        "spawnFactor": 1.1,
+        "extraPickups": 0,
+        "heatLag": 1,
+        "patience": 1.15,
+        "tip": 1,
+        "note": "cloudy and mild: folks are patient"
+      },
+      {
+        "id": "hot",
+        "name": "hot",
+        "weight": 2,
+        "spawnFactor": 0.9,
+        "extraPickups": 0,
+        "heatLag": 1.6,
+        "patience": 0.8,
+        "tip": 1.1,
+        "note": "hot! the oil heats fast and nobody wants to wait"
+      },
+      {
+        "id": "rainy",
+        "name": "rainy",
+        "weight": 2,
+        "spawnFactor": 1.6,
+        "extraPickups": 2,
+        "heatLag": 1,
+        "patience": 1.2,
+        "tip": 1.2,
+        "note": "rainy: fewer walk-ups, more delivery orders"
+      }
     ]
   },
   "regulars": {
@@ -173,10 +522,26 @@
   "guides": {
     "_note": "Dashed guides at the Glaze station, bought once at the supply store (the tutorial shows them all). 'base' is the loops for any base coat; the others are a flavour's drizzle stripes.",
     "items": [
-      { "id": "base", "name": "base coat guide", "price": 6 },
-      { "id": "strawberry", "name": "strawberry drizzle guide", "price": 5 },
-      { "id": "chocolate-hazelnut", "name": "chocolate hazelnut drizzle guide", "price": 5 },
-      { "id": "cookie-butter", "name": "cookie butter drizzle guide", "price": 5 }
+      {
+        "id": "base",
+        "name": "base coat guide",
+        "price": 6
+      },
+      {
+        "id": "strawberry",
+        "name": "strawberry drizzle guide",
+        "price": 5
+      },
+      {
+        "id": "chocolate-hazelnut",
+        "name": "chocolate hazelnut drizzle guide",
+        "price": 5
+      },
+      {
+        "id": "cookie-butter",
+        "name": "cookie butter drizzle guide",
+        "price": 5
+      }
     ]
   },
   "box": {

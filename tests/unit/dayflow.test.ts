@@ -538,3 +538,25 @@ describe('saving a day in progress', () => {
     expect(r.timeUp).toBe(true);
   });
 });
+
+describe('glazes and toppings are supplies', () => {
+  it('a serving is used per use; none left, none used; each new flavour brings its own items, sold from its unlock day', () => {
+    const s = day(1, { stock: { ...startingStock(balance.supplies), 'glaze-strawberry': 1 } });
+    expect(s.useSupply('glaze-strawberry')).toBe(true);
+    expect(s.useSupply('glaze-strawberry')).toBe(false);
+    expect(s.stockOf('glaze-strawberry')).toBe(0);
+    // Every glaze and topping a flavour needs is on sale from (at latest) that flavour's day.
+    for (const f of menu.flavors) {
+      const needs = [f.glaze, ...(f.drizzle ? [f.drizzle] : [])].map((g) => `glaze-${g}`).concat((f.toppings ?? []).map((t) => `topping-${t}`));
+      for (const id of needs) {
+        const it = balance.supplies.items.find((i) => i.id === id);
+        expect(it, id).toBeDefined();
+        expect(it!.unlockDay ?? 1).toBeLessThanOrEqual(f.unlockDay);
+      }
+    }
+    // Day 1's flavours start stocked; later ones start at 0.
+    const st = startingStock(balance.supplies);
+    expect(st['glaze-strawberry']).toBeGreaterThan(0);
+    expect(st['glaze-cookie-butter']).toBe(0);
+  });
+});

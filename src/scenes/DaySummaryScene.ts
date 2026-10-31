@@ -87,7 +87,8 @@ export class DaySummaryScene extends Phaser.Scene {
         .setName('summary-total'),
     );
     card.add(
-      text(0, 315, [sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '', fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!` : sum.nextEvent ? '' : 'same menu tomorrow'].filter(Boolean).join('\n'), 38, {
+      text(0, 315, [sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '', fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!
+(its glaze and toppings are at the supply store)` : sum.nextEvent ? '' : 'same menu tomorrow'].filter(Boolean).join('\n'), 38, {
         color: fresh.length || sum.nextEvent ? '#b0406a' : '#6b5d52',
         fontStyle: fresh.length || sum.nextEvent ? 'bold' : 'normal',
         align: 'center',

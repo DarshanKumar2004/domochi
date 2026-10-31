@@ -557,6 +557,13 @@ export class GameSession {
     return this.supplies;
   }
 
+  /** A station uses a serving of something (a glaze, a topping). False if there's none left. */
+  useSupply(id: string): boolean {
+    const ok = this.use(id);
+    if (ok && this.supplies) this.events.emit('changed', undefined);
+    return ok;
+  }
+
   /** Use one of a supply. False if there's none left. */
   private use(id: string): boolean {
     if (!this.supplies) return true;

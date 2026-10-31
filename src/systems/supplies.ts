@@ -3,7 +3,7 @@
 import type { DoughBalance } from '../stations/dough';
 import type { ThanksTier } from './customers';
 
-export type SupplyKind = 'ingredient' | 'box' | 'oil';
+export type SupplyKind = 'ingredient' | 'box' | 'oil' | 'glaze' | 'topping';
 
 export interface SupplyItem {
   /** An ingredient id (balance.dough), 'box-' + a menu box id, or 'oil'. */
@@ -14,6 +14,16 @@ export interface SupplyItem {
   pack: number;
   /** Usual price of a pack, dollars. */
   price: number;
+  /** Sold from this day on (greyed out in the store before then). */
+  unlockDay?: number;
+}
+
+/** The stock id of a glaze or a topping. */
+export function glazeStockId(glazeId: string): string {
+  return `glaze-${glazeId}`;
+}
+export function toppingStockId(toppingId: string): string {
+  return `topping-${toppingId}`;
 }
 
 export interface SuppliesBalance {

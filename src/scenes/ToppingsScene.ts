@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { toppingStockId } from '../systems/supplies';
 import { TextureKeys } from '../assets/keys';
 import type { ToppingWork } from '../stations/toppings';
 import type { Topping } from '../systems/menu';
@@ -373,6 +374,13 @@ day ${lockedUntil}`, {
   // ---- State → screen -----------------------------------------------------------
 
   private refresh(): void {
+    // Servings left under each jar (when supplies are counted).
+    for (const jar of this.jars) {
+      if (jar.lockedUntil !== null) continue;
+      const n = session().stockOf(toppingStockId(jar.topping.id));
+      jar.label.setText(Number.isFinite(n) ? `${jar.topping.name}\n${n} left` : jar.topping.name).setColor(n < 1 ? '#ff9b9b' : CSS.cream);
+      jar.img.setAlpha(n < 1 ? 0.4 : 1);
+    }
     const s = session();
     const work = s.toppingWork;
 
@@ -493,6 +501,11 @@ day ${lockedUntil}`, {
 
   /** Tap a jar to pick it up; tap it again to put it down (then a finger on the bare tray wipes it). */
   private select(toppingId: string): void {
+    if (this.selected !== toppingId && session().stockOf(toppingStockId(toppingId)) < 1) {
+      const t = menu.toppings.find((x) => x.id === toppingId);
+      this.flash(`out of ${t?.name ?? 'that'}!\nbuy more at the store`);
+      return;
+    }
     this.selected = this.selected === toppingId && !this.autoPicked ? null : toppingId;
     this.autoPicked = false;
     this.refresh();
@@ -627,6 +640,14 @@ day ${lockedUntil}`, {
       return;
     }
     const { x, y, size } = this.boardPos;
+    // The first of a topping on this donut uses a serving; none left, it doesn't land.
+    const first = !work.pieces.some((p) => p.toppingId === f.toppingId);
+    if (first && session().stockOf(toppingStockId(f.toppingId)) < 1) {
+      f.active = false;
+      f.img.setVisible(false);
+      return;
+    }
+    if (first) session().useSupply(toppingStockId(f.toppingId));
     const piece = work.add(f.toppingId, (f.x - x) / (size / 2), (f.y - y) / (size / 2), f.rand);
     this.dirty = true;
     f.active = false;
