@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config';
 import { SaveService } from './systems/SaveService';
-import { audio, hasSession, save, session, setClockPaused, setSave, setSeed } from './systems/services';
+import { audio, feedback, hasSession, save, session, setClockPaused, setSave, setSeed } from './systems/services';
 import { createDefaultStorage } from './systems/storage';
 import { measureGameSize, watchContainerSize } from './ui/viewport';
 
@@ -40,6 +40,9 @@ async function start(): Promise<void> {
   window.addEventListener('pointercancel', letGo);
   document.addEventListener('visibilitychange', letGo);
   window.addEventListener('pageshow', () => audio().wake());
+
+  // A report left from last time (no connection then, say) goes out now.
+  void feedback().sendReport(save().data.day);
 
   // Exposed for Playwright tests.
   const w = window as unknown as { __game: Phaser.Game; __session?: unknown; __save: unknown; __setClockPaused: (p: boolean) => void };

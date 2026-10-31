@@ -3,7 +3,7 @@ import brand from '../data/brand.json';
 import { flavorsForDay } from '../systems/menu';
 import { addPage, dayNote, type JournalPage } from '../systems/journal';
 import { createRng } from '../systems/rng';
-import { audio, journalData, menu, save, session, stickers } from '../systems/services';
+import { audio, feedback, journalData, menu, save, session, stickers } from '../systems/services';
 import { drawFinishedDonut } from '../ui/donutArt';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
@@ -143,6 +143,8 @@ export class DaySummaryScene extends Phaser.Scene {
       d.journal.pages = addPage(d.journal.pages, page);
       delete d.inProgress; // the day's done: tomorrow starts fresh
     });
+    // Players' notes for Ethan go out as the day's report.
+    void feedback().sendReport(sum.day);
     if (s.tracksSupplies) {
       this.scene.launch(SceneKeys.Store);
       this.scene.stop();

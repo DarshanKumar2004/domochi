@@ -15,6 +15,8 @@ import { fillStock } from './supplies';
 import journalJson from '../data/journal.json';
 import { StickerTracker, type JournalData } from './journal';
 import { weatherFor } from './weather';
+import brandJson from '../data/brand.json';
+import { FeedbackService } from './FeedbackService';
 
 // Game-wide services, set up once in main.ts before Phaser starts.
 
@@ -120,6 +122,32 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
 
 export const journalData = journalJson as JournalData;
 let currentTracker: StickerTracker | null = null;
+
+let feedbackService: FeedbackService | null = null;
+
+/** Players' notes for Ethan (kept on the device, sent as a daily report). */
+export function feedback(): FeedbackService {
+  if (!feedbackService) {
+    const store = {
+      get: (k: string) => {
+        try {
+          return localStorage.getItem(k);
+        } catch {
+          return null;
+        }
+      },
+      set: (k: string, v: string) => {
+        try {
+          localStorage.setItem(k, v);
+        } catch {
+          // Storage full or blocked: the note is lost, nothing else breaks.
+        }
+      },
+    };
+    feedbackService = new FeedbackService(store, (brandJson as { feedbackEndpoint?: string }).feedbackEndpoint ?? '');
+  }
+  return feedbackService;
+}
 
 /** Save the day so far (not the tutorial, and not once it's over). */
 export function saveDayInProgress(): void {

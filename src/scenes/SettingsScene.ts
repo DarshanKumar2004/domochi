@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { audio, save } from '../systems/services';
+import { audio, save, saveDayInProgress } from '../systems/services';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -7,7 +7,7 @@ import { onLayout } from '../ui/viewport';
 import { startMainGame, stopMainGame } from './flow';
 import { SceneKeys } from './sceneKeys';
 
-const CARD_H = 960;
+const CARD_H = 1100;
 
 export class SettingsScene extends Phaser.Scene {
   private confirmingReset = false;
@@ -24,7 +24,7 @@ export class SettingsScene extends Phaser.Scene {
 
     card.add(
       this.add
-        .text(0, -400, 'Settings', { fontFamily: FONT_FAMILY, fontSize: '80px', fontStyle: 'bold', color: CSS.ink })
+        .text(0, -460, 'Settings', { fontFamily: FONT_FAMILY, fontSize: '80px', fontStyle: 'bold', color: CSS.ink })
         .setOrigin(0.5),
     );
     // Sound and music switches (saved, and applied straight away).
@@ -70,8 +70,17 @@ export class SettingsScene extends Phaser.Scene {
     );
     card.add(reset);
 
+    // Back to the home screen (about us, notes for Ethan); the day so far is saved.
     card.add(
-      new Button(this, 0, 340, 'Close', () => this.scene.stop(), {
+      new Button(this, 0, 260, 'Home screen', () => this.goHome(), {
+        width: 640,
+        fill: COLORS.dough,
+        name: 'btn-home',
+      }),
+    );
+
+    card.add(
+      new Button(this, 0, 440, 'Close', () => this.scene.stop(), {
         width: 400,
         fill: COLORS.dough,
         name: 'btn-close-settings',
@@ -84,5 +93,11 @@ export class SettingsScene extends Phaser.Scene {
   private replayTutorial(): void {
     stopMainGame(this);
     startMainGame(this, { tutorial: true });
+  }
+
+  private goHome(): void {
+    saveDayInProgress();
+    stopMainGame(this);
+    this.scene.start(SceneKeys.Preload);
   }
 }

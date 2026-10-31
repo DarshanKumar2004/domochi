@@ -446,3 +446,30 @@ Kumar's "almost ready for launch" batch.
   - **No cup in hand, touching a donut:** says "pick a cup first!" instead of starting the sponge, which looked like some unknown topping. Wiping only starts on the bare tray, with a "scrubbing the tray clean" note.
   - **Ethan's friends** wait at the window with their message until you tap them, then wave off. At a station, their note stays until tapped.
 - **For another day** (Kumar): high-score coupon codes, and seasonal menus that match the real shop.
+
+## A month of play: supplies for every flavour, a scrollable store, saving mid-day, a home screen (2026-11-01)
+
+- **New flavours need their glaze and toppings** (Kumar chose this). Each glaze and topping is a supply: a serving is used each time it goes on a donut.
+  - Cups and jars show the servings left. At 0 they're dimmed and say "out of …! buy more at the store".
+  - Day-1 flavours start stocked. Later ones come into the store on their flavour's unlock day.
+- **Slower unlocks**, so the menu lasts a month: chocolate hazelnut day 4, fruity cereal day 8, cookie butter day 12, beignet day 16.
+- **The store scrolls** (drag, or the mouse wheel), in sections: dough & oil, boxes, glazes & toppings, guides.
+  - Items not in yet are greyed out with "day N".
+  - mochi's tip names what's short: a day's needs first, then anything under one pack.
+- **The day is saved as you go** (`GameSession.snapshot/restore`, `save.inProgress`):
+  - When: every 5 s, when the page hides, and on Settings → Home.
+  - What: the clock, customers and orders, money earned, supplies, the dough tub and friendships.
+  - Lost: donuts mid-kitchen can't be saved, so they count as thrown away.
+- **Close early** (two taps), any time while open.
+- **Friend drop-offs and invites start on day 3.** They're also rarer: friends 20% a minute, invites 8% after a great order.
+- **Pickups come from stand-in coffee shops** (Kumar: familiar-sounding but not real): Campus Brews and Alley Cat Coffee.
+- **Home screen** (the first screen; Settings → Home screen goes back to it):
+  - **About us** links to domochitreats.com and says the places in the game are made up.
+  - **Suggest a flavor** and **Let Ethan know** are small HTML forms over the game, since the canvas can't do text boxes.
+  - **Sending:** notes are kept on the device and sent as one daily report at the end of each day (and at start-up). The endpoint is `brand.json` `feedbackEndpoint`, which is empty (TODO-BRAND). Kumar picks the service (Formspree, EmailJS or a small function) and Ethan's address; until then, notes wait.
+- **Fixes:**
+  - Pointers stuck after leaving the page are released.
+  - The audio is rebuilt if the phone closed it.
+  - The toppings sponge only comes out with no jar in hand.
+  - Scrubbing has its own sound.
+  - Close early sits above the tab bar on short phones.
