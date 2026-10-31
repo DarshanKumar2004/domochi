@@ -140,6 +140,7 @@
   },
   "toppings": {
     "_note": "Pieces are placed in normalised donut coordinates. Per wanted topping: amount (menu topping.amount, too much is 0 at max × tooMuchZeroAtFactor) × evenness over the 8 balls × (1 − share that fell off / messZeroAt). Each unwanted topping multiplies by unwantedFactor.",
+    "boards": 2,
     "sprinkleEveryMs": 60,
     "scatter": 0.09,
     "fallMs": 220,

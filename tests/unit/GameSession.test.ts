@@ -384,6 +384,29 @@ describe('GameSession: toppings', () => {
     expect(s.shelfFull).toBe(false);
     expect(s.trashed).toBe(1);
   });
+
+  it('two donuts on the toppings tray: each spot works on its own; the third waits', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    makeFlavor(s, 'strawberry');
+    makeFlavor(s, 'strawberry');
+    makeFlavor(s, 'strawberry');
+    expect(s.toppingBoards).toHaveLength(baseBalance.toppings.boards ?? 1);
+    const a = s.startToppings(0)!;
+    expect(s.activeToppingSpot).toBe(0);
+    const b = s.startToppings(0)!;
+    expect(s.activeToppingSpot).toBe(1);
+    expect(s.toppingWork).toBe(b);
+    expect(s.startToppings(0)).toBeNull(); // the tray is full
+    expect(s.setActiveTopping(0)).toBe(true);
+    expect(s.toppingWork).toBe(a);
+    // Redo trashes the active one; Done (per spot) shelves the other.
+    expect(s.trashToppings()).toBe(true);
+    expect(s.toppingBoards[0]).toBeNull();
+    expect(s.toppingWork).toBe(b);
+    expect(s.finishToppings(1)?.id).toBe(b.donut.id);
+    expect(s.toppingBoards.every((w) => !w)).toBe(true);
+    expect(s.setActiveTopping(1)).toBe(false);
+  });
 });
 
 describe('GameSession: box and serving', () => {

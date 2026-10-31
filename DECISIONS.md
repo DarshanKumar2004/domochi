@@ -473,3 +473,9 @@ Kumar's "almost ready for launch" batch.
   - The toppings sponge only comes out with no jar in hand.
   - Scrubbing has its own sound.
   - Close early sits above the tab bar on short phones.
+- **Two donuts on the toppings tray** (`balance.json` `toppings.boards`), like the glaze tray.
+  - Each spot has its own art, mess and guides, and pieces land on the spot under them.
+  - Press on a donut to work on it; a pink ring marks the active one when there are two.
+  - **Redo** trashes the active donut. **Done** sends every donut on the tray to the shelf.
+- **A sponge to pick up:** a messy tray shows a sponge on its corner ("tap to clean"). Picking it up puts down your cup or jar; then scrub. Cleaning the tray, or picking a cup or jar, puts it back.
+- **Pop-up days are downtown:** a brick storefront (the made-up "Gator & Co.") with an awning and shop windows behind the booth, instead of the oaks.

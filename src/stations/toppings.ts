@@ -13,6 +13,8 @@ import type { GlazedDonut } from './glaze';
 import type { Flavor, Menu, Topping } from '../systems/menu';
 
 export interface ToppingsBalance {
+  /** Donuts on the toppings tray at once. */
+  boards?: number;
   /** While shaking a sprinkle jar, one piece falls this often (ms). */
   sprinkleEveryMs: number;
   /** Sprinkle pieces land up to this far from the finger (normalised). */

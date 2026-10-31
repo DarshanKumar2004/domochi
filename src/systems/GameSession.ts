@@ -265,7 +265,9 @@ export class GameSession {
   private readonly shelfDonuts: FinishedDonut[] = [];
   /** Donuts on the glazing tray (balance.glaze.boards spots). */
   private readonly boards: (GlazeWork | null)[];
-  private topWork: ToppingWork | null = null;
+  /** Donuts on the toppings tray (balance.toppings.boards spots), and the one being worked on. */
+  private readonly topBoards: (ToppingWork | null)[];
+  private activeTop = 0;
   /** The open box at the Box station (slot i holds a donut or nothing). */
   private readonly boxSlots: (FinishedDonut | undefined)[] = [];
   private readonly glazeMask: MaskTemplate;
@@ -308,6 +310,7 @@ export class GameSession {
     this.fryer = new Fryer(deps.weather ? { ...fry, heatLagPerSec: fry.heatLagPerSec * deps.weather.heatLag } : fry);
     this.glazeMask = ringMask(deps.balance.glaze);
     this.boards = new Array<GlazeWork | null>(Math.max(1, deps.balance.glaze.boards ?? 1)).fill(null);
+    this.topBoards = new Array<ToppingWork | null>(Math.max(1, deps.balance.toppings.boards ?? 1)).fill(null);
     this.dayPhase = deps.dayFlow ? 'prep' : 'open';
     this.doughLeft = deps.dayFlow || deps.trackDough ? 0 : Infinity;
     for (let i = 0; i < pickups; i++) this.addPickup();
@@ -318,7 +321,8 @@ export class GameSession {
   /** Everything worth keeping about the day so far (see DaySnapshot). */
   snapshot(): DaySnapshot {
     // Donuts in the kitchen don't survive a reload: count them as thrown away.
-    let kitchen = this.rackDonuts.length + this.shelfDonuts.length + this.fryer.count + (this.topWork ? 1 : 0);
+    let kitchen = this.rackDonuts.length + this.shelfDonuts.length + this.fryer.count;
+    for (const w of this.topBoards) if (w) kitchen++;
     for (const w of this.boards) if (w) kitchen++;
     for (const d of this.boxSlots) if (d) kitchen++;
     const finite = (n: number) => (Number.isFinite(n) ? n : null);
@@ -1071,7 +1075,9 @@ export class GameSession {
 
   /** Full counts the donut on the toppings board: its spot is kept for it. */
   get shelfFull(): boolean {
-    return this.shelfDonuts.length + (this.topWork ? 1 : 0) >= this.deps.balance.glaze.shelfCapacity;
+    let n = this.shelfDonuts.length;
+    for (const w of this.topBoards) if (w) n++;
+    return n >= this.deps.balance.glaze.shelfCapacity;
   }
 
   /** Move a rack donut onto the glazing tray (a free spot, or `slot`). */
@@ -1129,36 +1135,59 @@ export class GameSession {
 
   // ---- Toppings ---------------------------------------------------------------
 
-  /** The donut on the toppings board, if any. */
-  get toppingWork(): ToppingWork | null {
-    return this.topWork;
+  /** Every spot on the toppings tray (null = empty). */
+  get toppingBoards(): readonly (ToppingWork | null)[] {
+    return this.topBoards;
   }
 
-  /** Move a shelf donut onto the toppings board (one at a time). */
-  startToppings(shelfIndex: number): ToppingWork | null {
-    if (this.topWork) return null;
+  /** The donut being worked on at the toppings tray (the last one picked or placed), if any. */
+  get toppingWork(): ToppingWork | null {
+    return this.topBoards[this.activeTop] ?? this.topBoards.find((w) => w) ?? null;
+  }
+
+  /** Which toppings spot is being worked on. */
+  get activeToppingSpot(): number {
+    return this.topBoards[this.activeTop] ? this.activeTop : Math.max(0, this.topBoards.findIndex((w) => w));
+  }
+
+  /** Work on the donut in a spot (if there is one). */
+  setActiveTopping(slot: number): boolean {
+    if (!this.topBoards[slot]) return false;
+    this.activeTop = slot;
+    return true;
+  }
+
+  /** Move a shelf donut onto the toppings tray: into `slot` if it's free, else the first free one. */
+  startToppings(shelfIndex: number, slot?: number): ToppingWork | null {
+    const to = slot !== undefined && slot >= 0 && slot < this.topBoards.length && !this.topBoards[slot] ? slot : this.topBoards.findIndex((w) => !w);
+    if (to < 0) return null;
     const d = this.shelfDonuts[shelfIndex];
     if (!d) return null;
     this.shelfDonuts.splice(shelfIndex, 1);
-    this.topWork = new ToppingWork(d, this.deps.menu, this.deps.balance.toppings, this.deps.balance.glaze);
+    const w = new ToppingWork(d, this.deps.menu, this.deps.balance.toppings, this.deps.balance.glaze);
+    this.topBoards[to] = w;
+    this.activeTop = to;
     this.events.emit('changed', undefined);
-    return this.topWork;
+    return w;
   }
 
-  /** Done: the donut goes back on the shelf (its spot was kept). */
-  finishToppings(): FinishedDonut | null {
-    if (!this.topWork) return null;
-    const d = this.topWork.finish();
-    this.topWork = null;
+  /** Done with one donut (the active one by default): it goes back on the shelf. */
+  finishToppings(slot?: number): FinishedDonut | null {
+    const i = slot ?? this.activeToppingSpot;
+    const w = this.topBoards[i];
+    if (!w) return null;
+    const d = w.finish();
+    this.topBoards[i] = null;
     this.shelfDonuts.push(d);
     this.events.emit('changed', undefined);
     return d;
   }
 
-  /** Redo: throw away the donut on the toppings board. */
-  trashToppings(): boolean {
-    if (!this.topWork) return false;
-    this.topWork = null;
+  /** Redo: throw away a donut on the toppings tray (the active one by default). */
+  trashToppings(slot?: number): boolean {
+    const i = slot ?? this.activeToppingSpot;
+    if (!this.topBoards[i]) return false;
+    this.topBoards[i] = null;
     this.trashed1();
     return true;
   }
@@ -1388,7 +1417,8 @@ export class GameSession {
 
   /** Donuts' worth made but not sold: on the rack, shelf, trays and in the box, frying, and dough left in the tub or bowl. */
   get unsold(): number {
-    let n = this.rackDonuts.length + this.shelfDonuts.length + this.fryer.count + (this.topWork ? 1 : 0);
+    let n = this.rackDonuts.length + this.shelfDonuts.length + this.fryer.count;
+    for (const w of this.topBoards) if (w) n++;
     for (const w of this.boards) if (w) n++;
     for (const d of this.boxSlots) if (d) n++;
     if (Number.isFinite(this.doughLeft)) n += this.doughLeft;
