@@ -43,6 +43,7 @@ export interface Balance {
   weather: WeatherBalance;
   regulars: { chance: number; usualAt: number; maxLevel: number };
   special: { priceBonus: number };
+  goals: { reward: number; fromDay: number; list: { id: string; text: string; base: number; perDay: number; max: number }[] };
   streak: { tipPerOrder: number; maxBonus: number };
 }
 

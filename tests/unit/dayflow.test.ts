@@ -613,3 +613,39 @@ describe('special of the day, streaks, patience', () => {
     expect(starText(2)).toBe('★★☆');
   });
 });
+
+describe('daily goals', () => {
+  it('from day 2, each day has a goal (the same for that day) whose target grows', () => {
+    expect(day(1).goal).toBeUndefined();
+    const g = day(5).goal!;
+    expect(g).toBeDefined();
+    expect(day(5, { seed: 42 }).goal).toEqual(g);
+    expect(g.text).not.toContain('{');
+    const ids = new Set(Array.from({ length: 40 }, (_, i) => day(i + 2).goal!.id));
+    expect(ids.size).toBeGreaterThan(2);
+  });
+
+  it('meeting it says so once and pays the reward with the day', () => {
+    // Find a day whose goal is to serve orders.
+    let d = 2;
+    while (day(d).goal!.id !== 'serve') d++;
+    const generous = { scoring: { ...balance.scoring, tiers: { great: 0, good: 0, okay: 0 } }, payment: { ...balance.payment, awfulBelow: -1 } };
+    const s = day(d, { over: { ...generous, day: { lengthSec: 900 }, spawn: { ...balance.spawn, intervalSec: { min: 1, max: 1 } } } });
+    const target = s.goal!.target;
+    const hits: string[] = [];
+    s.events.on('goal', (e) => hits.push(e.text));
+    s.openShop();
+    for (let n = 0; n < target + 1; n++) {
+      for (let k = 0; k < 200 && !s.line.some((c) => c.state === 'inLine'); k++) s.tick(500);
+      const c = s.line.find((x) => x.state === 'inLine')!;
+      const t = s.takeOrder(c.id);
+      s.finishOrdering(c.id);
+      s.selectTicket(t.no);
+      s.serveActiveTicket();
+      if (n < target - 1) expect(s.goalProgress!.done).toBe(false);
+    }
+    expect(hits).toHaveLength(1);
+    expect(s.goalProgress!.done).toBe(true);
+    expect(s.summary().goalBonus).toBe(balance.goals.reward);
+  });
+});

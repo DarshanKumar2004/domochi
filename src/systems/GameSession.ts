@@ -133,6 +133,9 @@ export interface DaySummary {
   profit: number;
   /** Walk-ups who went home without being served. */
   wentHome: number;
+  /** Today's goal, and what meeting it paid (0 if missed). */
+  goal?: string;
+  goalBonus: number;
   /** Longest run of good-or-great orders. */
   bestStreak: number;
   /** Donuts of the day's special sold. */
@@ -185,7 +188,7 @@ export interface DaySnapshot {
   friendship: Record<string, number> | null;
   regularsToday: string[];
   fryer: { oil: number; temp: number; target: number };
-  streak?: { count: number; best: number; specials: number };
+  streak?: { count: number; best: number; specials: number; goalDone?: boolean };
 }
 
 export interface SessionEvents extends Record<string, unknown> {
@@ -207,6 +210,8 @@ export interface SessionEvents extends Record<string, unknown> {
   dropped: { frying: number; slots: number };
   /** A batch of dough went in the tub. */
   doughMade: { quality: number };
+  /** Today's goal was met. */
+  goal: { text: string; reward: number };
   /** Good or great orders in a row (from the second one on). */
   streak: { count: number; bonus: number };
   /** A regular who knows you ordered "the usual": straight onto the rail. */
@@ -301,6 +306,7 @@ export class GameSession {
   private streakCount = 0;
   private bestStreakCount = 0;
   private specials = 0;
+  private goalDone = false;
   private friendsToday = 0;
   private nextFriendCheckMs = Infinity;
   private readonly friendship: Record<string, number> | null;
@@ -367,7 +373,7 @@ export class GameSession {
       friendship: this.friendship ? { ...this.friendship } : null,
       regularsToday: [...this.regularsToday],
       fryer: { oil: this.fryer.oil, temp: this.fryer.temp, target: this.fryer.target },
-      streak: { count: this.streakCount, best: this.bestStreakCount, specials: this.specials },
+      streak: { count: this.streakCount, best: this.bestStreakCount, specials: this.specials, goalDone: this.goalDone },
     };
   }
 
@@ -407,6 +413,7 @@ export class GameSession {
     this.streakCount = s.streak?.count ?? 0;
     this.bestStreakCount = s.streak?.best ?? 0;
     this.specials = s.streak?.specials ?? 0;
+    this.goalDone = s.streak?.goalDone ?? false;
     this.events.emit('changed', undefined);
   }
 
@@ -422,6 +429,55 @@ export class GameSession {
     let h = Math.imul(this.day ^ 0x5bd1e995, 0x27d4eb2d);
     h ^= h >>> 15;
     return open[(h >>> 0) % open.length]!.id;
+  }
+
+  /**
+   * Today's goal (full day, from goals.fromDay): one from the list, the same for
+   * a given day, its target growing with the day.
+   */
+  get goal(): { id: string; text: string; target: number } | undefined {
+    const g = this.deps.balance.goals;
+    if (!this.deps.dayFlow || this.isTutorial || this.day < g.fromDay || !g.list.length) return undefined;
+    let h = Math.imul(this.day ^ 0x2545f491, 0x9e3779b1);
+    h ^= h >>> 16;
+    let list = g.list;
+    // No special today (or no specials to sell): skip that one.
+    if (!this.special) list = list.filter((x) => x.id !== 'special');
+    const def = list[(h >>> 0) % list.length]!;
+    const target = Math.min(def.max, Math.floor(def.base + def.perDay * this.day));
+    return { id: def.id, text: def.text.replace('{n}', String(target)), target };
+  }
+
+  /** How far along today's goal is (0 to its target), and whether it's met. */
+  get goalProgress(): { value: number; done: boolean } | undefined {
+    const g = this.goal;
+    if (!g) return undefined;
+    let value = 0;
+    let tips = 0;
+    let great = 0;
+    let served = 0;
+    for (const t of this.allTickets) {
+      const s = t.results.score;
+      if (!s) continue;
+      served++;
+      tips += s.tip;
+      if (s.tier === 'great') great++;
+    }
+    if (g.id === 'serve') value = served;
+    else if (g.id === 'great') value = great;
+    else if (g.id === 'special') value = this.specials;
+    else if (g.id === 'tips') value = Math.floor(tips);
+    else if (g.id === 'tidy') value = this.tidyClose ? 1 : 0;
+    return { value: Math.min(value, g.target), done: this.goalDone || value >= g.target };
+  }
+
+  /** Met the goal just now? Then say so (once). */
+  private checkGoal(): void {
+    if (this.goalDone) return;
+    const p = this.goalProgress;
+    if (!p?.done) return;
+    this.goalDone = true;
+    this.events.emit('goal', { text: this.goal!.text, reward: this.deps.balance.goals.reward });
   }
 
   /** Specials sold today. */
@@ -848,6 +904,7 @@ export class GameSession {
     if (this.dayPhase !== 'closing') return false;
     const c = this.cleanup;
     this.tidyClose = c.glazeTray && c.toppingsTray && c.oil;
+    this.checkGoal();
     this.dayPhase = 'closed';
     this.events.emit('phase', this.dayPhase);
     this.events.emit('changed', undefined);
@@ -1455,6 +1512,7 @@ export class GameSession {
     const event: ServedEvent = { customer: c, ticket: t, waitMs, score, sale };
     this.events.emit('served', event);
     this.events.emit('changed', undefined);
+    this.checkGoal();
     // Last order out: time to clean up and close.
     this.checkClosing();
     return event;
@@ -1543,6 +1601,8 @@ export class GameSession {
       ...(this.inviteAccepted && this.invite ? { nextEvent: this.invite.name } : {}),
       tidy: this.tidyClose,
       tidyBonus: this.tidyClose ? this.deps.balance.cleanup.tidyBonus : 0,
+      ...(this.goal ? { goal: this.goal.text } : {}),
+      goalBonus: this.goalDone ? this.deps.balance.goals.reward : 0,
     };
   }
 
@@ -1554,7 +1614,7 @@ export class GameSession {
     let suppliesCost = 0;
     for (const [id, n] of Object.entries(this.used)) suppliesCost += unitCost(sb, id) * n;
     const counted = this.supplies !== null;
-    let earned = this.deps.balance.cleanup.tidyBonus * (this.tidyClose ? 1 : 0);
+    let earned = this.deps.balance.cleanup.tidyBonus * (this.tidyClose ? 1 : 0) + (this.goalDone ? this.deps.balance.goals.reward : 0);
     for (const t of this.allTickets) if (t.results.score) earned += t.results.score.tip + (t.results.sale ?? 0);
     return {
       wasted,

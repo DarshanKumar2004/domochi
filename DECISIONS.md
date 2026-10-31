@@ -479,3 +479,23 @@ Kumar's "almost ready for launch" batch.
   - **Redo** trashes the active donut. **Done** sends every donut on the tray to the shelf.
 - **A sponge to pick up:** a messy tray shows a sponge on its corner ("tap to clean"). Picking it up puts down your cup or jar; then scrub. Cleaning the tray, or picking a cup or jar, puts it back.
 - **Pop-up days are downtown:** a brick storefront (the made-up "Gator & Co.") with an awning and shop windows behind the booth, instead of the oaks.
+
+## Free rein: specials, streaks, patience hearts, day stars, daily goals (2026-11-01)
+
+Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `balance.json`.
+
+- **Special of the day** (`special`). One flavour on today's menu, the same each time you play that day.
+  - It sells for +$0.50, and customers favour it like one of their favourites.
+  - It's chalked on a board hanging on the trailer, and named on the morning checklist.
+  - Sticker: "chalkboard hit" for selling 5 in a day.
+- **Hot streak** (`streak`). Each good or great order in a row after the first adds +10% to tips, up to +50%. An okay or bad order ends the run.
+  - A note under the rail cheers at ×2, ×3, ×6 and so on, and the summary shows the best streak.
+  - Sticker: "on a roll" at 5.
+- **Patience hearts.** Waiting customers' tags show ♥♥♥, emptying as their wait score falls; the tag turns red at 0. It updates every second.
+- **Day stars.** The summary opens with 1–3 stars, popping in one by one: 2 for an average of 65+, 3 for 85+ with 5 or more served. They're stamped on the journal page.
+- **Daily goals** (`goals`, from day 2). One small challenge a day, with targets that grow with the day: serve N, N great reactions, sell N specials, $N in tips, or close up spotless.
+  - It's on the morning checklist, and a note cheers when you meet it.
+  - It pays $3, banked with the day; the summary row says done or missed.
+- **Layout:**
+  - The summary card is taller and spaced so the extra rows don't crowd it.
+  - The portrait morning checklist moved down so it clears mochi's journal button.

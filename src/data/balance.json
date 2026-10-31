@@ -280,6 +280,18 @@
     "_note": "With the full day (not the tutorial): the window is open for lengthSec. Walk-ups keep coming until then; when time's up, anyone still in line goes home, and the orders already taken still get served (or sent home). Days never run out. customersPerDay only applies without the full day (tests).",
     "lengthSec": 300
   },
+  "goals": {
+    "_note": "A daily goal (full day only, from day 2): one of these, the same for a given day. Targets grow with the day (base + perDay × day, up to max). Meeting it pays reward (banked with the day's takings).",
+    "reward": 3,
+    "fromDay": 2,
+    "list": [
+      { "id": "serve", "text": "serve {n} orders", "base": 3, "perDay": 0.34, "max": 12 },
+      { "id": "great", "text": "{n} great reactions", "base": 1, "perDay": 0.2, "max": 6 },
+      { "id": "special", "text": "sell {n} specials", "base": 2, "perDay": 0.1, "max": 6 },
+      { "id": "tips", "text": "earn ${n} in tips", "base": 2, "perDay": 0.4, "max": 15 },
+      { "id": "tidy", "text": "close up spotless", "base": 1, "perDay": 0, "max": 1 }
+    ]
+  },
   "special": {
     "_note": "Special of the day (full day only): one flavour on today's menu, the same for a given day. It sells for priceBonus more per donut, and customers favour it like one of their favourites.",
     "priceBonus": 0.5

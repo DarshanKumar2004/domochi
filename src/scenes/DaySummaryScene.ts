@@ -36,7 +36,7 @@ export class DaySummaryScene extends Phaser.Scene {
     const s = session();
     const sum = s.summary();
     const bank = save().data.money;
-    const today = sum.sales + sum.tips + sum.tidyBonus;
+    const today = sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus;
     const counted = s.tracksSupplies;
     // The day's stickers (finishing the day, a tidy close, no waste...).
     const tracker = stickers();
@@ -73,6 +73,7 @@ export class DaySummaryScene extends Phaser.Scene {
       counted
         ? ['wasted', `${sum.wasted} donut${sum.wasted === 1 ? '' : 's'}  −${money(sum.wasteCost)}`, 'waste']
         : ['donuts thrown away', `${sum.trashed}`, 'waste'],
+      ...(sum.goal ? [['daily goal', sum.goalBonus ? `done! +${money(sum.goalBonus)}` : 'missed', 'goal'] as Row] : []),
       ...(sum.bestStreak >= 2 ? [['best streak', `${sum.bestStreak} in a row`, 'streak'] as Row] : []),
       ...(sum.specialsSold ? [["special sold", `${sum.specialsSold}`, 'specials'] as Row] : []),
       ...(earned.length ? [['new stickers', earned.map((st) => st.glyph).join(' '), 'stickers'] as Row] : []),
@@ -142,7 +143,7 @@ export class DaySummaryScene extends Phaser.Scene {
     };
     void save().update((d) => {
       d.day = sum.day + 1;
-      d.money = Math.round((d.money + sum.sales + sum.tips + sum.tidyBonus) * 100) / 100;
+      d.money = Math.round((d.money + sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus) * 100) / 100;
       // Book tomorrow's pop-up (or drop a booking that's been and gone).
       if (invite) d.event = { id: invite.id, day: sum.day + 1 };
       else if (d.event && d.event.day <= sum.day) delete d.event;

@@ -41,7 +41,7 @@ export class HudScene extends Phaser.Scene {
       },
       () => {
         const today = session().summary();
-        return save().data.money + today.sales + today.tips + today.tidyBonus;
+        return save().data.money + today.sales + today.tips + today.tidyBonus + today.goalBonus;
       },
     );
     const settings = new Button(this, 0, 0, 'Settings', () => this.openSettings(), {
@@ -88,6 +88,10 @@ export class HudScene extends Phaser.Scene {
     });
     listen(this, session().events, 'streak', (e) => {
       if (e.count === 2 || e.count % 3 === 0) this.showToast(`hot streak ×${e.count}! tips +${Math.round(e.bonus * 100)}%`);
+    });
+    listen(this, session().events, 'goal', (e) => {
+      audio().play('fanfare');
+      this.showToast(`daily goal done: ${e.text}!\n+$${e.reward.toFixed(2)}`);
     });
     listen(this, session().events, 'timeUp', () => {
       audio().play('ding');

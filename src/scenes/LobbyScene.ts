@@ -29,8 +29,8 @@ const LAYOUT = {
     sign: { x: 120, feetY: 850, scale: 0.7 },
     chalk: { x: 215, y: 330 },
     line: { x: [600, 760, 920, 1080], feetY: 1300, scale: 0.85 },
-    panel: { x: 780, y: 1060, buttonY: 1330, width: 540 },
-    pickups: { x: 780, y: 1500 },
+    panel: { x: 780, y: 1112, buttonY: 1375, width: 540 },
+    pickups: { x: 780, y: 1515 },
     journal: { x: 955, y: 820, scale: 0.6 },
     // On the sidewalk between the patio and the line (short phones have no room at the bottom).
     closeEarly: { x: 665, y: 905 },
@@ -324,6 +324,7 @@ export class LobbyScene extends Phaser.Scene {
       const lines = [
         s.event ? `pop-up day: ${s.event.name}!` : 'good morning! before opening:',
         ...(s.weather ? [`(${s.weather.note})`] : []),
+        ...(s.goal ? [`• goal: ${s.goal.text} (+$${balance.goals.reward})`] : []),
         ...(s.special ? [`• special: ${menu.flavors.find((f) => f.id === s.special)?.name} (+${money(balance.special.priceBonus)})`] : []),
         `• ${dough ? `dough: ${dough} donuts ready` : 'make dough (Dough station)'}`,
       ];
