@@ -103,12 +103,19 @@ export interface SessionDeps {
   balance: Balance;
   day: number;
   rng: Rng;
+  /**
+   * A scripted day (the tutorial): exactly these orders, one customer each,
+   * arriving quickly. No day summary at the end.
+   */
+  script?: { orders: Order[] };
 }
 
 export class GameSession {
   readonly events = new Emitter<SessionEvents>();
   readonly day: number;
   readonly customersToday: number;
+  /** A scripted tutorial day (see SessionDeps.script). */
+  readonly isTutorial: boolean;
   /** The fryer keeps running (heating, cooking) whichever station you're at. */
   readonly fryer: Fryer;
 
@@ -132,7 +139,8 @@ export class GameSession {
 
   constructor(private readonly deps: SessionDeps) {
     this.day = deps.day;
-    this.customersToday = forDay(deps.balance.customersPerDay, deps.day);
+    this.isTutorial = !!deps.script;
+    this.customersToday = deps.script ? deps.script.orders.length : forDay(deps.balance.customersPerDay, deps.day);
     this.nextSpawnAtMs = deps.balance.spawn.firstDelaySec * 1000;
     this.fryer = new Fryer(deps.balance.fry);
     this.glazeMask = ringMask(deps.balance.glaze);
@@ -162,6 +170,11 @@ export class GameSession {
   /** The ticket the Box station will serve. */
   get activeTicket(): Ticket | undefined {
     return this.activeNo === null ? undefined : this.ticket(this.activeNo);
+  }
+
+  /** Customers who have arrived so far today. */
+  get arrivals(): number {
+    return this.spawned;
   }
 
   get trashed(): number {
@@ -251,7 +264,10 @@ export class GameSession {
     const { menu, balance, rng } = this.deps;
     const type = this.typeOf(front);
     const size = orderSizeRange(forDay(balance.orderSizeByDay, this.day), type.orderSize);
-    const order = generateOrder(menu, this.day, size, type.favorites, balance.favoriteWeight, rng);
+    const scripted = this.deps.script?.orders[this.nextTicketNo - 1];
+    const order = scripted
+      ? { flavors: [...scripted.flavors], boxId: scripted.boxId }
+      : generateOrder(menu, this.day, size, type.favorites, balance.favoriteWeight, rng);
     const ticket: Ticket = {
       no: this.nextTicketNo++,
       customerId,

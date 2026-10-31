@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { fryColor } from '../stations/fry';
-import { session } from '../systems/services';
+import { audio, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { HoldButton } from '../ui/HoldButton';
 import type { Viewport } from '../ui/layout';
@@ -330,6 +330,7 @@ export class FryScene extends StationScene {
     const shown = this.rackMinis.filter((m) => m.visible).map((m) => ({ x: m.x, y: m.y, tint: m.tintTopLeft, size: m.displayWidth }));
     const n = session().trashRack();
     if (!n) return;
+    audio().play('trash');
     shown.forEach((m, k) => this.ghost(m.x, m.y, m.tint, m.size, { x: this.trashBin.x, y: this.trashBin.y - 10, size: 20 }, k * 50));
     this.flash(`rack emptied (${n} donut${n === 1 ? '' : 's'})`);
   }
@@ -343,6 +344,7 @@ export class FryScene extends StationScene {
     img.on(Phaser.Input.Events.DRAG_END, (p: Phaser.Input.Pointer) => {
       img.setDepth(5);
       if (this.overTrash(p.worldX, p.worldY) && session().trashRackDonut(i)) {
+        audio().play('trash');
         this.ghost(p.worldX, p.worldY, img.tintTopLeft, img.displayWidth, { x: this.trashBin.x, y: this.trashBin.y - 10, size: 20 });
       }
       const home = this.rackSpot(i);
@@ -648,11 +650,15 @@ export class FryScene extends StationScene {
 
   private drop(): void {
     const slot = session().dropDonut();
-    if (slot >= 0) this.dropAnimation(slot);
+    if (slot >= 0) {
+      this.dropAnimation(slot);
+      audio().play('drop');
+    }
   }
 
   private flip(slot: number): void {
     if (!session().flipDonut(slot)) return;
+    audio().play('flip');
     const v = this.slotViews[slot]!;
     this.tweens.killTweensOf(v);
     v.hop = 0;
@@ -673,6 +679,7 @@ export class FryScene extends StationScene {
 
     if (overTrash && s.trashDonut(slot)) {
       this.ghost(x, y, tint, v.img.displayWidth, { x: bin.x, y: bin.y - 10, size: 20 });
+      audio().play('trash');
       return;
     }
     if (overRack) {
@@ -736,6 +743,7 @@ export class FryScene extends StationScene {
 
   /** The donut hops in the oil with a puff of steam: this side is golden. */
   private goldenHop(v: SlotView, x: number, y: number, size: number): void {
+    audio().play('ding');
     this.tweens.add({ targets: v, hop: size * 0.18, duration: 130, yoyo: true, ease: 'Sine.Out' });
     for (let k = 0; k < 3; k++) this.puff(x + (k - 1) * size * 0.3, y - size * 0.1, size * 0.28);
   }
@@ -771,6 +779,7 @@ export class FryScene extends StationScene {
 
   /** A burnt donut: puff of smoke, then it flies into the trash. */
   private burnAnimation(slot: number): void {
+    audio().play('burn');
     const home = this.slotPosition(slot);
     const x = home.x;
     const y = home.y;

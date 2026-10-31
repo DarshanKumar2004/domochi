@@ -1,11 +1,14 @@
 import balanceJson from '../data/balance.json';
 import customersJson from '../data/customers.json';
 import menuJson from '../data/menu.json';
+import tutorialData from '../data/tutorial.json';
 import type { Balance } from './balance';
 import type { CustomersData } from './customers';
 import { GameSession } from './GameSession';
 import type { Menu } from './menu';
+import { boxFor } from './orders';
 import { createRng, randomSeed } from './rng';
+import { AudioService } from './AudioService';
 import type { SaveService } from './SaveService';
 
 // Game-wide services, set up once in main.ts before Phaser starts.
@@ -15,6 +18,7 @@ export const customersData = customersJson as CustomersData;
 export const balance = balanceJson as Balance;
 
 let saveService: SaveService | null = null;
+let audioService: AudioService | null = null;
 let currentSession: GameSession | null = null;
 let seedOverride: number | null = null;
 let clockPaused = false;
@@ -32,6 +36,15 @@ export function setSave(s: SaveService): void {
   saveService = s;
 }
 
+/** Sound and music (made on first use, with the saved settings; silent until unlocked by a tap). */
+export function audio(): AudioService {
+  if (!audioService) {
+    const s = saveService?.data.settings ?? { sound: true, music: true };
+    audioService = new AudioService({ sound: s.sound, music: s.music });
+  }
+  return audioService;
+}
+
 export function save(): SaveService {
   if (!saveService) throw new Error('SaveService used before main.ts initialised it');
   return saveService;
@@ -42,14 +55,19 @@ export function setSeed(seed: number | null): void {
   seedOverride = seed;
 }
 
-/** Start a fresh day at the trailer. */
-export function startSession(day: number): GameSession {
+/**
+ * Start a fresh day at the trailer. A tutorial day has one scripted customer
+ * whose order (from tutorial.json) goes through every station.
+ */
+export function startSession(day: number, opts: { tutorial?: boolean } = {}): GameSession {
+  const flavors = [...tutorialData.order];
   currentSession = new GameSession({
     menu,
     customers: customersData,
     balance,
     day,
     rng: createRng(seedOverride ?? randomSeed()),
+    ...(opts.tutorial ? { script: { orders: [{ flavors, boxId: boxFor(menu, flavors.length).id }] } } : {}),
   });
   return currentSession;
 }

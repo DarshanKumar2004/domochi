@@ -9,7 +9,6 @@ import {
   isSleeping,
   seedTutorialDone,
   shot,
-  tapGame,
   tapNamed,
   waitForScene,
 } from './helpers';
@@ -32,11 +31,12 @@ test('full scene flow', async ({ page }) => {
   await waitForScene(page, SceneKeys.Tutorial);
   await shot(page, '02-tutorial');
 
-  // Advance one line, then skip
-  const size = await gameSize(page);
-  await tapGame(page, size.width / 2, size.height / 2);
+  // The tutorial coaches over the live game. Advance one line, then skip.
+  await waitForScene(page, SceneKeys.Lobby);
+  await tapNamed(page, SceneKeys.Tutorial, 'btn-tutorial-next');
   await shot(page, '03-tutorial-line2');
   await tapNamed(page, SceneKeys.Tutorial, 'btn-skip');
+  await waitForScene(page, SceneKeys.Tutorial, false);
   await waitForScene(page, SceneKeys.Lobby);
   await waitForScene(page, SceneKeys.Hud);
 
@@ -120,8 +120,10 @@ test('full scene flow', async ({ page }) => {
   await waitForScene(page, SceneKeys.Settings);
   await tapNamed(page, SceneKeys.Settings, 'btn-replay-tutorial');
   await waitForScene(page, SceneKeys.Tutorial);
-  expect(await activeScenes(page)).toEqual([SceneKeys.Tutorial]);
+  expect(await activeScenes(page)).toEqual(expect.arrayContaining([SceneKeys.Tutorial, SceneKeys.Lobby, SceneKeys.Hud]));
+  expect(await activeScenes(page)).not.toContain(SceneKeys.Settings);
   await tapNamed(page, SceneKeys.Tutorial, 'btn-skip');
+  await waitForScene(page, SceneKeys.Tutorial, false);
   await waitForScene(page, SceneKeys.Lobby);
 
   // Reset progress (two taps) brings the tutorial back

@@ -254,3 +254,33 @@ Kumar's feedback after Phase 5.
   - **Start day N+1** banks the money and saves (`day`, `money`, plus new `served` and `bestOrder` stats), then restarts the main scenes on a fresh session. Reloading continues on the saved day.
 - **The ticket rail** shows Day, served/total and money (banked plus today's sales and tips).
 - **Kumar's ideas for later** (opening/closing tasks with a Dough station, and event invites for pop-up booth days) are recorded under Future ideas in CLAUDE.md.
+
+## Phase 7: tutorial, sound, loading screen, web build (2026-10-30)
+
+- **The tutorial coaches over the real game,** instead of being a separate screen. On first launch (and from Settings → Replay tutorial) the day starts as a **scripted training day**: one customer, who orders a cookies & cream (`tutorial.json` `order`), because it goes through every station.
+  - Ethan's bubble says what to do, and a **pointing hand and a pink ring** show where. The hand finds things by the same object names the tests use.
+  - Each step moves on only when you've done it.
+  - **Steps are worked out from the game's state every frame,** not ticked off: where the order is (ticket → in the oil → flipped → rack → glazing → shelf → toppings → box → served), which cup or jar is picked, and how much glaze or how many crumbs are on.
+    - **It can't get stuck.** If the donut burns, it's back to "drop a donut". If you're at the wrong station, Ethan points at the right tab first.
+  - The panel sits away from the target: at the top if the target is low, and vice versa.
+  - **Skip tutorial** is always there. Finishing or skipping saves `tutorialDone` and opens the real day.
+  - **The training customer doesn't count:** there's no day summary for it, and day 1 starts fresh.
+  - The lines are data (`tutorial.json`), in Ethan's voice and the brand's lowercase.
+  - New placeholder texture: `pointer-hand`.
+- **Sound is synthesised in code** (`systems/AudioService.ts`, Web Audio), so there are no audio files and nothing to license.
+  - **Effects:** tap, plop + sizzle (drop), flip, ding (golden), pour, shake, trash, burn, lid, cha-ching (tip), a chime when a customer walks up, and a fanfare for the day summary.
+  - **Music:** a soft lo-fi loop (Cmaj7–Am7–Fmaj7–G7 with a pentatonic melody) at 5% volume.
+  - **Unlocking:** browsers only allow sound after a tap, so "Tap to start" unlocks it.
+  - **Pausing:** everything pauses when the page is hidden.
+  - **Settings:** gains **Sound** and **Music** switches, which are saved.
+  - **Tests:** unit-tested with a fake AudioContext.
+- **Loading screen polish:** the logo pops in and bobs; a dozen donuts (every flavour) drift up behind everything; "best with sound on"; and a footer with the handle and website.
+- **Web build and Netlify:**
+  - **`netlify.toml`:** builds with `npm run build` on Node 24 and publishes `dist/`.
+  - **Caching:** Vite's hashed bundle goes in `build/`, cached forever. Everything else, including the art in `assets/`, is re-checked each visit, so an art drop shows up straight away.
+  - **Paths:** the build uses relative paths (`base: './'`), so it also works under a path like `/games` or inside Capacitor later.
+  - **Size:** one bundle of about 400 KB gzipped, mostly Phaser. The chunk-size warning was raised rather than splitting it.
+  - **Page tags:** description and share tags (og/twitter), a favicon, an iPhone home-screen icon, and a **web app manifest**, so "Add to Home Screen" gives a proper icon and full-screen play.
+  - **Icons:** made by `npm run icons` from the logo on cream (see MANIFEST.md).
+  - **Production check:** I tested the production build (`vite preview`) in Chromium on phone and desktop sizes: no errors, and the tutorial starts over the lobby.
+- **The site address:** Netlify's free `*.netlify.app` address for now. A custom subdomain (for example `games.domochitreats.com`) can be added later in Netlify plus one DNS record, with no code changes.

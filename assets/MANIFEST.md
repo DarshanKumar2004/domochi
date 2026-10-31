@@ -28,6 +28,7 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `fry-grate` | `public/assets/fry-grate.png` | 690×360 | 1 | Placeholder (code) | Pressing grate laid over the oil; moves down while held. Mostly transparent between the bars. |
 | `fry-dispenser` | `public/assets/fry-dispenser.png` | 215×175 | 1 | Placeholder (code) | Mochi donut depositor over the vat. Donuts drop from its nozzle at the bottom centre (100, 170). |
 | `trash-bin` | `public/assets/trash-bin.png` | 160×160 | 1 | Placeholder (code) | Trash can at the Fry station: drag donuts here to throw them out; burnt donuts fly here on their own. |
+| `pointer-hand` | `public/assets/pointer-hand.png` | 120×164 | 1 | Placeholder (code) | Tutorial pointing hand. Fingertip at the top centre (≈ 59, 8); the tutorial rotates it to point at things. |
 | `donut-fry` | `public/assets/donut-fry.png` | 160×160 | 1 | Placeholder (code) | **Must be white or greyscale:** it's tinted at runtime from raw (pale) to golden to burnt by `fryColor()`. Plain pon de ring, no glaze. |
 | `glaze-cup` | `public/assets/glaze-cup.png` | 150×160 | 1 | Placeholder (code) | Pouring cup for the Glaze station. **Draw it white/light grey:** it's tinted per glaze at runtime, which makes the coloured cups. Spout at the top left (about 6, 26); the stream falls from there. |
 | `sugar-sifter` | `public/assets/sugar-sifter.png` | 160×140 | 1 | Placeholder (code) | Powdered-sugar sifter (beignet's dust). Not tinted. |
@@ -38,6 +39,17 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `icon-glaze` | `public/assets/icons/glaze.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
 | `icon-toppings` | `public/assets/icons/toppings.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
 | `icon-box` | `public/assets/icons/box.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
+
+## Web icons (not game textures)
+
+Home-screen and browser-tab icons: the logo on cream, made by `npm run icons` (scripts/make-icons.mjs) from `public/assets/logo.png`. Re-run that whenever the logo changes.
+
+| File | Size (px) | Purpose |
+|---|---|---|
+| `public/icons/icon-512.png` | 512×512 | Web app manifest (Android home screen, splash), share preview |
+| `public/icons/icon-192.png` | 192×192 | Web app manifest |
+| `public/icons/icon-180.png` | 180×180 | iPhone home screen (apple-touch-icon) |
+| `public/icons/icon-32.png` | 32×32 | Browser tab |
 
 ## Animations
 

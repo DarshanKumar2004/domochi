@@ -3,11 +3,12 @@ import { ASSET_FILES, queueAssetFile } from '../assets/files';
 import brand from '../data/brand.json';
 import { TextureKeys } from '../assets/keys';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
-import { save } from '../systems/services';
+import { audio, menu, save } from '../systems/services';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { Truck } from '../ui/Truck';
-import { onLayout } from '../ui/viewport';
+import { addDonutIcon } from '../ui/DonutIcon';
+import { getViewport, onLayout } from '../ui/viewport';
 import { startMainGame } from './flow';
 import { SceneKeys } from './sceneKeys';
 
@@ -26,6 +27,10 @@ export class PreloadScene extends Phaser.Scene {
   private barBg!: Phaser.GameObjects.Rectangle;
   private barFill!: Phaser.GameObjects.Rectangle;
   private prompt!: Phaser.GameObjects.Text;
+  private soundHint!: Phaser.GameObjects.Text;
+  private footer!: Phaser.GameObjects.Text;
+  /** Donuts of every flavour drifting up behind everything. */
+  private floaters: { img: Phaser.GameObjects.Image; speed: number; sway: number; phase: number }[] = [];
   private loadProgress = 0;
   private elapsed = 0;
   private ready = false;
@@ -44,10 +49,21 @@ export class PreloadScene extends Phaser.Scene {
     // Cream, like the real trailer: the official logo is ink-on-white and its
     // hollow wordmark would vanish on a dark background.
     this.cameras.main.setBackgroundColor(COLORS.cream);
-    this.logo = this.add.image(0, 0, TextureKeys.Logo);
+    this.floaters = [];
+    this.logo = this.add.image(0, 0, TextureKeys.Logo).setDepth(2);
     this.subtitle = this.add
       .text(0, 0, brand.tagline, { fontFamily: FONT_FAMILY, fontSize: '48px', color: CSS.ink })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(2);
+    this.footer = this.add
+      .text(0, 0, `${brand.instagram}  ·  ${brand.website.replace(/^https?:\/\/(www\.)?/, '')}`, { fontFamily: FONT_FAMILY, fontSize: '34px', color: '#6b5d52' })
+      .setOrigin(0.5)
+      .setDepth(2);
+    this.soundHint = this.add
+      .text(0, 0, 'best with sound on', { fontFamily: FONT_FAMILY, fontSize: '32px', color: '#6b5d52' })
+      .setOrigin(0.5)
+      .setDepth(2)
+      .setVisible(false);
     this.truck = new Truck(this, 0, 0);
     this.barBg = this.add.rectangle(0, 0, BAR_WIDTH + 16, BAR_HEIGHT + 16, 0xe6e1d6);
     this.barFill = this.add.rectangle(0, 0, BAR_WIDTH, BAR_HEIGHT, COLORS.pink).setOrigin(0, 0.5).setScale(0, 1);
@@ -55,6 +71,7 @@ export class PreloadScene extends Phaser.Scene {
       .text(0, 0, 'Tap to start', { fontFamily: FONT_FAMILY, fontSize: '72px', fontStyle: 'bold', color: CSS.ink })
       .setOrigin(0.5)
       .setName('prompt-start')
+      .setDepth(2)
       .setVisible(false);
     onLayout(this, (v) => this.layout(v));
 
@@ -69,6 +86,8 @@ export class PreloadScene extends Phaser.Scene {
     }
   }
 
+  private logoY = 0;
+
   private layout(v: Viewport): void {
     const s = v.safe;
     if (v.orientation === 'landscape') {
@@ -81,6 +100,8 @@ export class PreloadScene extends Phaser.Scene {
       this.barBg.setPosition(rx, s.y + 830);
       this.barFill.setPosition(rx - BAR_WIDTH / 2, s.y + 830);
       this.prompt.setPosition(rx, s.y + 940);
+      this.soundHint.setPosition(rx, s.y + 1010);
+      this.footer.setPosition(lx, s.y + 900);
     } else {
       const cx = v.width / 2;
       this.logo.setPosition(cx, s.y + 400).setDisplaySize(560, 560);
@@ -89,15 +110,47 @@ export class PreloadScene extends Phaser.Scene {
       this.barBg.setPosition(cx, s.y + 1560);
       this.barFill.setPosition(cx - BAR_WIDTH / 2, s.y + 1560);
       this.prompt.setPosition(cx, s.y + 1700);
+      this.soundHint.setPosition(cx, s.y + 1775);
+      this.footer.setPosition(cx, s.y + 1860);
     }
+    this.logoY = this.logo.y;
   }
 
   create(): void {
     ensurePlaceholderTextures(this);
     this.loadProgress = 1;
+    this.addFloaters();
+    // The logo pops in.
+    const sx = this.logo.scaleX;
+    const sy = this.logo.scaleY;
+    this.logo.setScale(sx * 0.7, sy * 0.7).setAlpha(0);
+    this.tweens.add({ targets: this.logo, scaleX: sx, scaleY: sy, alpha: 1, duration: 600, ease: 'Back.Out' });
   }
 
-  override update(_time: number, delta: number): void {
+  /** A dozen donuts (every flavour) drifting slowly up behind the logo and trailer. */
+  private addFloaters(): void {
+    const v = getViewport(this);
+    for (let i = 0; i < 12; i++) {
+      const flavor = menu.flavors[i % menu.flavors.length]!;
+      const size = 90 + ((i * 37) % 60);
+      const img = addDonutIcon(this, ((i * 0.37) % 1) * v.width, ((i * 0.61) % 1) * v.height, size, flavor.id, menu)
+        .setAlpha(0.28)
+        .setDepth(-1); // behind the logo and the trailer
+      this.add.existing(img);
+      this.floaters.push({ img, speed: 18 + ((i * 13) % 20), sway: 20 + ((i * 7) % 25), phase: i });
+    }
+  }
+
+  override update(time: number, delta: number): void {
+    // Drifting donuts wrap round from top to bottom; the logo bobs gently.
+    const v = getViewport(this);
+    for (const f of this.floaters) {
+      f.img.y -= (f.speed * delta) / 1000;
+      if (f.img.y < -100) f.img.y = v.height + 100;
+      f.img.x += Math.sin(time / 1500 + f.phase) * f.sway * (delta / 1000);
+      f.img.rotation += 0.0002 * delta;
+    }
+    if (this.logo.alpha === 1) this.logo.y = this.logoY + Math.sin(time / 900) * 8;
     if (this.ready) return;
     if (!this.hasWork) {
       this.showPrompt();
@@ -112,10 +165,11 @@ export class PreloadScene extends Phaser.Scene {
   private showPrompt(): void {
     this.ready = true;
     this.prompt.setVisible(true);
+    this.soundHint.setVisible(true);
     this.tweens.add({ targets: this.prompt, alpha: 0.35, duration: 700, yoyo: true, repeat: -1 });
     this.input.once(Phaser.Input.Events.POINTER_DOWN, () => {
-      if (save().data.tutorialDone) startMainGame(this);
-      else this.scene.start(SceneKeys.Tutorial);
+      audio().unlock(); // browsers allow sound only after a tap
+      startMainGame(this, { tutorial: !save().data.tutorialDone });
     });
   }
 }

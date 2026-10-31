@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
-import { balance, menu, session } from '../systems/services';
+import { audio, balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { donutIcon, pruneDonutIcons } from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
@@ -328,6 +328,7 @@ export class BoxScene extends StationScene {
       return;
     }
     this.closing = true;
+    this.time.delayedCall(300, () => audio().play('lid'));
     this.serveButton.setEnabled(false);
     const full = this.lidImg.displayHeight;
     this.lid.setVisible(true).setScale(1, 0.05).setY(this.boxArea.y - full / 2);

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { isClockPaused, menu, save, session } from '../systems/services';
+import { audio, isClockPaused, menu, save, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
@@ -49,7 +49,12 @@ export class HudScene extends Phaser.Scene {
       name: 'btn-settings',
     });
 
-    listen(this, session().events, 'changed', () => this.rail.refresh(session()));
+    let arrived = session().arrivals;
+    listen(this, session().events, 'changed', () => {
+      this.rail.refresh(session());
+      if (session().arrivals > arrived) audio().play('chime');
+      arrived = session().arrivals;
+    });
     onLayout(this, (v) => {
       this.tabBar.layout(v);
       this.rail.layout(v, session());

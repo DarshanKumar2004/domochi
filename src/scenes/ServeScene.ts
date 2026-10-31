@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { orderVerdict } from '../systems/score';
-import { balance, session } from '../systems/services';
+import { audio, balance, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -66,6 +66,7 @@ export class ServeScene extends Phaser.Scene {
           .setName('serve-tip'),
       );
     }
+    if (score) audio().play(score.tip > 0 ? 'cash' : 'tap');
     card.add(new Button(this, 0, 380, 'Back to lobby', () => this.close(), { name: 'btn-serve-done' }));
 
     onLayout(this, (v) => {
@@ -76,7 +77,7 @@ export class ServeScene extends Phaser.Scene {
 
   /** Back to the lobby; if that was the last customer, the day is done. */
   private close(): void {
-    if (session().isDayComplete) this.scene.launch(SceneKeys.DaySummary);
+    if (session().isDayComplete && !session().isTutorial) this.scene.launch(SceneKeys.DaySummary);
     this.scene.stop();
   }
 }

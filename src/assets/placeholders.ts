@@ -302,6 +302,31 @@ function paintFryDispenser(g: G): void {
 }
 
 /** Kitchen trash can with an open lid: drag donuts here to throw them out. */
+/** A cartoon hand pointing straight up (fingertip at the top centre); the tutorial rotates it. */
+function paintPointerHand(g: G): void {
+  const ink = COLORS.ink;
+  g.fillStyle(0xfff4e6);
+  g.lineStyle(6, ink);
+  // Index finger
+  g.fillRoundedRect(42, 6, 34, 86, 17);
+  g.strokeRoundedRect(42, 6, 34, 86, 17);
+  // Palm with curled fingers
+  g.fillRoundedRect(22, 70, 84, 74, 26);
+  g.strokeRoundedRect(22, 70, 84, 74, 26);
+  // Thumb
+  g.fillRoundedRect(6, 88, 34, 26, 13);
+  g.strokeRoundedRect(6, 88, 34, 26, 13);
+  // Knuckle lines
+  g.lineStyle(4, ink, 0.6);
+  g.lineBetween(80, 92, 100, 92);
+  g.lineBetween(80, 110, 100, 110);
+  // Pink cuff
+  g.fillStyle(COLORS.pink);
+  g.fillRect(28, 140, 72, 18);
+  g.lineStyle(6, ink);
+  g.strokeRect(28, 140, 72, 18);
+}
+
 function paintTrashBin(g: G): void {
   const ink = COLORS.ink;
   g.fillStyle(0x6b6f73);
@@ -467,6 +492,7 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.Fryer]: { width: 760, height: 440, paint: paintFryer },
   [TextureKeys.FryGrate]: { width: 690, height: 360, paint: paintFryGrate },
   [TextureKeys.TrashBin]: { width: 160, height: 160, paint: paintTrashBin },
+  [TextureKeys.PointerHand]: { width: 120, height: 164, paint: paintPointerHand },
   [TextureKeys.FryDispenser]: { width: 215, height: 175, paint: paintFryDispenser },
   [TextureKeys.DonutFry]: { width: 160, height: 160, paint: paintDonutFry },
   [TextureKeys.GlazeCup]: { width: 150, height: 160, paint: paintGlazeCup },

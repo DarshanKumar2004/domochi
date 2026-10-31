@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config';
 import { SaveService } from './systems/SaveService';
-import { hasSession, session, setClockPaused, setSave, setSeed } from './systems/services';
+import { audio, hasSession, session, setClockPaused, setSave, setSeed } from './systems/services';
 import { createDefaultStorage } from './systems/storage';
 import { measureGameSize, watchContainerSize } from './ui/viewport';
 
@@ -17,6 +17,8 @@ async function start(): Promise<void> {
   const size = measureGameSize(container);
   const game = new Phaser.Game(createGameConfig(size.width, size.height));
   watchContainerSize(game, container);
+  // Hush when the tab or app goes to the background.
+  document.addEventListener('visibilitychange', () => audio().setSuspended(document.hidden));
 
   // Exposed for Playwright tests.
   const w = window as unknown as { __game: Phaser.Game; __session?: unknown; __setClockPaused: (p: boolean) => void };

@@ -15,6 +15,7 @@ export const TextureKeys = {
   FryGrate: 'fry-grate',
   FryDispenser: 'fry-dispenser',
   TrashBin: 'trash-bin',
+  PointerHand: 'pointer-hand',
   DonutFry: 'donut-fry',
   GlazeCup: 'glaze-cup',
   SugarSifter: 'sugar-sifter',

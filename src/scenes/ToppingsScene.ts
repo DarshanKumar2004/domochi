@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { ToppingWork } from '../stations/toppings';
 import { flavorsForDay, type Topping } from '../systems/menu';
-import { balance, menu, session } from '../systems/services';
+import { audio, balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import {
   ART_SIZE,
@@ -94,6 +94,7 @@ export class ToppingsScene extends StationScene {
   private guideSpot!: Phaser.GameObjects.Graphics;
   /** The shaking finger, read every frame (its events can go to the rail or tab bar if it strays there). */
   private shakePointer: Phaser.Input.Pointer | null = null;
+  private nextShakeSound = 0;
   private shelfBg!: Phaser.GameObjects.Graphics;
   private shelfLabel!: Phaser.GameObjects.Text;
   private shelfImgs: Phaser.GameObjects.Image[] = [];
@@ -432,6 +433,11 @@ export class ToppingsScene extends StationScene {
 
   // ---- Shaking ----------------------------------------------------------------
 
+  /** The jar that's picked (the tutorial checks it). */
+  get selectedJar(): string | null {
+    return this.selected;
+  }
+
   private select(toppingId: string): void {
     this.selected = toppingId;
     this.refresh();
@@ -457,6 +463,7 @@ export class ToppingsScene extends StationScene {
     if (t.style === 'piece') {
       // One whole piece per tap, dropped from just above your finger.
       this.emit(t, this.time.now, p.worldX, p.worldY, 0);
+      audio().play('lid');
       return;
     }
     this.shaking = true;
@@ -519,6 +526,10 @@ export class ToppingsScene extends StationScene {
         while (time - this.lastEmit >= tb.sprinkleEveryMs && !work.full) {
           this.lastEmit += tb.sprinkleEveryMs;
           this.emit(t, time, this.fingerX, this.fingerY, tb.scatter);
+          if (time >= this.nextShakeSound) {
+            this.nextShakeSound = time + 120;
+            audio().play('shake');
+          }
         }
       }
     }
@@ -649,6 +660,7 @@ export class ToppingsScene extends StationScene {
 
   /** Fly a copy of a donut into the trash can. `owned` = animate the passed image itself. */
   private toTrash(x: number, y: number, img: Phaser.GameObjects.Image, owned = false): void {
+    audio().play('trash');
     const ghost = owned ? img : this.add.image(x, y, img.texture.key).setDisplaySize(img.displayWidth, img.displayHeight).setDepth(15);
     ghost.setPosition(x, y);
     this.tweens.add({

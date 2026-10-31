@@ -4,7 +4,7 @@ import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
 import { paintOnPattern, type GlazeLayer, type GlazeWork, type PourCheck } from '../stations/glaze';
 import type { Glaze, Stripe } from '../systems/menu';
 import { flavorsForDay } from '../systems/menu';
-import { balance, menu, session } from '../systems/services';
+import { audio, balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { hexToNumber } from '../ui/DonutIcon';
 import {
@@ -101,6 +101,7 @@ export class GlazeScene extends StationScene {
   private guideDrizzle!: Phaser.GameObjects.Graphics;
   /** The finger that's pouring, read every frame (its events can go to the rail or tab bar if it strays there). */
   private pourPointer: Phaser.Input.Pointer | null = null;
+  private nextPourSound = 0;
   private trayBg!: Phaser.GameObjects.Graphics;
   private trayLabel!: Phaser.GameObjects.Text;
   private shelfLabel!: Phaser.GameObjects.Text;
@@ -391,6 +392,11 @@ export class GlazeScene extends StationScene {
     return { nx: (x - bx) / (size / 2), ny: (y - by) / (size / 2) };
   }
 
+  /** The cup that's picked (the tutorial checks it). */
+  get selectedCup(): string | null {
+    return this.selected;
+  }
+
   private select(glazeId: string): void {
     this.selected = glazeId;
     this.refreshControls();
@@ -476,6 +482,10 @@ export class GlazeScene extends StationScene {
       const sy = SPOUT.x * Math.sin(a) + SPOUT.y * Math.cos(a);
       const { lx, ly } = this.lipFor(this.fingerX, this.fingerY);
       this.handCup.setPosition(lx - sx, ly - sy);
+      if (time >= this.nextPourSound) {
+        this.nextPourSound = time + 150;
+        audio().play(this.handCup.texture.key === TextureKeys.SugarSifter ? 'shake' : 'pour');
+      }
       const d = this.drops[this.nextDrop]!;
       this.nextDrop = (this.nextDrop + 1) % DROPS;
       d.active = true;
@@ -740,6 +750,7 @@ export class GlazeScene extends StationScene {
 
   /** Fly a copy of a donut into the trash can. `owned` = destroy the passed image afterwards. */
   private toTrash(x: number, y: number, img: Phaser.GameObjects.Image, owned = false): void {
+    audio().play('trash');
     const ghost = owned ? img : this.add.image(x, y, img.texture.key).setDisplaySize(img.displayWidth, img.displayHeight).setTint(img.tintTopLeft).setDepth(15);
     ghost.setPosition(x, y);
     this.tweens.add({

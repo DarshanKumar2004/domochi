@@ -3,8 +3,9 @@ import { save, startSession } from '../systems/services';
 import type { HudScene } from './HudScene';
 import { SceneKeys, type SceneKey } from './sceneKeys';
 
-/** Scenes that make up the running game (everything after Preload/Tutorial). */
+/** Scenes that make up the running game (everything after Preload). */
 const MAIN_GAME_SCENES: readonly SceneKey[] = [
+  SceneKeys.Tutorial,
   SceneKeys.Lobby,
   SceneKeys.Fry,
   SceneKeys.Glaze,
@@ -18,11 +19,16 @@ const MAIN_GAME_SCENES: readonly SceneKey[] = [
   SceneKeys.DaySummary,
 ];
 
-/** Leave `from` and enter the game at the Lobby, with the tab bar on top, starting a fresh day. */
-export function startMainGame(from: Phaser.Scene): void {
-  startSession(save().data.day);
+/**
+ * Leave `from` and enter the game at the Lobby, with the tab bar on top,
+ * starting a fresh day. With `tutorial`, it's the guided training day: one
+ * scripted customer, with Ethan coaching over the top.
+ */
+export function startMainGame(from: Phaser.Scene, opts: { tutorial?: boolean } = {}): void {
+  startSession(save().data.day, opts);
   from.scene.launch(SceneKeys.Lobby);
   from.scene.launch(SceneKeys.Hud);
+  if (opts.tutorial) from.scene.launch(SceneKeys.Tutorial);
   from.scene.stop();
 }
 

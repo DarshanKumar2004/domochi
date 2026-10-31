@@ -1,8 +1,32 @@
 {
+  "_note": "The guided first day. Ethan's lines, by step id. The steps themselves (what to point at and when each is done) are in TutorialScene; they follow the game's state, so a burnt donut sends you back to 'drop'. {station} is replaced with a station name.",
+  "order": ["cookies-and-cream"],
   "intro": [
-    "Hey there! I'm Ethan, founder of domochi, Lafayette's first mochi donut shop.",
-    "A mochi donut is made with rice flour and shaped into a ring of little pull-apart bubbles. Crispy-light outside, soft and chewy inside!",
-    "The full training day is still being cooked up. For now, take a look around the kitchen!"
+    "hey there! I'm Ethan, founder of domochi, Lafayette's first mochi donut shop.",
+    "mochi donuts are made with rice flour and shaped into a ring of little pull-apart bubbles. light and crispy outside, soft and chewy inside!",
+    "let's make your first order together. I'll show you each station."
   ],
-  "steps": []
+  "steps": {
+    "customer": "here comes a customer! tap them to take their order.",
+    "take": "tap Take order. their ticket goes up on the rail at the top.",
+    "goTo": "head to the {station} station (down at the bottom).",
+    "drop": "tap Drop to put a donut in the oil.",
+    "flip": "watch its little meter. when the bottom bar reaches the gold band, the donut hops. tap it to flip!",
+    "pull": "now the top side. when it starts steaming it's golden on both sides: drag it onto the rack.",
+    "tray": "tap the fried donut (or drag it) onto the tray.",
+    "cup": "cookies & cream gets our white cookies & cream glaze. tap that cup.",
+    "pour": "press on the donut and pour, following the dashed loops all the way round.",
+    "glazeDone": "beautiful. tap Done to put it on the shelf.",
+    "shelf": "tap the glazed donut to bring it to the toppings tray.",
+    "jar": "it needs crushed chocolate cookies. tap that jar.",
+    "shake": "press and drag round the ring to shake the crumbs on, nice and even.",
+    "toppingsDone": "perfect. tap Done.",
+    "pack": "tap the donut to put it in the box. the slots are numbered in the ticket's order.",
+    "serve": "close the lid! it goes straight to the customer.",
+    "card": "every station gets a score, and a great order earns a great tip. tap to head back."
+  },
+  "outro": [
+    "you did it! that's the whole kitchen: fry, glaze, toppings, box.",
+    "you can make donuts ahead of time, and keep a few orders going at once. let's open for the day!"
+  ]
 }

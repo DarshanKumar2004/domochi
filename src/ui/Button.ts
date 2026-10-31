@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { audio } from '../systems/services';
 import { MIN_HIT_SIZE } from './layout';
 import { COLORS, CSS, FONT_FAMILY } from './theme';
 
@@ -56,7 +57,10 @@ export class Button extends Phaser.GameObjects.Container {
     this.on('pointerup', () => {
       const wasPressed = this.pressed;
       this.release();
-      if (wasPressed && this.enabled) onTap();
+      if (wasPressed && this.enabled) {
+        audio().play('tap');
+        onTap();
+      }
     });
 
     if (opts.name) this.setName(opts.name);

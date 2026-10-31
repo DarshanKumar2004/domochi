@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import brand from '../data/brand.json';
 import { flavorsForDay } from '../systems/menu';
-import { menu, save, session } from '../systems/services';
+import { audio, menu, save, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -25,6 +25,7 @@ export class DaySummaryScene extends Phaser.Scene {
 
   create(): void {
     beginOverlay(this, 0.7);
+    audio().play('fanfare');
     const s = session();
     const sum = s.summary();
     const bank = save().data.money;
