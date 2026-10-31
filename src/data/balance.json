@@ -110,7 +110,7 @@
   },
   "events": {
     "_note": "A served walk-up customer may invite domochi to their event (chance by reaction tier, plus giftBonus if you gave them a gift). Accepting makes tomorrow a pop-up day (see events.json). At most one invite a day.",
-    "inviteChance": { "great": 0.3, "good": 0.15, "okay": 0.04, "bad": 0 },
+    "inviteChance": { "great": 0.08, "good": 0.03, "okay": 0, "bad": 0 },
     "giftBonus": 0.1
   },
   "cleanup": {
@@ -148,8 +148,8 @@
     ],
     "start": { "rice-flour": 12, "tapioca": 4, "sugar": 4, "milk": 8, "egg": 4, "box-single": 6, "box-trio": 6, "box-flight": 3, "box-domochi-box": 1, "oil": 2 },
     "priceSwing": 0.25,
-    "friendCheckSec": 30,
-    "friendChance": 0.5,
+    "friendCheckSec": 60,
+    "friendChance": 0.2,
     "friendsPerDay": 1
   },
   "weather": {
