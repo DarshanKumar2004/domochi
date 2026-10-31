@@ -7,6 +7,7 @@ import type { DoughBalance } from '../stations/dough';
 import { validateScoring, type ScoringBalance } from './score';
 import type { GuideItem, PaymentBalance, SuppliesBalance } from './supplies';
 import type { WeatherBalance } from './weather';
+import type { StaffBalance } from './staff';
 
 /** A decoration for the lot (bought once at the store), with a small perk. */
 export interface DecorItem {
@@ -54,6 +55,7 @@ export interface Balance {
   regulars: { chance: number; usualAt: number; maxLevel: number };
   special: { priceBonus: number; fromDay?: number };
   decor: { items: DecorItem[] };
+  staff: StaffBalance;
   goals: { reward: number; fromDay: number; list: { id: string; text: string; base: number; perDay: number; max: number }[] };
   streak: { tipPerOrder: number; maxBonus: number };
 }

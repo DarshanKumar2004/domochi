@@ -4,6 +4,7 @@ import { flavorsForDay } from '../systems/menu';
 import { fillStock, glazeStockId, priceOn, shopNeeds, shoppingPlan, toppingStockId, type ShopPick, type SupplyItem } from '../systems/supplies';
 import { TextureKeys } from '../assets/keys';
 import type { DecorItem } from '../systems/balance';
+import type { Hire } from '../systems/staff';
 import { Button } from '../ui/Button';
 import { beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -103,6 +104,7 @@ export class StoreScene extends Phaser.Scene {
     }
     sections.push({ label: label('glaze guides: dashed lines that show you where to pour'), tiles: balance.guides.items.map((g) => this.guideTile(g)) });
     sections.push({ label: label('decorations for the lot (each gives a little perk)'), tiles: balance.decor.items.map((d) => this.decorTile(d, day)) });
+    sections.push({ label: label("your crew: they keep the trailer going while you're away"), tiles: balance.staff.hires.map((h) => this.hireTile(h, day)) });
 
     // Header and footer sit over the list (and catch taps there), so it scrolls under them.
     const card = this.add.graphics();
@@ -250,6 +252,25 @@ export class StoreScene extends Phaser.Scene {
         if (s.decor.includes(d.id)) return;
         s.decor.push(d.id);
         s.money = Math.round((s.money - d.price) * 100) / 100;
+      });
+    });
+    if (locked) tile.box.setAlpha(0.5);
+    return tile;
+  }
+
+  /** Hire someone (once, from their day): more made while you're away. */
+  private hireTile(h: Hire, day: number): Tile {
+    const locked = h.unlockDay > day;
+    const tile = this.makeTile(`store-hire-${h.id}`, `hire ${h.name}`, locked ? `day ${h.unlockDay}` : money(h.price), () => {
+      if (locked) return { label: 'comes in later', low: false, can: false, owned: false };
+      const owned = save().data.staff.includes(h.id);
+      return { label: owned ? 'on the crew ✓' : `up to +$${h.capAdd} while away`, low: false, can: !owned && save().data.money >= h.price, owned };
+    }, () => {
+      void save().update((s) => {
+        if (s.staff.includes(h.id)) return;
+        s.staff.push(h.id);
+        s.money = Math.round((s.money - h.price) * 100) / 100;
+        s.lastSeen = Date.now(); // they start from now
       });
     });
     if (locked) tile.box.setAlpha(0.5);

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { audio, isClockPaused, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
+import { audio, collectAwayEarnings, isClockPaused, markSeen, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
 import { Button } from '../ui/Button';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
@@ -57,9 +57,22 @@ export class HudScene extends Phaser.Scene {
       if (session().arrivals > arrived) audio().play('chime');
       arrived = session().arrivals;
     });
+    // Back from being away: the crew's takings.
+    const away = collectAwayEarnings();
+    if (away.amount > 0) {
+      const who = away.crew.length > 1 ? 'your crew' : away.crew[0];
+      this.time.delayedCall(800, () => {
+        audio().play('cash');
+        this.showToast(`while you were away, ${who} sold $${away.amount.toFixed(2)}!\n(tap to close)`, true);
+      });
+    }
     // The day so far is saved every few seconds, and whenever the page is hidden.
     this.time.addEvent({ delay: 5000, loop: true, callback: () => saveDayInProgress() });
-    const onHide = () => document.hidden && saveDayInProgress();
+    const onHide = () => {
+      if (!document.hidden) return;
+      saveDayInProgress();
+      markSeen();
+    };
     document.addEventListener('visibilitychange', onHide);
     window.addEventListener('pagehide', saveDayInProgress);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

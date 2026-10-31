@@ -32,6 +32,9 @@ export interface SaveData {
   guides: string[];
   /** Decorations for the lot (balance.decor ids). */
   decor: string[];
+  /** Your crew (balance.staff hire ids), and when you were last here (ms since 1970), for what they made meanwhile. */
+  staff: string[];
+  lastSeen?: number;
   /** How well each regular knows you (customers.json regulars ids). */
   regulars: Record<string, number>;
   /** The day being played, saved as you go so a reload picks it back up (gone once the day's done). */
@@ -54,6 +57,7 @@ export function defaultSave(): SaveData {
     bestOrder: 0,
     guides: [],
     decor: [],
+    staff: [],
     regulars: {},
     journal: { stickers: [], pages: [], seen: 0 },
     settings: { sound: true, music: true },
@@ -88,6 +92,8 @@ export function sanitizeSave(raw: unknown): SaveData {
     data.stock = stock;
   }
   if (Array.isArray(raw.guides)) data.guides = [...new Set(raw.guides.filter((g): g is string => typeof g === 'string'))];
+  if (Array.isArray(raw.staff)) data.staff = [...new Set(raw.staff.filter((g): g is string => typeof g === 'string'))];
+  if (typeof raw.lastSeen === 'number' && Number.isFinite(raw.lastSeen)) data.lastSeen = raw.lastSeen;
   if (Array.isArray(raw.decor)) data.decor = [...new Set(raw.decor.filter((g): g is string => typeof g === 'string'))];
   if (isRecord(raw.regulars)) {
     for (const [k, v] of Object.entries(raw.regulars)) if (typeof v === 'number' && Number.isInteger(v) && v >= 0) data.regulars[k] = v;

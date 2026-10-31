@@ -656,5 +656,33 @@
         }
       }
     ]
+  },
+  "staff": {
+    "_note": "Hire a crew (from each hire's unlockDay): they run the trailer while you're away. Money made away = cap × (1 − ½^(hours away / halfLifeHours)), where cap is the hires' capAdd added up: it levels off, so a long time away isn't worth much more than an evening. Nothing for under minHours away.",
+    "halfLifeHours": 6,
+    "minHours": 0.5,
+    "hires": [
+      {
+        "id": "mai",
+        "name": "Mai",
+        "price": 150,
+        "unlockDay": 75,
+        "capAdd": 20
+      },
+      {
+        "id": "theo",
+        "name": "Theo",
+        "price": 260,
+        "unlockDay": 90,
+        "capAdd": 25
+      },
+      {
+        "id": "rosa",
+        "name": "Rosa",
+        "price": 400,
+        "unlockDay": 110,
+        "capAdd": 35
+      }
+    ]
   }
 }

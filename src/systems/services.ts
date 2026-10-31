@@ -12,6 +12,7 @@ import { createRng, randomSeed } from './rng';
 import { AudioService } from './AudioService';
 import type { SaveService } from './SaveService';
 import { fillStock } from './supplies';
+import { awayEarnings } from './staff';
 import journalJson from '../data/journal.json';
 import { StickerTracker, type JournalData } from './journal';
 import { weatherFor } from './weather';
@@ -148,6 +149,29 @@ export function feedback(): FeedbackService {
     feedbackService = new FeedbackService(store, (brandJson as { feedbackEndpoint?: string }).feedbackEndpoint ?? '');
   }
   return feedbackService;
+}
+
+/**
+ * Back from being away: what the crew made meanwhile (banked straight away),
+ * and remember that you're here now. Returns the amount and who's on the crew.
+ */
+export function collectAwayEarnings(now = Date.now()): { amount: number; hours: number; crew: string[] } {
+  const s = saveService;
+  if (!s) return { amount: 0, hours: 0, crew: [] };
+  const last = s.data.lastSeen;
+  const hours = last ? Math.max(0, (now - last) / 3_600_000) : 0;
+  const amount = awayEarnings(balance.staff, s.data.staff, hours);
+  const crew = balance.staff.hires.filter((h) => s.data.staff.includes(h.id)).map((h) => h.name);
+  void s.update((d) => {
+    d.lastSeen = now;
+    if (amount > 0) d.money = Math.round((d.money + amount) * 100) / 100;
+  });
+  return { amount, hours, crew };
+}
+
+/** Note that the player is here (so time away is counted from now). */
+export function markSeen(now = Date.now()): void {
+  void saveService?.update((d) => void (d.lastSeen = now));
 }
 
 /** Save the day so far (not the tutorial, and not once it's over). */
