@@ -20,7 +20,8 @@ async function start(): Promise<void> {
   // Hush when the tab or app goes to the background.
   document.addEventListener('visibilitychange', () => audio().setSuspended(document.hidden));
   // ...and pick the sound back up on the next tap if the phone paused it.
-  document.addEventListener('pointerdown', () => audio().wake(), { capture: true, passive: true });
+  // (iPhones only let sound resume from a finished tap, so touchend and click too.)
+  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click']) document.addEventListener(ev, () => audio().wake(), { capture: true, passive: true });
   // Clicking back into the window (or returning to the tab) brings the music back too.
   window.addEventListener('focus', () => audio().wake());
   // Leaving the page mid-press (switching apps, a notification) can swallow the finger

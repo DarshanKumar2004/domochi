@@ -122,7 +122,13 @@ export class AudioService {
   wake(): void {
     const ctx = this.ctx;
     if (!ctx || this.hidden) return;
-    if (ctx.state !== 'running') void ctx.resume?.();
+    if (ctx.state !== 'running') {
+      // Coming back from a pause: restart the music's schedule from now, once it's running again.
+      void ctx.resume?.()?.then(() => {
+        this.stopMusic();
+        if (this.settings.music) this.startMusic();
+      });
+    }
     if (this.settings.music) this.startMusic();
   }
 
