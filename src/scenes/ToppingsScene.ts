@@ -124,6 +124,8 @@ export class ToppingsScene extends StationScene {
   private shelfPos = { x: 0, y: 0, step: 0, size: 0 };
   private jarScale = 1;
   private selected: string | null = null;
+  /** The jar was picked for you (the only one open): tapping it keeps it, not puts it down. */
+  private autoPicked = false;
   private shaking = false;
   private fingerX = 0;
   private fingerY = 0;
@@ -489,16 +491,21 @@ day ${lockedUntil}`, {
     return this.selected;
   }
 
+  /** Tap a jar to pick it up; tap it again to put it down (then a finger on the bare tray wipes it). */
   private select(toppingId: string): void {
-    this.selected = toppingId;
+    this.selected = this.selected === toppingId && !this.autoPicked ? null : toppingId;
+    this.autoPicked = false;
     this.refresh();
   }
 
   private startShake(p: Phaser.Input.Pointer): void {
     const s = session();
     if (!s.toppingWork) {
-      // No donut on the board: scrub the tray if it's messy.
-      if (this.wiper.dirty) this.wiper.start(p);
+      // No donut on the board: scrub the tray if it's messy (only with no jar in hand).
+      if (this.wiper.dirty && !this.selectedTopping()) {
+        this.wiper.start(p);
+        this.flash('scrubbing the tray clean');
+      }
       else this.flash(s.shelf.length ? 'take a donut from the shelf first' : 'glaze some donuts first');
       return;
     }
@@ -652,7 +659,10 @@ day ${lockedUntil}`, {
     s.fadeMess('toppings', TRAY_KEEP);
     this.mess.refresh();
     const open = this.jars.filter((j) => j.lockedUntil === null);
-    if (!this.selected && open.length === 1) this.selected = open[0]!.topping.id;
+    if (!this.selected && open.length === 1) {
+      this.selected = open[0]!.topping.id;
+      this.autoPicked = true;
+    }
     const ghost = this.add.image(from.x, from.y, from.key).setDisplaySize(from.size, from.size).setDepth(15);
     this.board.setAlpha(0);
     this.tweens.add({
