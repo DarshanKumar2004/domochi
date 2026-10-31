@@ -39,6 +39,8 @@ export interface GlazeBalance {
   fallMs: number;
   /** Most glazed donuts the shelf holds. */
   shelfCapacity: number;
+  /** Donuts on the glazing tray at once. */
+  boards?: number;
   /** Share of a flavour's drizzle stripes covered for full marks. */
   patternGoodCoverage: number;
   /** Paint off the stripes (relative to their size) at which a patterned drizzle scores 0. Gentler than spillZeroAt: the stripes are a small target. */
@@ -313,9 +315,16 @@ export class GlazeWork {
     private readonly menu: Menu,
     private readonly b: GlazeBalance,
     tpl?: MaskTemplate,
+    /** Back from the shelf for more glaze: its layers so far, and anything on top to keep. */
+    from?: { layers: readonly GlazeLayer[]; extra?: Record<string, unknown> },
   ) {
     this.tpl = tpl ?? ringMask(b);
+    if (from) this.layers.push(...from.layers.map((l) => ({ ...l, segments: [...l.segments] })));
+    this.extra = from?.extra ?? {};
   }
+
+  /** Fields carried through a re-glaze unchanged (its toppings). */
+  private readonly extra: Record<string, unknown>;
 
   /** Every layer, finished and in progress, bottom first (for drawing). */
   get allLayers(): GlazeLayer[] {
@@ -388,7 +397,7 @@ export class GlazeWork {
   finish(): GlazedDonut {
     this.closeCurrent();
     const layers = [...this.layers].sort((a, c) => (a.kind === c.kind ? 0 : a.kind === 'base' ? -1 : 1));
-    return { id: this.id, fry: this.fry, layers };
+    return { ...this.extra, id: this.id, fry: this.fry, layers };
   }
 
   private closeCurrent(): void {

@@ -194,9 +194,9 @@ export class BoxScene extends StationScene {
   }
 
   /** Lay out the open box for `size` slots: a grid that fits the box area, drawn as card with dimples. */
-  private layoutBox(size: number, ordered: number): void {
+  private layoutBox(size: number, ordered: number, idle = false): void {
     const v = getViewport(this);
-    const key = `${v.width}x${v.height}:${size}:${ordered}`;
+    const key = `${v.width}x${v.height}:${size}:${ordered}:${idle}`;
     if (key === this.shownLayout) return;
     this.shownLayout = key;
     const a = this.boxArea;
@@ -233,7 +233,7 @@ export class BoxScene extends StationScene {
     });
     this.slotNumbers.forEach((t, i) => {
       const s = this.slots[i];
-      t.setVisible(!!s);
+      t.setVisible(!!s && !idle);
       // Ordered slots are numbered; spare ones get a "+": room for a gift.
       if (s) t.setText(i < ordered ? String(i + 1) : '+').setAlpha(i < ordered ? 1 : 0.6).setPosition(s.x, s.y).setFontSize(Math.round(Math.min(48, this.slotSize * 0.3)));
     });
@@ -261,7 +261,9 @@ export class BoxScene extends StationScene {
     this.card = null;
     const active = s.activeTicket;
     const size = s.boxSize;
-    this.layoutBox(size, active?.order.flavors.length ?? 0);
+    // With no order selected, an empty trio stays on the counter (dimmed) so the station never looks bare.
+    this.layoutBox(size || 3, active?.order.flavors.length ?? 0, !active);
+    this.boxBody.setAlpha(active ? 1 : 0.5);
     this.slotImgs.forEach((img, i) => {
       const d = i < size ? s.box[i] : undefined;
       img.setVisible(!!d);

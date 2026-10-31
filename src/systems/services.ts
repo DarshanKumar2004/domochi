@@ -74,7 +74,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
     day,
     rng: createRng(seedOverride ?? randomSeed()),
     ...(opts.tutorial
-      ? { script: { orders: [{ flavors, boxId: boxFor(menu, flavors.length).id }] } }
+      ? { script: { orders: [{ flavors, boxId: boxFor(menu, flavors.length).id }] }, trackDough: true }
       : { dayFlow: true, events: popupEvents, ...(event ? { event } : {}) }),
   });
   return currentSession;

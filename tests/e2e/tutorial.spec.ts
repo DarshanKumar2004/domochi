@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, drawPath, isVisibleNamed, pauseClock, shot, tapNamed, toPage, waitForScene } from './helpers';
+import balanceJson from '../../src/data/balance.json' with { type: 'json' };
+import { stirDough, advance, boundsNamed, drawPath, isVisibleNamed, pauseClock, shot, tapNamed, toPage, waitForScene } from './helpers';
 
 type Slot = { down: number; up: number; flips: number } | null;
 interface SessionView {
@@ -62,9 +63,21 @@ test('the guided first order: mochi the donut walks you through every station', 
   await waitForScene(page, SceneKeys.Order, false);
   expect(await s((x) => x.ticket(1)!.order.flavors)).toEqual(['cookies-and-cream']);
 
-  // Not at the fryer yet: Ethan sends you there.
+  // First the dough: mochi sends you to the Dough station and points at each ingredient in turn.
+  await expect.poll(() => line(page)).toContain('Dough station');
+  await shot(page, 'tutorial-2-go-to-dough');
+  await tapNamed(page, SceneKeys.Hud, 'tab-Dough');
+  await waitForScene(page, SceneKeys.Dough);
+  await expect.poll(() => line(page)).toContain('scoop');
+  await shot(page, 'tutorial-2b-scoop');
+  for (const [id, n] of Object.entries(balanceJson.dough.recipe)) for (let i = 0; i < n; i++) await tapNamed(page, SceneKeys.Dough, `bin-${id}`);
+  await expect.poll(() => line(page)).toContain('stir');
+  await stirDough(page);
+  await expect.poll(() => line(page)).toContain('Into the tub');
+  await tapNamed(page, SceneKeys.Dough, 'btn-dough-done');
+
+  // Now the fryer.
   await expect.poll(() => line(page)).toContain('Fry station');
-  await shot(page, 'tutorial-2-go-to-fry');
   await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
   await waitForScene(page, SceneKeys.Fry);
   await advance(page, 12_000); // the oil heats up

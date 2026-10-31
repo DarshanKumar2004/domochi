@@ -19,9 +19,10 @@ export class TrayWiper {
   constructor(
     scene: Phaser.Scene,
     private readonly tray: 'glaze' | 'toppings',
-    private readonly mess: () => Phaser.Textures.CanvasTexture,
-    /** The board: centre and donut size (the tray is a little bigger). */
-    private readonly board: () => { x: number; y: number; size: number },
+    /** The tray's mess canvases, one per donut spot. */
+    private readonly mess: () => readonly Phaser.Textures.CanvasTexture[],
+    /** Each spot: centre and donut size (its mess canvas is a little bigger). */
+    private readonly boards: () => readonly { x: number; y: number; size: number }[],
     private readonly onClean: () => void,
   ) {
     this.sponge = scene.add.image(0, 0, TextureKeys.Sponge).setDepth(22).setVisible(false).setName(`sponge-${tray}`);
@@ -60,7 +61,7 @@ export class TrayWiper {
     const dx = p.x - this.lastX;
     const dy = p.y - this.lastY;
     if (dx === 0 && dy === 0) return;
-    const b = this.board();
+    const b = this.boards()[0]!;
     const dist = Math.hypot(dx, dy) / (b.size / 2); // in donut-normalised units
     this.erase(this.lastX, this.lastY, p.x, p.y);
     this.lastX = p.x;
@@ -78,31 +79,35 @@ export class TrayWiper {
     }
   }
 
-  /** Rub the mess off the canvas along the sponge's path. */
+  /** Rub the mess off every spot's canvas along the sponge's path. */
   private erase(x0: number, y0: number, x1: number, y1: number): void {
-    const b = this.board();
-    const span = b.size * (1 + 2 * TRAY_PAD);
-    const k = MESS_SIZE / span;
-    const toCanvas = (x: number, y: number) => [(x - (b.x - span / 2)) * k, (y - (b.y - span / 2)) * k] as const;
-    const [ax, ay] = toCanvas(x0, y0);
-    const [bx, by] = toCanvas(x1, y1);
-    const tex = this.mess();
-    const ctx = tex.context;
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = MESS_SIZE * 0.2;
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(bx + 0.01, by);
-    ctx.stroke();
-    ctx.restore();
-    tex.refresh();
+    const boards = this.boards();
+    this.mess().forEach((tex, i) => {
+      const b = boards[i];
+      if (!b) return;
+      const span = b.size * (1 + 2 * TRAY_PAD);
+      const k = MESS_SIZE / span;
+      const toCanvas = (x: number, y: number) => [(x - (b.x - span / 2)) * k, (y - (b.y - span / 2)) * k] as const;
+      const [ax, ay] = toCanvas(x0, y0);
+      const [bx, by] = toCanvas(x1, y1);
+      const ctx = tex.context;
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = MESS_SIZE * 0.2;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx + 0.01, by);
+      ctx.stroke();
+      ctx.restore();
+      tex.refresh();
+    });
   }
 
   private clearAll(): void {
-    const tex = this.mess();
-    tex.context.clearRect(0, 0, MESS_SIZE, MESS_SIZE);
-    tex.refresh();
+    for (const tex of this.mess()) {
+      tex.context.clearRect(0, 0, MESS_SIZE, MESS_SIZE);
+      tex.refresh();
+    }
   }
 }

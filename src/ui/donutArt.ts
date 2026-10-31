@@ -57,9 +57,18 @@ export function drawGlazeSegment(ctx: CanvasRenderingContext2D, size: number, gl
     return;
   }
 
-  ctx.strokeStyle = g.color;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  if (g.style === 'drizzle') {
+    // Piped icing: a soft shadow edge under the line, so white icing reads on white glaze.
+    ctx.strokeStyle = 'rgba(70,50,35,0.28)';
+    ctx.lineWidth = r * 2 + Math.max(2, 3 * k);
+    ctx.beginPath();
+    ctx.moveTo(px(x0), px(y0) + k);
+    ctx.lineTo(px(x1) + 0.01, px(y1) + k);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = g.color;
   ctx.lineWidth = r * 2;
   ctx.beginPath();
   ctx.moveTo(px(x0), px(y0));
@@ -151,18 +160,23 @@ export function fadeTray(ctx: CanvasRenderingContext2D, keep = 0.55): void {
 /** A steel tray centred on (x, y) for a donut of `size`. */
 export function drawTray(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number): void {
   const s = size * (1 + 2 * TRAY_PAD);
-  const r = s * 0.08;
+  drawTrayRect(g, x, y, s, s);
+}
+
+/** A steel tray of any size, centred on (x, y). */
+export function drawTrayRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number): void {
+  const r = Math.min(w, h) * 0.08;
   g.clear();
   g.fillStyle(0x000000, 0.25);
-  g.fillRoundedRect(x - s / 2 + 8, y - s / 2 + 12, s, s, r);
+  g.fillRoundedRect(x - w / 2 + 8, y - h / 2 + 12, w, h, r);
   g.fillStyle(0xb9c0c6);
-  g.fillRoundedRect(x - s / 2, y - s / 2, s, s, r);
+  g.fillRoundedRect(x - w / 2, y - h / 2, w, h, r);
   g.fillStyle(0xd7dce0);
-  g.fillRoundedRect(x - s / 2 + 16, y - s / 2 + 16, s - 32, s - 32, r * 0.7);
+  g.fillRoundedRect(x - w / 2 + 16, y - h / 2 + 16, w - 32, h - 32, r * 0.7);
   g.lineStyle(5, 0x1f1a17);
-  g.strokeRoundedRect(x - s / 2, y - s / 2, s, s, r);
+  g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, r);
   g.lineStyle(3, 0x9aa3ab, 0.8);
-  g.strokeRoundedRect(x - s / 2 + 16, y - s / 2 + 16, s - 32, s - 32, r * 0.7);
+  g.strokeRoundedRect(x - w / 2 + 16, y - h / 2 + 16, w - 32, h - 32, r * 0.7);
 }
 
 /** Dashed guide paths, in donut-normalised coordinates, drawn onto a Graphics. */

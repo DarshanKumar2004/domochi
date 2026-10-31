@@ -49,9 +49,9 @@
     "ringRadius": 0.65,
     "ballOverlap": 1.15,
     "edgeMargin": 0.08,
-    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.16 },
+    "brushRadius": { "dip": 0.16, "dust": 0.2, "drizzle": 0.045 },
     "goodCoverage": { "dip": 0.9, "dust": 0.85 },
-    "drizzleAmount": { "idealMin": 0.25, "idealMax": 0.65, "zeroAt": 0.95 },
+    "drizzleAmount": { "idealMin": 0.18, "idealMax": 0.5, "zeroAt": 0.9 },
     "drizzleBallTouched": 0.06,
     "spillZeroAt": 0.6,
     "wrongGlazeFactor": 0.3,
@@ -60,6 +60,8 @@
     "drizzleWeight": 0.35,
     "fallMs": 140,
     "shelfCapacity": 6,
+    "_boards": "Donuts on the glazing tray at once.",
+    "boards": 2,
     "_pattern": "Flavours with a drizzlePattern score the drizzle like a coat over those stripes: coverage of the stripes / patternGoodCoverage, minus spill off them (0 at patternSpillZeroAt × the stripes' size).",
     "patternGoodCoverage": 0.7,
     "patternSpillZeroAt": 1.5
@@ -86,8 +88,8 @@
     "gift": { "tipPerDonut": 0.75, "max": 3, "tierBoost": 1 }
   },
   "dough": {
-    "_note": "Morning prep: scoop the recipe into the bowl, stir, and the batch fills the dough tub (batchSize donuts). Quality = 1 − scoopPenalty × (scoops off the recipe), at least qualityFloor. Each donut dropped in the fryer uses one.",
-    "batchSize": 12,
+    "_note": "Morning prep: scoop the recipe into the bowl, stir, and the batch fills the dough tub. The ingredient you have least of (relative to the recipe) sets how many donuts it makes: batchSize × that share (a double recipe makes twice as many; any missing ingredient makes none). Quality = 1 − scoopPenalty × (scoops off those proportions), at least qualityFloor. Each donut dropped in the fryer uses one.",
+    "batchSize": 8,
     "tubCapacity": 24,
     "stirTurns": 5,
     "scoopPenalty": 0.15,

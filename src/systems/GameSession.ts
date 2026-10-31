@@ -156,6 +156,8 @@ export interface SessionDeps {
   dayFlow?: boolean;
   /** Today is a pop-up booth day. */
   event?: PopupEvent;
+  /** Frying needs dough even without the full day (the tutorial teaches the Dough station). */
+  trackDough?: boolean;
   /** Events a happy customer might invite you to. */
   events?: PopupEvent[];
 }
@@ -182,7 +184,8 @@ export class GameSession {
   private activeNo: number | null = null;
   private readonly rackDonuts: FriedDonut[] = [];
   private readonly shelfDonuts: FinishedDonut[] = [];
-  private work: GlazeWork | null = null;
+  /** Donuts on the glazing tray (balance.glaze.boards spots). */
+  private readonly boards: (GlazeWork | null)[];
   private topWork: ToppingWork | null = null;
   /** The open box at the Box station (slot i holds a donut or nothing). */
   private readonly boxSlots: (FinishedDonut | undefined)[] = [];
@@ -212,8 +215,9 @@ export class GameSession {
     this.nextSpawnAtMs = deps.balance.spawn.firstDelaySec * 1000;
     this.fryer = new Fryer(deps.balance.fry);
     this.glazeMask = ringMask(deps.balance.glaze);
+    this.boards = new Array<GlazeWork | null>(Math.max(1, deps.balance.glaze.boards ?? 1)).fill(null);
     this.dayPhase = deps.dayFlow ? 'prep' : 'open';
-    this.doughLeft = deps.dayFlow ? 0 : Infinity;
+    this.doughLeft = deps.dayFlow || deps.trackDough ? 0 : Infinity;
     for (let i = 0; i < pickups; i++) this.addPickup();
   }
 
@@ -421,8 +425,9 @@ export class GameSession {
     return this.doughWork;
   }
 
+  /** Not even one more batch fits. */
   get tubFull(): boolean {
-    return this.doughLeft + this.deps.balance.dough.batchSize > this.deps.balance.dough.tubCapacity;
+    return this.tubSpace < this.deps.balance.dough.batchSize;
   }
 
   /** Start a batch in the bowl (one at a time). */
@@ -433,11 +438,16 @@ export class GameSession {
     return this.doughWork;
   }
 
-  /** The stirred batch goes in the tub. Null if it isn't ready or the tub can't take it. */
+  /** Room left in the tub (donuts' worth). */
+  get tubSpace(): number {
+    return Number.isFinite(this.doughLeft) ? this.deps.balance.dough.tubCapacity - this.doughLeft : Infinity;
+  }
+
+  /** The stirred batch goes in the tub. Null if it isn't ready, makes nothing, or doesn't fit. */
   finishDough(): { quality: number; added: number } | null {
     const w = this.doughWork;
-    if (!w || w.stage !== 'ready' || this.tubFull) return null;
-    const added = this.deps.balance.dough.batchSize;
+    if (!w || w.stage !== 'ready' || w.yield < 1 || w.yield > this.tubSpace) return null;
+    const added = w.yield;
     const left = Number.isFinite(this.doughLeft) ? this.doughLeft : 0;
     // The tub's quality is the mix of what's left and the new batch.
     this.doughQ = (this.doughQ * left + w.quality * added) / (left + added);
@@ -621,9 +631,33 @@ export class GameSession {
 
   // ---- Glazing ----------------------------------------------------------------
 
-  /** The donut on the glazing board, if any. */
+  /** The donuts on the glazing tray, by spot (null = free). */
+  get glazeBoards(): readonly (GlazeWork | null)[] {
+    return this.boards;
+  }
+
+  /** The first donut on the glazing tray, if any. */
   get glazeWork(): GlazeWork | null {
-    return this.work;
+    for (const w of this.boards) if (w) return w;
+    return null;
+  }
+
+  private freeBoard(slot?: number): number {
+    if (slot !== undefined && slot >= 0 && slot < this.boards.length && !this.boards[slot]) return slot;
+    return this.boards.indexOf(null);
+  }
+
+  /** The spot of a donut on the tray (the first one with glaze if not given). */
+  private boardSlot(slot?: number): number {
+    if (slot !== undefined) return this.boards[slot] ? slot : -1;
+    let first = -1;
+    for (let i = 0; i < this.boards.length; i++) {
+      const w = this.boards[i];
+      if (!w) continue;
+      if (w.hasGlaze) return i;
+      if (first < 0) first = i;
+    }
+    return first;
   }
 
   /** Finished (glazed, maybe topped) donuts on the shelf, oldest first, waiting to be boxed. */
@@ -636,31 +670,48 @@ export class GameSession {
     return this.shelfDonuts.length + (this.topWork ? 1 : 0) >= this.deps.balance.glaze.shelfCapacity;
   }
 
-  /** Move a rack donut onto the glazing board (one at a time). */
-  startGlazing(rackIndex: number): GlazeWork | null {
-    if (this.work) return null;
+  /** Move a rack donut onto the glazing tray (a free spot, or `slot`). */
+  startGlazing(rackIndex: number, slot?: number): GlazeWork | null {
+    const at = this.freeBoard(slot);
     const d = this.rackDonuts[rackIndex];
-    if (!d) return null;
+    if (at < 0 || !d) return null;
     this.rackDonuts.splice(rackIndex, 1);
-    this.work = new GlazeWork(d.id, d, this.deps.menu, this.deps.balance.glaze, this.glazeMask);
+    const w = new GlazeWork(d.id, d, this.deps.menu, this.deps.balance.glaze, this.glazeMask);
+    this.boards[at] = w;
     this.events.emit('changed', undefined);
-    return this.work;
+    return w;
   }
 
-  /** Done glazing: the donut goes to the shelf. Null if there's nothing to finish or the shelf is full. */
-  finishGlazing(): FinishedDonut | null {
-    if (!this.work || !this.work.hasGlaze || this.shelfFull) return null;
-    const d = this.work.finish();
+  /** Bring a glazed donut back from the shelf to add more glaze (its toppings stay). */
+  reglaze(shelfIndex: number, slot?: number): GlazeWork | null {
+    const at = this.freeBoard(slot);
+    const d = this.shelfDonuts[shelfIndex];
+    if (at < 0 || !d) return null;
+    this.shelfDonuts.splice(shelfIndex, 1);
+    const { id, fry, layers, ...extra } = d;
+    const w = new GlazeWork(id, fry, this.deps.menu, this.deps.balance.glaze, this.glazeMask, { layers, extra });
+    this.boards[at] = w;
+    this.events.emit('changed', undefined);
+    return w;
+  }
+
+  /** Done glazing (one donut): it goes to the shelf. Null if there's nothing to finish or the shelf is full. */
+  finishGlazing(slot?: number): FinishedDonut | null {
+    const at = this.boardSlot(slot);
+    const w = at >= 0 ? this.boards[at] : null;
+    if (!w || !w.hasGlaze || this.shelfFull) return null;
+    const d = w.finish();
     this.shelfDonuts.push(d);
-    this.work = null;
+    this.boards[at] = null;
     this.events.emit('changed', undefined);
     return d;
   }
 
-  /** Redo: throw away the donut on the board (you'll glaze another one). */
-  trashGlazing(): boolean {
-    if (!this.work) return false;
-    this.work = null;
+  /** Redo: throw away a donut on the tray (you'll glaze another one). */
+  trashGlazing(slot?: number): boolean {
+    const at = this.boardSlot(slot);
+    if (at < 0) return false;
+    this.boards[at] = null;
     this.trashed1();
     return true;
   }

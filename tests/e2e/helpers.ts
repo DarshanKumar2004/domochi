@@ -306,3 +306,21 @@ export async function openDay(page: Page, batches = 2): Promise<void> {
     [recipe as Record<string, number>, stirTurns, batches] as const,
   );
 }
+
+/** Stir the Dough station's bowl: circles round it until the dough is smooth. */
+export async function stirDough(page: Page): Promise<void> {
+  const b = await boundsNamed(page, 'DoughScene', 'dough-stir');
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  const r = Math.min(b.w, b.h) * 0.3;
+  const pts = await Promise.all(Array.from({ length: 17 }, (_, k) => toPage(page, cx + Math.cos((k / 16) * Math.PI * 2) * r, cy + Math.sin((k / 16) * Math.PI * 2) * r * 0.5)));
+  await page.mouse.move(pts[0]!.px, pts[0]!.py);
+  await page.mouse.down();
+  for (let turn = 0; turn < balanceJson.dough.stirTurns + 1; turn++) {
+    for (const p of pts.slice(1)) {
+      await page.mouse.move(p.px, p.py);
+      await page.waitForTimeout(20);
+    }
+  }
+  await page.mouse.up();
+}

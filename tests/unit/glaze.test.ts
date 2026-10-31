@@ -164,12 +164,12 @@ describe('glazeScoreFor: matching a glazed donut to a flavour', () => {
     w.pour('white-icing', -0.8, 0, 0.8, 0);
     expect(w.currentLayer!.spill).toBeLessThan(0.02);
     const smothered = new GlazeWork(1, fried, menu, B);
-    zigzag((a, b, c, d) => smothered.pour('white-icing', a, b, c, d), 7, 0.7);
+    zigzag((a, b, c, d) => smothered.pour('white-icing', a, b, c, d), 30, 0.8);
     expect(drizzleQuality(smothered.currentLayer!, B)).toBeLessThan(0.2);
   });
 
-  it('the drizzle pours as thick as the glaze', () => {
-    expect(B.brushRadius.drizzle).toBe(B.brushRadius.dip);
+  it('the drizzle is a thin stream (thinner icing, Kumar 2026-10-31)', () => {
+    expect(B.brushRadius.drizzle).toBeLessThan(B.brushRadius.dip / 2);
   });
 
   it('missing the drizzle costs the drizzle share', () => {

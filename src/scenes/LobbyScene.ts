@@ -3,6 +3,7 @@ import { TextureKeys } from '../assets/keys';
 import type { Customer } from '../systems/GameSession';
 import { audio, session } from '../systems/services';
 import { Booth } from '../ui/Booth';
+import { LobbyScenery } from '../ui/LobbyScenery';
 import { Button } from '../ui/Button';
 import type { Viewport } from '../ui/layout';
 import { SpeechBubble } from '../ui/SpeechBubble';
@@ -82,6 +83,7 @@ export class LobbyScene extends Phaser.Scene {
   private doneText!: Phaser.GameObjects.Text;
   private bubble: SpeechBubble | null = null;
   private truck: Truck | null = null;
+  private scenery!: LobbyScenery;
   /** Morning prep / closing time: a checklist and a button (open the window, close up). */
   private panelText!: Phaser.GameObjects.Text;
   private openButton!: Button;
@@ -97,16 +99,17 @@ export class LobbyScene extends Phaser.Scene {
     this.bubble = null;
     this.confirmOpen = false;
     this.cameras.main.setBackgroundColor(COLORS.sky);
-    const ground = this.add.graphics();
+    this.scenery = new LobbyScenery(this);
     // A pop-up booth on event days, the trailer otherwise.
     const ev = session().event;
     this.truck = ev ? null : new Truck(this, 0, 0);
     const truck: Phaser.GameObjects.Container = this.truck ?? new Booth(this, 0, 0, ev!.name);
     const sign = this.add.image(0, 0, TextureKeys.SignAFrame).setOrigin(0.5, 1);
-    const waiting = this.add.rectangle(0, 0, 1, 1, 0xffffff, 0.25).setStrokeStyle(6, COLORS.ink, 0.35);
+    // A little chalkboard naming the patio where customers wait.
     const waitingLabel = this.add
-      .text(0, 0, 'Waiting', { fontFamily: FONT_FAMILY, fontSize: '40px', color: CSS.ink })
-      .setOrigin(0.5);
+      .text(0, 0, 'waiting patio', { fontFamily: FONT_FAMILY, fontSize: '34px', color: CSS.cream, backgroundColor: '#2b2522', padding: { x: 16, y: 6 } })
+      .setOrigin(0.5)
+      .setDepth(4);
 
     this.frontTag = this.add
       .text(0, 0, 'Tap me!', {
@@ -155,16 +158,16 @@ export class LobbyScene extends Phaser.Scene {
       const c = v.content;
       const groundY = c.y + L.groundY;
 
-      // The ground fills the whole screen width and runs under the tab bar.
-      ground.clear();
-      ground.fillStyle(COLORS.concrete);
-      ground.fillRect(0, groundY, v.width, v.height - groundY);
-      ground.fillStyle(0xf4f2ee);
-      for (let x = 60; x < v.width; x += 240) ground.fillRect(x, groundY + 53, 120, 14);
+      // The lot, sky and patio fill the whole screen width and run under the tab bar.
+      this.scenery.layout(v, {
+        groundY,
+        truck: { x: c.x + L.truck.x, y: c.y + L.truck.y, scale: L.truck.scale },
+        sign: { x: c.x + L.sign.x, feetY: c.y + L.sign.feetY },
+        patio: { x: c.x + L.waiting.x, y: c.y + L.waiting.y, w: L.waiting.w, h: L.waiting.h },
+      });
 
       truck.setPosition(c.x + L.truck.x, c.y + L.truck.y).setScale(L.truck.scale);
       sign.setPosition(c.x + L.sign.x, c.y + L.sign.feetY).setScale(L.sign.scale);
-      waiting.setPosition(c.x + L.waiting.x, c.y + L.waiting.y).setSize(L.waiting.w, L.waiting.h);
       waitingLabel.setPosition(c.x + L.waiting.x, c.y + L.waiting.labelY);
       this.doneText.setPosition(c.x + c.width / 2, c.y + (v.orientation === 'landscape' ? 160 : 230));
       this.panelText.setPosition(c.x + L.panel.x, c.y + L.panel.y).setWordWrapWidth(L.panel.width);
@@ -173,6 +176,10 @@ export class LobbyScene extends Phaser.Scene {
       this.pickupsText.setPosition(c.x + L.pickups.x, c.y + L.pickups.y);
       this.sync(true);
     });
+  }
+
+  override update(_time: number, delta: number): void {
+    this.scenery.update(delta);
   }
 
   // ---- Rendering from session state --------------------------------------
@@ -218,6 +225,7 @@ export class LobbyScene extends Phaser.Scene {
   /** The prep / closing checklist and button, the sign, and the pickups list. */
   private syncPanels(): void {
     const s = session();
+    this.scenery.setPhase(s.phase);
     this.truck?.setOpen(s.phase === 'open');
     const prep = s.phase === 'prep';
     const closing = s.phase === 'closing';

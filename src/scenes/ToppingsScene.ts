@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { ToppingWork } from '../stations/toppings';
-import { flavorsForDay, type Topping } from '../systems/menu';
+import type { Topping } from '../systems/menu';
 import { audio, balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import {
@@ -45,6 +45,8 @@ const PIECE_TEX_R = 0.7;
 
 interface JarView {
   topping: Topping;
+  /** Day it unlocks (if it's still locked today: drawn as a dotted outline). */
+  lockedUntil: number | null;
   img: Phaser.GameObjects.Image;
   fill: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text;
@@ -105,6 +107,8 @@ export class ToppingsScene extends StationScene {
   private shelfImgs: Phaser.GameObjects.Image[] = [];
   private trash!: Phaser.GameObjects.Image;
   private jars: JarView[] = [];
+  /** Dotted outlines where locked jars will go. */
+  private lockedJars!: Phaser.GameObjects.Graphics;
   private jarHighlight!: Phaser.GameObjects.Graphics;
   private hand!: Phaser.GameObjects.Container;
   private handJar!: Phaser.GameObjects.Image;
@@ -165,10 +169,16 @@ export class ToppingsScene extends StationScene {
     this.guideSpot = this.add.graphics().setName('toppings-guide-spot');
     this.boardZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('toppings-board');
 
-    // Jars for every topping used by today's flavours.
-    const used = new Set(flavorsForDay(menu, session().day).flatMap((f) => f.toppings));
+    // A jar for every topping on the menu; ones not unlocked yet are dotted outlines.
     this.jarHighlight = this.add.graphics();
-    for (const t of menu.toppings.filter((x) => used.has(x.id))) this.jars.push(this.makeJar(t));
+    this.lockedJars = this.add.graphics();
+    const day = session().day;
+    for (const t of menu.toppings) {
+      const uses = menu.flavors.filter((f) => f.toppings.includes(t.id));
+      if (!uses.length) continue;
+      const unlock = Math.min(...uses.map((f) => f.unlockDay));
+      this.jars.push(this.makeJar(t, unlock > day ? unlock : null));
+    }
 
     for (let i = 0; i < FALLING; i++) {
       this.falling.push({
@@ -202,7 +212,7 @@ export class ToppingsScene extends StationScene {
       this.fingerY = p.worldY;
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, () => this.stopShake());
-    this.wiper = new TrayWiper(this, 'toppings', () => this.mess, () => this.boardPos, () => {
+    this.wiper = new TrayWiper(this, 'toppings', () => [this.mess], () => [this.boardPos], () => {
       audio().play('ding');
       this.flash('sparkling clean!');
       this.refresh();
@@ -280,15 +290,27 @@ export class ToppingsScene extends StationScene {
     return key;
   }
 
-  private makeJar(t: Topping): JarView {
+  private makeJar(t: Topping, lockedUntil: number | null): JarView {
     const img = this.add.image(0, 0, TextureKeys.ToppingJar).setName(`jar-${t.id}`);
     const fill = this.add.image(0, 0, this.jarFillTexture(t));
-    img.setInteractive({ useHandCursor: true });
-    img.on(Phaser.Input.Events.POINTER_DOWN, () => this.select(t.id));
+    if (lockedUntil === null) {
+      img.setInteractive({ useHandCursor: true });
+      img.on(Phaser.Input.Events.POINTER_DOWN, () => this.select(t.id));
+    } else {
+      img.setVisible(false);
+      fill.setVisible(false);
+    }
     const label = this.add
-      .text(0, 0, t.name, { fontFamily: FONT_FAMILY, fontSize: '26px', color: CSS.cream, align: 'center', wordWrap: { width: 190 } })
+      .text(0, 0, lockedUntil === null ? t.name : `${t.name}
+day ${lockedUntil}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '26px',
+        color: lockedUntil === null ? CSS.cream : CSS.muted,
+        align: 'center',
+        wordWrap: { width: 190 },
+      })
       .setOrigin(0.5, 0);
-    return { topping: t, img, fill, label };
+    return { topping: t, img, fill, label, lockedUntil };
   }
 
   protected layoutStation(v: Viewport): void {
@@ -315,12 +337,27 @@ export class ToppingsScene extends StationScene {
 
     this.jarScale = L.jars.scale;
     const n = this.jars.length;
+    this.lockedJars.clear();
     this.jars.forEach((jar, i) => {
       const jx = c.x + L.jars.x + (i - (n - 1) / 2) * L.jars.step;
       const jy = c.y + L.jars.y;
       jar.img.setPosition(jx, jy).setScale(L.jars.scale);
       jar.fill.setPosition(jx, jy).setScale(L.jars.scale);
       jar.label.setPosition(jx, jy + 130 * L.jars.scale + 10);
+      if (jar.lockedUntil !== null) {
+        // A dotted outline where the jar will be.
+        const w = 140 * L.jars.scale;
+        const h = 190 * L.jars.scale;
+        const pts = [
+          { x: -w / 2, y: -h / 2 },
+          { x: w / 2, y: -h / 2 },
+          { x: w / 2, y: h / 2 },
+          { x: -w / 2, y: h / 2 },
+          { x: -w / 2, y: -h / 2 },
+        ];
+        this.lockedJars.lineStyle(4, COLORS.cream, 0.5);
+        drawDashedPath(this.lockedJars, jx, jy, 1, pts, 10, 8);
+      }
     });
 
     this.instruction.setPosition(c.x + L.instruction.x, c.y + L.instruction.y);
@@ -360,7 +397,7 @@ export class ToppingsScene extends StationScene {
       if (st.phase === 'closing' && st.messOn('toppings') > 0) this.instruction.setText('closing time: scrub the tray clean');
       else this.instruction.setText((s.shelf.length ? 'tap a glazed donut to top it' : 'no glazed donuts: glaze some first!') + (st.messOn('toppings') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : ''));
     }
-    else if (!this.jars.length) this.instruction.setText("nothing on today's menu needs toppings");
+    else if (!this.jars.some((j) => j.lockedUntil === null)) this.instruction.setText("nothing on today's menu needs toppings");
     else if (!t) this.instruction.setText('pick a jar');
     else this.instruction.setText(t.style === 'piece' ? `tap the donut to place a ${t.name}` : `shake ${t.name} over the donut`);
     this.refreshControls();
@@ -614,7 +651,8 @@ export class ToppingsScene extends StationScene {
     fadeTray(this.mess.context, TRAY_KEEP);
     s.fadeMess('toppings', TRAY_KEEP);
     this.mess.refresh();
-    if (!this.selected && this.jars.length === 1) this.selected = this.jars[0]!.topping.id;
+    const open = this.jars.filter((j) => j.lockedUntil === null);
+    if (!this.selected && open.length === 1) this.selected = open[0]!.topping.id;
     const ghost = this.add.image(from.x, from.y, from.key).setDisplaySize(from.size, from.size).setDepth(15);
     this.board.setAlpha(0);
     this.tweens.add({

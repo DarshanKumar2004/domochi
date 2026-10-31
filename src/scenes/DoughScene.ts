@@ -182,11 +182,17 @@ export class DoughScene extends StationScene {
     if (!w || w.totalScoops === 0) this.instruction.setText(s.tubFull ? 'the tub is full!' : 'tap the ingredients to scoop them in');
     else if (w.stage !== 'ready') this.instruction.setText('stir: drag round and round in the bowl');
     else this.instruction.setText('smooth! tip it into the tub');
-    if (!w || w.totalScoops === 0) this.readout.setText('follow the recipe below');
-    else this.readout.setText(`${w.totalScoops} scoops · stirred ${Math.round(w.stirProgress * 100)}%${w.stage === 'ready' ? ` · ${doughVerdict(w.quality)}` : ''}`);
+    if (!w || w.totalScoops === 0) this.readout.setText('follow the recipe below (double it for twice the donuts)');
+    else {
+      // How much it makes depends on the ingredient you have least of.
+      const names = new Map(D.ingredients.map((i) => [i.id, i.name]));
+      const makes = w.yield ? `makes ${w.yield} donut${w.yield === 1 ? '' : 's'}` : `needs ${w.missing.map((id) => names.get(id)).join(', ')}`;
+      const fits = w.yield > s.tubSpace ? ' · too much for the tub!' : '';
+      this.readout.setText(`${makes}${fits} · stirred ${Math.round(w.stirProgress * 100)}%${w.stage === 'ready' && w.yield ? ` · ${doughVerdict(w.quality)}` : ''}`);
+    }
 
     this.redoButton.setEnabled(!!w && w.totalScoops > 0);
-    this.doneButton.setEnabled(!!w && w.stage === 'ready' && !s.tubFull);
+    this.doneButton.setEnabled(!!w && w.stage === 'ready' && w.yield >= 1 && w.yield <= s.tubSpace);
     this.drawContents();
   }
 
@@ -335,9 +341,11 @@ export class DoughScene extends StationScene {
 
   private done(): void {
     const s = session();
+    const w = s.doughBatch;
     const res = s.finishDough();
     if (!res) {
-      if (s.tubFull) this.flash('the tub is full!');
+      if (w && w.yield < 1) this.flash('that makes no dough: add every ingredient');
+      else this.flash('too much for the tub!');
       return;
     }
     audio().play('lid');

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import tutorial from '../data/tutorial.json';
-import { menu, save, session } from '../systems/services';
+import { balance, menu, save, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import type { Viewport } from '../ui/layout';
 import { SpeechBubble } from '../ui/SpeechBubble';
@@ -123,9 +123,18 @@ export class TutorialScene extends Phaser.Scene {
       case 0:
         if (active(SceneKeys.Order)) return { id: 'take', target: { scene: SceneKeys.Order, name: 'btn-take-order' } };
         return { id: 'customer', station: SceneKeys.Lobby, target: { scene: SceneKeys.Lobby, name: 'customer-front' } };
-      case 1:
+      case 1: {
         if (active(SceneKeys.Order)) return { id: 'take', target: { scene: SceneKeys.Order, name: 'btn-take-order' } };
+        // No dough yet: the Dough station first (scoop each ingredient, stir, into the tub).
+        if (s.dough < 1) {
+          const w = s.doughBatch;
+          const next = Object.entries(balance.dough.recipe).find(([id, n]) => (w?.scoopsOf(id) ?? 0) < n);
+          if (next) return { id: 'scoop', station: SceneKeys.Dough, target: { scene: SceneKeys.Dough, name: `bin-${next[0]}` } };
+          if (w && w.stage !== 'ready') return { id: 'stir', station: SceneKeys.Dough, target: { scene: SceneKeys.Dough, name: 'dough-stir' } };
+          return { id: 'tub', station: SceneKeys.Dough, target: { scene: SceneKeys.Dough, name: 'btn-dough-done' } };
+        }
         return { id: 'drop', station: SceneKeys.Fry, target: { scene: SceneKeys.Fry, name: 'btn-drop' } };
+      }
       case 2:
       case 3: {
         const slot = s.fryer.slots.findIndex((d) => d !== null);
@@ -140,7 +149,7 @@ export class TutorialScene extends Phaser.Scene {
           return { id: 'glazeDone', station: SceneKeys.Glaze, target: { scene: SceneKeys.Glaze, name: 'btn-glaze-done' } };
         }
         if (glaze.selectedCup !== recipe.glaze) return { id: 'cup', station: SceneKeys.Glaze, target: { scene: SceneKeys.Glaze, name: `cup-${recipe.glaze}` } };
-        return { id: 'pour', station: SceneKeys.Glaze, target: { scene: SceneKeys.Glaze, name: 'glaze-board' } };
+        return { id: 'pour', station: SceneKeys.Glaze, target: { scene: SceneKeys.Glaze, name: 'glaze-donut' } };
       }
       case 6:
         return { id: 'shelf', station: SceneKeys.Toppings, target: { scene: SceneKeys.Toppings, name: 'toppings-shelf-0' } };

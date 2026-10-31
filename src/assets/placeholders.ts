@@ -455,6 +455,88 @@ function paintPopupBooth(g: G): void {
   g.strokeRect(60, 470, 780, 26);
 }
 
+/** A soft cartoon cloud. */
+function paintCloud(g: G): void {
+  g.fillStyle(0xffffff, 0.95);
+  g.fillEllipse(120, 72, 220, 64);
+  g.fillCircle(80, 56, 38);
+  g.fillCircle(132, 42, 48);
+  g.fillCircle(178, 60, 32);
+  g.fillStyle(0xe8eef4, 0.9);
+  g.fillEllipse(120, 92, 200, 22);
+}
+
+/** A Louisiana live oak: a wide, low canopy with Spanish moss hanging down. */
+function paintOakTree(g: G): void {
+  const ink = COLORS.ink;
+  // Trunk and spreading branches
+  g.fillStyle(0x6b4a33);
+  g.lineStyle(5, ink);
+  g.fillRect(205, 230, 50, 190);
+  g.strokeRect(205, 230, 50, 190);
+  g.lineStyle(26, 0x6b4a33);
+  g.lineBetween(230, 250, 110, 190);
+  g.lineBetween(230, 250, 360, 180);
+  // Canopy: overlapping blobs, dark then light
+  g.fillStyle(0x3f6b3a);
+  for (const [x, y, r] of [[90, 170, 80], [170, 120, 95], [270, 110, 100], [360, 160, 85], [230, 190, 90], [60, 210, 55], [400, 210, 55]] as const) g.fillCircle(x, y, r);
+  g.fillStyle(0x58894c);
+  for (const [x, y, r] of [[150, 100, 60], [260, 85, 65], [340, 130, 50], [100, 150, 45]] as const) g.fillCircle(x, y, r);
+  // Spanish moss: grey-green strands
+  g.lineStyle(6, 0x9fae8f, 0.9);
+  for (let i = 0; i < 16; i++) {
+    const x = 40 + i * 25;
+    const top = 200 + ((i * 37) % 50);
+    g.lineBetween(x, top, x + ((i % 3) - 1) * 6, top + 40 + ((i * 53) % 45));
+  }
+}
+
+/** A wooden picnic table under a pink patio umbrella, front view. */
+function paintPatioTable(g: G): void {
+  const ink = COLORS.ink;
+  // Umbrella pole and canopy
+  g.fillStyle(0xd7dce0);
+  g.fillRect(146, 60, 8, 170);
+  g.fillStyle(COLORS.pink);
+  g.lineStyle(5, ink);
+  g.beginPath();
+  g.moveTo(10, 90);
+  g.lineTo(150, 20);
+  g.lineTo(290, 90);
+  g.closePath();
+  g.fillPath();
+  g.strokePath();
+  g.fillStyle(0xffffff);
+  g.fillTriangle(150, 20, 110, 90, 150, 90);
+  g.fillTriangle(150, 20, 190, 90, 230, 90);
+  // Table top, legs and benches
+  g.fillStyle(0xb07a4a);
+  g.fillRect(40, 200, 220, 26);
+  g.strokeRect(40, 200, 220, 26);
+  g.fillStyle(0x8c5d36);
+  g.fillRect(60, 226, 14, 60);
+  g.fillRect(226, 226, 14, 60);
+  g.fillRect(20, 250, 260, 16);
+  g.strokeRect(20, 250, 260, 16);
+}
+
+/** A wooden planter box with flowers. */
+function paintPlanter(g: G): void {
+  const ink = COLORS.ink;
+  g.fillStyle(0x4f8a46);
+  for (const [x, y, r] of [[30, 60, 22], [62, 46, 26], [96, 52, 24], [124, 64, 20]] as const) g.fillCircle(x, y, r);
+  for (const [x, y, c] of [[34, 48, COLORS.pink], [70, 34, 0xffffff], [100, 44, 0xffd166], [124, 54, COLORS.pink], [56, 60, 0xffd166]] as const) {
+    g.fillStyle(c);
+    g.fillCircle(x, y, 9);
+  }
+  g.fillStyle(0xa8714a);
+  g.lineStyle(5, ink);
+  g.fillRect(10, 74, 130, 52);
+  g.strokeRect(10, 74, 130, 52);
+  g.lineStyle(3, 0x7d5234);
+  g.lineBetween(10, 100, 140, 100);
+}
+
 function paintIconDough(g: G): void {
   g.fillStyle(COLORS.cream);
   g.beginPath();
@@ -638,6 +720,10 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.Sponge]: { width: 120, height: 84, paint: paintSponge },
   [TextureKeys.PopupBooth]: { width: 900, height: 620, paint: paintPopupBooth },
   [TextureKeys.IconDough]: { width: 96, height: 96, paint: paintIconDough },
+  [TextureKeys.Cloud]: { width: 240, height: 110, paint: paintCloud },
+  [TextureKeys.OakTree]: { width: 460, height: 420, paint: paintOakTree },
+  [TextureKeys.PatioTable]: { width: 300, height: 290, paint: paintPatioTable },
+  [TextureKeys.Planter]: { width: 150, height: 130, paint: paintPlanter },
   [TextureKeys.FryDispenser]: { width: 215, height: 175, paint: paintFryDispenser },
   [TextureKeys.DonutFry]: { width: 160, height: 160, paint: paintDonutFry },
   [TextureKeys.GlazeCup]: { width: 150, height: 160, paint: paintGlazeCup },

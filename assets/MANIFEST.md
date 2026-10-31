@@ -32,6 +32,10 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `ingredient-bin` | `public/assets/ingredient-bin.png` | 160×200 | 1 | Placeholder (code) | Dough station ingredient canister (white; tinted and labelled per ingredient in code). |
 | `sponge` | `public/assets/sponge.png` | 120×84 | 1 | Placeholder (code) | Wiping the glaze and toppings trays at closing (follows your finger). |
 | `popup-booth` | `public/assets/popup-booth.png` | 900×620 | 1 | Placeholder (code) | Event days: a striped pop-up canopy with a blank banner (≈ 400×130 centred at (450, 150); the logo and event name go there in code) and a table. Anchors in `BOOTH_SPEC`. |
+| `cloud` | `public/assets/scenery/cloud.png` | 240×110 | 1 | Placeholder (code) | Lobby sky: clouds that drift slowly across. |
+| `oak-tree` | `public/assets/scenery/oak-tree.png` | 460×420 | 1 | Placeholder (code) | Lobby backdrop: a Louisiana live oak with Spanish moss (trunk base at the bottom centre). |
+| `patio-table` | `public/assets/scenery/patio-table.png` | 300×290 | 1 | Placeholder (code) | Lobby waiting patio: a picnic table under a pink umbrella. |
+| `planter` | `public/assets/scenery/planter.png` | 150×130 | 1 | Placeholder (code) | Lobby: a flower planter by the A-frame sign. |
 | `icon-dough` | `public/assets/icons/dough.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
 | `mascot` | `public/assets/mascot.png` | 220×210 | 1 | Placeholder (code) | "mochi", the tutorial guide: a strawberry-glazed pon de ring with a face. Bobs and squishes in code. |
 | `pointer-hand` | `public/assets/pointer-hand.png` | 120×164 | 1 | Placeholder (code) | Tutorial pointing hand. Fingertip at the top centre (≈ 59, 8); the tutorial rotates it to point at things. |

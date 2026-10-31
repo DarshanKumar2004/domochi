@@ -54,6 +54,32 @@ describe('dough', () => {
     expect(doughVerdict(w.quality)).toBe('perfect dough!');
   });
 
+  it('the scarcest ingredient sets the yield: just milk makes nothing, a double recipe makes double', () => {
+    const milk = new DoughWork(D);
+    for (let i = 0; i < 6; i++) milk.scoop('milk');
+    expect(milk.yield).toBe(0);
+    expect(milk.missing).toContain('rice-flour');
+    const double = new DoughWork(D);
+    for (const [id, n] of Object.entries(D.recipe)) for (let i = 0; i < n * 2; i++) double.scoop(id);
+    expect(double.yield).toBe(D.batchSize * 2);
+    expect(double.quality).toBe(1); // right proportions
+    // Not enough egg for a double: the egg decides.
+    const half = new DoughWork(D);
+    for (const [id, n] of Object.entries(D.recipe)) for (let i = 0; i < n * 2; i++) if (id !== 'egg') half.scoop(id);
+    half.scoop('egg');
+    expect(half.yield).toBe(D.batchSize);
+    expect(half.quality).toBeLessThan(1);
+  });
+
+  it('a batch that makes nothing can\'t go in the tub', () => {
+    const s = day(1);
+    const w = s.startDough()!;
+    w.scoop('milk');
+    w.stir(Math.PI * 2 * D.stirTurns);
+    expect(w.stage).toBe('ready');
+    expect(s.finishDough()).toBeNull();
+  });
+
   it('scoops off the recipe (extra or missing) cost quality, down to a floor', () => {
     const w = new DoughWork(D);
     w.scoop('rice-flour');
@@ -86,11 +112,13 @@ describe('a full day: prep, open, closing', () => {
     expect(s.dropDonut()).toBeGreaterThanOrEqual(0);
     expect(s.dough).toBe(D.batchSize - 1);
     expect(s.oilDirt).toBe(1);
-    // A second batch fits (24), a third doesn't.
+    // Fill the tub up batch by batch; a batch that doesn't fit stays in the bowl.
+    while (!s.tubFull) {
+      perfectBatch(s);
+      expect(s.finishDough()).not.toBeNull();
+    }
+    expect(s.dough).toBeLessThanOrEqual(D.tubCapacity);
     perfectBatch(s);
-    expect(s.finishDough()).not.toBeNull();
-    perfectBatch(s);
-    expect(s.tubFull).toBe(true);
     expect(s.finishDough()).toBeNull();
     expect(s.trashDough()).toBe(true);
   });
@@ -100,8 +128,10 @@ describe('a full day: prep, open, closing', () => {
     const lumpy = day(1, { seed: 1 });
     perfectBatch(good);
     good.finishDough();
+    // The recipe, plus three extra scoops of milk.
     const w = lumpy.startDough()!;
-    w.scoop('rice-flour');
+    for (const [id, n] of Object.entries(D.recipe)) for (let i = 0; i < n; i++) w.scoop(id);
+    for (let i = 0; i < 3; i++) w.scoop('milk');
     w.stir(Math.PI * 2 * D.stirTurns);
     lumpy.finishDough();
     for (const s of [good, lumpy]) {

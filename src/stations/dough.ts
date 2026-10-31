@@ -13,7 +13,7 @@ export interface Ingredient {
 }
 
 export interface DoughBalance {
-  /** Donuts one batch makes. */
+  /** Donuts the recipe makes (a double recipe makes twice as many). */
   batchSize: number;
   /** Most donuts' worth of dough the tub holds. */
   tubCapacity: number;
@@ -62,11 +62,32 @@ export class DoughWork {
     return this.turnsDone > 0 ? 'stirring' : 'ingredients';
   }
 
-  /** Scoops away from the recipe, over all ingredients (missing and extra both count). */
+  /**
+   * How many recipes' worth is in the bowl: the scarcest ingredient decides
+   * (just milk is 0; a double recipe is 2).
+   */
+  get recipes(): number {
+    let k = Infinity;
+    for (const [id, n] of Object.entries(this.b.recipe)) k = Math.min(k, this.scoopsOf(id) / n);
+    return Number.isFinite(k) ? k : 0;
+  }
+
+  /** Donuts this batch makes. */
+  get yield(): number {
+    return Math.floor(this.b.batchSize * this.recipes + 1e-9);
+  }
+
+  /** Ingredients with nothing in the bowl yet (the batch makes nothing without them). */
+  get missing(): string[] {
+    return Object.keys(this.b.recipe).filter((id) => this.scoopsOf(id) === 0);
+  }
+
+  /** Scoops away from the recipe's proportions (at the batch's size; extra of anything counts). */
   get scoopsOff(): number {
+    const k = Math.max(1, Math.round(this.recipes));
     let off = 0;
     const ids = new Set([...Object.keys(this.b.recipe), ...this.scoops.keys()]);
-    for (const id of ids) off += Math.abs(this.scoopsOf(id) - (this.b.recipe[id] ?? 0));
+    for (const id of ids) off += Math.abs(this.scoopsOf(id) - (this.b.recipe[id] ?? 0) * k);
     return off;
   }
 

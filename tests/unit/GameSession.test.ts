@@ -255,12 +255,45 @@ describe('GameSession: glazing', () => {
     const id = s.rack[1]!.id;
     expect(s.startGlazing(1)?.id).toBe(id);
     expect(s.rack).toHaveLength(1);
-    expect(s.startGlazing(0)).toBeNull(); // one at a time
     expect(s.finishGlazing()).toBeNull(); // nothing poured yet
     glazeBoard(s, 'strawberry');
     expect(s.finishGlazing()?.id).toBe(id);
     expect(s.glazeWork).toBeNull();
     expect(s.shelf.map((d) => d.id)).toEqual([id]);
+  });
+
+  it('two donuts fit on the glaze tray; a third waits on the rack', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    fryRack(s, 3);
+    expect(s.startGlazing(0)).not.toBeNull();
+    expect(s.startGlazing(0)).not.toBeNull();
+    expect(s.startGlazing(0)).toBeNull();
+    expect(s.glazeBoards.filter(Boolean)).toHaveLength(2);
+    // Each spot finishes on its own.
+    s.glazeBoards[1]!.pour('strawberry', -0.6, -0.65, 0.6, -0.65);
+    expect(s.finishGlazing(0)).toBeNull(); // spot 0 has no glaze yet
+    expect(s.finishGlazing(1)).not.toBeNull();
+    expect(s.glazeBoards[1]).toBeNull();
+    expect(s.glazeBoards[0]).not.toBeNull();
+  });
+
+  it('a glazed donut can come back from the shelf for more glaze, keeping what it had', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [1] });
+    fryRack(s, 1);
+    s.startGlazing(0);
+    glazeBoard(s, 'cookies-and-cream');
+    const d = s.finishGlazing()!;
+    s.startToppings(0);
+    s.toppingWork!.add('crushed-cookies', 0, -0.65, 0.1);
+    s.finishToppings();
+    const w = s.reglaze(0)!;
+    expect(w.id).toBe(d.id);
+    expect(w.layers.map((l) => l.glazeId)).toEqual(['cookies-and-cream']);
+    expect(s.shelf).toHaveLength(0);
+    w.pour('cookies-and-cream', -0.5, 0.65, 0.5, 0.65); // touch up
+    const again = s.finishGlazing()!;
+    expect(again.layers).toHaveLength(1);
+    expect((again as { toppings?: unknown[] }).toppings).toHaveLength(1);
   });
 
   it('redo trashes the donut on the board; shelf donuts can be trashed one by one', () => {

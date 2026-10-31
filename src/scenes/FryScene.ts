@@ -99,7 +99,8 @@ interface Area {
 const LAYOUT = {
   portrait: {
     vat: { x: 540, y: 470, scale: 1.25 },
-    dispenser: { x: 130, y: 205, scale: 0.8 },
+    // Top right, so it doesn't cover the subtitle.
+    dispenser: { x: 975, y: 250, scale: 0.8 },
     rack: { x: 40, y: 790, w: 760, h: 120, minisX: 190, step: 74, size: 64 },
     trash: { x: 940, y: 850, size: 140 },
     dial: { x: 190, y: 1075 },
@@ -696,7 +697,7 @@ export class FryScene extends StationScene {
   private refresh(): void {
     const s = session();
     const dough = Number.isFinite(s.dough) ? ` · dough ${s.dough}` : '';
-    this.setSubtitle(`${s.rack.length} of ${s.fryer.balance.rackCapacity} on the rack · ${s.fryer.count} in the oil${dough}`);
+    this.setSubtitle(`rack ${s.rack.length}/${s.fryer.balance.rackCapacity} · ${s.fryer.count} frying${dough}`);
 
     const rack = s.rack;
     this.rackMinis.forEach((m, i) => {

@@ -348,3 +348,35 @@ Kumar's ideas from the earlier sessions ("opening and closing tasks", "deliverie
   - **Unit:** dough, phases, the tub, clean-up, pickups, invites and pop-up days (`dayflow.test.ts`).
   - **Browser:** `dayflow.spec.ts` makes dough by hand, opens the window, closes up after scrubbing both trays and filtering the oil, and checks the pickups, the invite card and the booth.
   - **Older specs:** they use `openDay()`, which makes dough through the real API and opens the window.
+
+## Two-donut glaze tray, re-glazing, thin icing, dough yield, locked items, dough in the tutorial, new lobby (2026-10-31)
+
+Kumar's next batch of feedback.
+
+- **The tutorial teaches the Dough station.** The training day now tracks dough (`trackDough`), so after you take the order, mochi points at each ingredient canister in turn (the next one still short of the recipe), then the bowl to stir, then Into the tub, and only then at the fryer.
+- **Dough yield follows the ingredients.**
+  - A recipe makes **8 donuts** (was 12). The ingredient you have least of, relative to the recipe, sets the yield: just milk makes 0, and a double recipe makes 16.
+  - Quality compares against the recipe's *proportions* at that size, so a clean double batch is perfect.
+  - The readout shows "makes N donuts", "needs: egg", or "too much for the tub!". **Into the tub** is off if it would make nothing or doesn't fit.
+- **Thin icing again** (Kumar preferred it after all): the drizzle brush is back to 0.045, and the drops are thin.
+  - The flavour stripe patterns are redrawn as **11 thin parallel stripes** over the right half for strawberry and chocolate hazelnut, and over the left half for cookie butter. That's closer to the photos.
+  - The guides draw them all, and following them still scores 100%.
+- **The white glazes are now distinct:**
+  - **white icing** is pure white with a soft shadow edge, so it reads as piped;
+  - **cookies & cream glaze** is off-white with light grey crumb flecks;
+  - **sweet glaze** (fruity cereal) is a warm vanilla cream.
+- **Two donuts on the glaze tray at once** (`balance.json` `glaze.boards`).
+  - The session holds `glazeBoards` (the old `glazeWork` is the first one). A drop lands on whichever donut is nearest. **Done** sends every glazed donut to the shelf. **Redo** trashes the one you last placed or poured on, which gets a pink ring when there are two.
+  - Each spot has its own paint, spill art and guides, and the sponge wipes them all.
+- **Re-glazing:** tap or drag a donut on the glazed shelf back onto the tray to add more. It keeps its layers and any toppings (`GameSession.reglaze`, and `GlazeWork`'s `from`).
+- **Locked items show as dotted outlines** with "day N": glaze cups (chocolate hazelnut day 2, sweet day 3, cookie butter day 4, powdered sugar day 5) and toppings jars (fruity cereal day 3, cookie butter cookie day 4).
+- **Fry header:** in portrait, the dough dispenser moved to the vat's right corner, and the subtitle is shorter ("rack 0/6 · 1 frying · dough 15"), so nothing covers it.
+- **Box station:** with no order selected, an empty trio stays on the counter (dimmed) instead of the space going blank.
+- **A new lobby** (`ui/LobbyScenery.ts`):
+  - **The sky follows the day:** peach sunrise during prep, blue while open, purple-orange sunset at closing. The sun moves with it.
+  - **Backdrop:** drifting clouds, and **live oaks with Spanish moss** on each side.
+  - **String lights:** bistro lights draped across the top, glowing warmer at sunrise and sunset.
+  - **The lot:** a grass verge and sidewalk, the concrete lot with parking lines and oil spots, and a shadow under the trailer.
+  - **The patio:** waiting customers stand on a **wooden patio with a picnic table and a pink umbrella**, with a chalkboard "waiting patio" sign.
+  - **Planter:** flowers in a planter by the A-frame.
+  - **Art:** all placeholder art under the new keys `cloud`, `oak-tree`, `patio-table` and `planter` (MANIFEST updated).

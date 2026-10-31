@@ -3,9 +3,7 @@ import { TextureKeys } from '../assets/keys';
 import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
 import { paintOnPattern, type GlazeLayer, type GlazeWork, type PourCheck } from '../stations/glaze';
 import { ballAt } from '../stations/toppings';
-import { TrayWiper } from '../ui/TrayWiper';
 import type { Glaze, Stripe } from '../systems/menu';
-import { flavorsForDay } from '../systems/menu';
 import { audio, balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { hexToNumber } from '../ui/DonutIcon';
@@ -17,7 +15,7 @@ import {
   drawGlazeLayers,
   drawGlazeSegment,
   drawOnTray,
-  drawTray,
+  drawTrayRect,
   fadeTray,
   fryTint,
   MESS_SIZE,
@@ -26,15 +24,13 @@ import {
 } from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
+import { TrayWiper } from '../ui/TrayWiper';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
 
-/** Paint canvas resolution (px per side) for the donut on the board. */
+/** Paint canvas resolution (px per side) for a donut on the tray. */
 const CANVAS = 420;
-const CANVAS_KEY = 'glaze-paint';
-/** Glaze that missed the donut, left on the tray. */
-const MESS_KEY = 'glaze-mess';
 /** How much of the tray's mess stays each time a new donut goes on it (the rest fades). */
 const TRAY_KEEP = 0.55;
 /** Drizzle guide when the base glaze isn't a drizzled flavour's: three stripes across. */
@@ -53,6 +49,8 @@ interface CupView {
   glaze: Glaze;
   img: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text;
+  /** Day it unlocks (if it's still locked today: drawn as a dotted outline). */
+  lockedUntil: number | null;
 }
 
 /** One falling drop of glaze: emitted at the spout, lands where the finger was. */
@@ -67,10 +65,33 @@ interface Drop {
   circle: Phaser.GameObjects.Arc;
 }
 
+/** One donut spot on the tray: the donut, its paint, its spill, its guides. */
+interface BoardView {
+  x: number;
+  y: number;
+  size: number;
+  img: Phaser.GameObjects.Image;
+  canvasKey: string;
+  canvas: Phaser.Textures.CanvasTexture;
+  paint: Phaser.GameObjects.Image;
+  messKey: string;
+  mess: Phaser.Textures.CanvasTexture;
+  messImg: Phaser.GameObjects.Image;
+  bubbles: Phaser.GameObjects.Graphics;
+  guideBase: Phaser.GameObjects.Graphics;
+  guideDrizzle: Phaser.GameObjects.Graphics;
+  shownWork: GlazeWork | null;
+  /** The drizzle stripes its guide shows (null: the generic ones). */
+  guidePattern: readonly Stripe[] | null;
+  lastLand: { stroke: number; nx: number; ny: number };
+  dirty: boolean;
+  messDirty: boolean;
+}
+
 const LAYOUT = {
   portrait: {
     tray: { x: 40, y: 230, w: 1000, h: 140, size: 110 },
-    board: { x: 540, y: 672, size: 440 },
+    boards: { x: 540, y: 670, size: 360, dx: 200 },
     instruction: { x: 540, y: 984 },
     readout: { x: 540, y: 1026 },
     cups: { x: 540, y: 1128, step: 140, scale: 0.75 },
@@ -80,7 +101,7 @@ const LAYOUT = {
   },
   landscape: {
     tray: { x: 1000, y: 160, w: 880, h: 120, size: 92 },
-    board: { x: 480, y: 362, size: 460 },
+    boards: { x: 480, y: 362, size: 370, dx: 215 },
     instruction: { x: 480, y: 684 },
     readout: { x: 480, y: 730 },
     cups: { x: 1440, y: 380, step: 120, scale: 0.65 },
@@ -90,19 +111,20 @@ const LAYOUT = {
   },
 } as const;
 
+/**
+ * Glazing, two donuts at a time. Fried donuts come from the rack (and glazed
+ * ones can come back from the shelf for more); pick a cup and pour: the drop
+ * lands on whichever donut is under it. Done sends every glazed donut on the
+ * tray to the shelf; Redo throws away the one you last worked on.
+ */
 export class GlazeScene extends StationScene {
-  private board!: Phaser.GameObjects.Image;
-  private paint!: Phaser.GameObjects.Image;
-  private canvas!: Phaser.Textures.CanvasTexture;
-  private bubbles!: Phaser.GameObjects.Graphics;
-  private boardZone!: Phaser.GameObjects.Zone;
+  private boards: BoardView[] = [];
   private boardTray!: Phaser.GameObjects.Graphics;
-  private mess!: Phaser.Textures.CanvasTexture;
-  private messImg!: Phaser.GameObjects.Image;
-  private messDirty = false;
-  /** Dashed lines to pour along: round the ring for a base coat, stripes for a drizzle. */
-  private guideBase!: Phaser.GameObjects.Graphics;
-  private guideDrizzle!: Phaser.GameObjects.Graphics;
+  private boardZone!: Phaser.GameObjects.Zone;
+  /** A ring round the donut you're working on, when there are two. */
+  private activeRing!: Phaser.GameObjects.Graphics;
+  /** The spot Redo and the readout are about (the last one placed or poured on). */
+  private active = 0;
   /** The finger that's pouring, read every frame (its events can go to the rail or tab bar if it strays there). */
   private pourPointer: Phaser.Input.Pointer | null = null;
   /** Scrubbing the empty tray (with no donut on it). */
@@ -116,6 +138,8 @@ export class GlazeScene extends StationScene {
   private trash!: Phaser.GameObjects.Image;
   private cups: CupView[] = [];
   private cupHighlight!: Phaser.GameObjects.Graphics;
+  /** Dotted outlines where locked cups will go. */
+  private lockedCups!: Phaser.GameObjects.Graphics;
   private handCup!: Phaser.GameObjects.Image;
   private drops: Drop[] = [];
   private instruction!: Phaser.GameObjects.Text;
@@ -124,7 +148,6 @@ export class GlazeScene extends StationScene {
   private redoButton!: Button;
   private doneButton!: Button;
 
-  private boardPos = { x: 0, y: 0, size: 1 };
   private trayPos = { x: 0, y: 0, step: 0, size: 0 };
   private shelfPos = { x: 0, y: 0, step: 0, size: 0 };
   private cupScale = 1;
@@ -134,11 +157,6 @@ export class GlazeScene extends StationScene {
   private fingerY = 0;
   private stroke = 0;
   private nextDrop = 0;
-  private lastLand = { stroke: -1, nx: 0, ny: 0 };
-  private dirty = false;
-  private shownWork: GlazeWork | null = null;
-  /** The drizzle stripes the guide shows (null: the generic ones). */
-  private guidePattern: readonly Stripe[] | null = null;
 
   constructor() {
     super(SceneKeys.Glaze, 'Glaze Station', 0x6b4a5a, null);
@@ -154,10 +172,10 @@ export class GlazeScene extends StationScene {
     this.trayImgs = [];
     this.shelfImgs = [];
     this.drops = [];
+    this.boards = [];
     this.selected = null;
     this.pouring = false;
-    this.shownWork = null;
-    this.guidePattern = null;
+    this.active = 0;
     this.input.dragDistanceThreshold = 16;
 
     this.trayBg = this.add.graphics();
@@ -169,22 +187,21 @@ export class GlazeScene extends StationScene {
     this.trash = this.add.image(0, 0, TextureKeys.TrashBin).setName('glaze-trash');
 
     this.boardTray = this.add.graphics();
-    if (this.textures.exists(MESS_KEY)) this.textures.remove(MESS_KEY);
-    this.mess = this.textures.createCanvas(MESS_KEY, MESS_SIZE, MESS_SIZE)!;
-    this.messImg = this.add.image(0, 0, MESS_KEY);
-    this.board = this.add.image(0, 0, TextureKeys.DonutFry).setName('glaze-donut');
-    if (this.textures.exists(CANVAS_KEY)) this.textures.remove(CANVAS_KEY);
-    this.canvas = this.textures.createCanvas(CANVAS_KEY, CANVAS, CANVAS)!;
-    this.paint = this.add.image(0, 0, CANVAS_KEY);
-    this.bubbles = this.add.graphics();
-    this.guideBase = this.add.graphics().setName('glaze-guide-base');
-    this.guideDrizzle = this.add.graphics().setName('glaze-guide-drizzle');
+    const spots = session().glazeBoards.length;
+    for (let i = 0; i < spots; i++) this.boards.push(this.makeBoard(i));
+    this.activeRing = this.add.graphics();
     this.boardZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('glaze-board');
 
-    // Cups for every glaze used by today's flavours (base coats first, then drizzles).
-    const used = new Set(flavorsForDay(menu, session().day).flatMap((f) => [f.glaze, ...(f.drizzle ? [f.drizzle] : [])]));
+    // A cup for every glaze on the menu; ones not unlocked yet are dotted outlines.
     this.cupHighlight = this.add.graphics();
-    for (const glaze of menu.glazes.filter((g) => used.has(g.id))) this.cups.push(this.makeCup(glaze));
+    this.lockedCups = this.add.graphics();
+    const day = session().day;
+    for (const glaze of menu.glazes) {
+      const uses = menu.flavors.filter((f) => f.glaze === glaze.id || f.drizzle === glaze.id);
+      if (!uses.length) continue;
+      const unlock = Math.min(...uses.map((f) => f.unlockDay));
+      this.cups.push(this.makeCup(glaze, unlock > day ? unlock : null));
+    }
 
     for (let i = 0; i < DROPS; i++) {
       this.drops.push({ active: false, emitAt: 0, x: 0, y: 0, stroke: 0, glazeId: '', circle: this.add.circle(0, 0, 10, 0xffffff).setVisible(false).setDepth(19) });
@@ -206,21 +223,60 @@ export class GlazeScene extends StationScene {
       this.fingerY = p.worldY;
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, () => this.stopPour());
-    this.wiper = new TrayWiper(this, 'glaze', () => this.mess, () => this.boardPos, () => {
-      audio().play('ding');
-      this.flash('sparkling clean!');
-      this.refresh();
-    });
+    this.wiper = new TrayWiper(
+      this,
+      'glaze',
+      () => this.boards.map((b) => b.mess),
+      () => this.boards,
+      () => {
+        audio().play('ding');
+        this.flash('sparkling clean!');
+        this.refresh();
+      },
+    );
     this.events.on(Phaser.Scenes.Events.SLEEP, this.stopPour, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.SLEEP, this.stopPour, this);
-      if (this.textures.exists(CANVAS_KEY)) this.textures.remove(CANVAS_KEY);
-      if (this.textures.exists(MESS_KEY)) this.textures.remove(MESS_KEY);
+      for (const b of this.boards) {
+        if (this.textures.exists(b.canvasKey)) this.textures.remove(b.canvasKey);
+        if (this.textures.exists(b.messKey)) this.textures.remove(b.messKey);
+      }
     });
     listen(this, session().events, 'changed', () => this.refresh());
   }
 
   // ---- Building blocks -----------------------------------------------------------
+
+  private makeBoard(i: number): BoardView {
+    const canvasKey = `glaze-paint-${i}`;
+    const messKey = `glaze-mess-${i}`;
+    for (const k of [canvasKey, messKey]) if (this.textures.exists(k)) this.textures.remove(k);
+    const mess = this.textures.createCanvas(messKey, MESS_SIZE, MESS_SIZE)!;
+    const messImg = this.add.image(0, 0, messKey);
+    const img = this.add.image(0, 0, TextureKeys.DonutFry).setName(i === 0 ? 'glaze-donut' : `glaze-donut-${i}`).setVisible(false);
+    const canvas = this.textures.createCanvas(canvasKey, CANVAS, CANVAS)!;
+    const paint = this.add.image(0, 0, canvasKey).setVisible(false);
+    return {
+      x: 0,
+      y: 0,
+      size: 1,
+      img,
+      canvasKey,
+      canvas,
+      paint,
+      messKey,
+      mess,
+      messImg,
+      bubbles: this.add.graphics(),
+      guideBase: this.add.graphics().setName('glaze-guide-base'),
+      guideDrizzle: this.add.graphics().setName('glaze-guide-drizzle'),
+      shownWork: null,
+      guidePattern: null,
+      lastLand: { stroke: -1, nx: 0, ny: 0 },
+      dirty: false,
+      messDirty: false,
+    };
+  }
 
   private makeTrayDonut(i: number): Phaser.GameObjects.Image {
     const img = this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false).setName(`glaze-tray-${i}`).setDepth(5);
@@ -238,21 +294,27 @@ export class GlazeScene extends StationScene {
         const ghost = this.ghostOf(img);
         if (session().trashRackDonut(i)) this.toTrash(p.worldX, p.worldY, ghost, true);
         else ghost.destroy();
-      } else if (this.overBoard(p.worldX, p.worldY)) {
-        this.takeFromTray(i);
+      } else if (this.overTray(p.worldX, p.worldY)) {
+        this.place('rack', i, this.nearestFreeSpot(p.worldX, p.worldY));
       }
       this.refresh();
     });
     img.on(Phaser.Input.Events.POINTER_UP, () => {
-      if (!dragged) this.takeFromTray(i);
+      if (!dragged) this.place('rack', i);
     });
     return img;
   }
 
+  /** A glazed donut on the shelf: drag it to the trash, or tap / drag it back onto the tray for more glaze. */
   private makeShelfDonut(i: number): Phaser.GameObjects.Image {
     const img = this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false).setName(`glaze-shelf-${i}`).setDepth(5);
     img.setInteractive({ draggable: true, useHandCursor: true });
-    img.on(Phaser.Input.Events.DRAG_START, () => img.setDepth(25));
+    let dragged = false;
+    img.on(Phaser.Input.Events.POINTER_DOWN, () => (dragged = false));
+    img.on(Phaser.Input.Events.DRAG_START, () => {
+      dragged = true;
+      img.setDepth(25);
+    });
     img.on(Phaser.Input.Events.DRAG, (_p: Phaser.Input.Pointer, x: number, y: number) => img.setPosition(x, y));
     img.on(Phaser.Input.Events.DRAG_END, (p: Phaser.Input.Pointer) => {
       img.setDepth(5);
@@ -260,37 +322,63 @@ export class GlazeScene extends StationScene {
         const ghost = this.ghostOf(img);
         if (session().trashShelfDonut(i)) this.toTrash(p.worldX, p.worldY, ghost, true);
         else ghost.destroy();
+      } else if (this.overTray(p.worldX, p.worldY)) {
+        this.place('shelf', i, this.nearestFreeSpot(p.worldX, p.worldY));
       }
       this.refresh();
+    });
+    img.on(Phaser.Input.Events.POINTER_UP, () => {
+      if (!dragged) this.place('shelf', i);
     });
     return img;
   }
 
-  private makeCup(glaze: Glaze): CupView {
+  private makeCup(glaze: Glaze, lockedUntil: number | null): CupView {
     const sifter = glaze.style === 'dust';
     const img = this.add.image(0, 0, sifter ? TextureKeys.SugarSifter : TextureKeys.GlazeCup).setName(`cup-${glaze.id}`);
     if (!sifter) img.setTint(hexToNumber(glaze.color));
-    img.setInteractive({ useHandCursor: true });
-    img.on(Phaser.Input.Events.POINTER_DOWN, () => this.select(glaze.id));
+    if (lockedUntil === null) {
+      img.setInteractive({ useHandCursor: true });
+      img.on(Phaser.Input.Events.POINTER_DOWN, () => this.select(glaze.id));
+    } else {
+      img.setVisible(false);
+    }
+    const name = glaze.name.replace(/ glaze$/, '');
     const label = this.add
-      .text(0, 0, glaze.name.replace(/ glaze$/, ''), { fontFamily: FONT_FAMILY, fontSize: '24px', color: CSS.cream, align: 'center', wordWrap: { width: 160 } })
+      .text(0, 0, lockedUntil === null ? name : `${name}\nday ${lockedUntil}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '24px',
+        color: lockedUntil === null ? CSS.cream : CSS.muted,
+        align: 'center',
+        wordWrap: { width: 160 },
+      })
       .setOrigin(0.5, 0);
-    return { glaze, img, label };
+    return { glaze, img, label, lockedUntil };
   }
 
   protected layoutStation(v: Viewport): void {
     const L = LAYOUT[v.orientation];
     const c = v.content;
-    this.boardPos = { x: c.x + L.board.x, y: c.y + L.board.y, size: L.board.size };
-    const { x, y, size } = this.boardPos;
-    this.board.setPosition(x, y).setDisplaySize(size, size);
-    this.paint.setPosition(x, y).setDisplaySize(size, size);
-    drawTray(this.boardTray, x, y, size);
-    this.messImg.setPosition(x, y).setDisplaySize(size * (1 + 2 * TRAY_PAD), size * (1 + 2 * TRAY_PAD));
-    this.drawGuides();
-    // Pouring is accepted a bit outside the donut too (that's spill).
-    this.boardZone.setPosition(x, y).setSize(size * 1.3, size * 1.3);
-    this.drawBubbles();
+    const B = L.boards;
+    const n = this.boards.length;
+    this.boards.forEach((b, i) => {
+      b.x = c.x + B.x + (i - (n - 1) / 2) * 2 * B.dx;
+      b.y = c.y + B.y;
+      b.size = B.size;
+      b.img.setPosition(b.x, b.y).setDisplaySize(b.size, b.size);
+      b.paint.setPosition(b.x, b.y).setDisplaySize(b.size, b.size);
+      b.messImg.setPosition(b.x, b.y).setDisplaySize(b.size * (1 + 2 * TRAY_PAD), b.size * (1 + 2 * TRAY_PAD));
+      b.shownWork = null; // force a canvas redraw at the new size
+      b.guidePattern = null;
+      this.drawBaseGuide(b);
+      this.drawDrizzleGuide(b, GENERIC_STRIPES);
+      this.drawBubbles(b);
+    });
+    // One wide tray under both spots; pouring is accepted anywhere on it.
+    const trayW = (n - 1) * 2 * B.dx + B.size * (1 + 2 * TRAY_PAD);
+    const trayH = B.size * (1 + 2 * TRAY_PAD);
+    drawTrayRect(this.boardTray, c.x + B.x, c.y + B.y, trayW, trayH);
+    this.boardZone.setPosition(c.x + B.x, c.y + B.y).setSize(trayW, trayH);
 
     const t = L.tray;
     this.trayBg.clear();
@@ -313,28 +401,50 @@ export class GlazeScene extends StationScene {
     this.trash.setPosition(c.x + L.trash.x, c.y + L.trash.y).setDisplaySize(L.trash.size, L.trash.size);
 
     this.cupScale = L.cups.scale;
-    const n = this.cups.length;
+    const k = this.cups.length;
+    this.lockedCups.clear();
     this.cups.forEach((cup, i) => {
-      const cx = c.x + L.cups.x + (i - (n - 1) / 2) * L.cups.step;
-      cup.img.setPosition(cx, c.y + L.cups.y).setScale(L.cups.scale);
-      cup.label.setPosition(cx, c.y + L.cups.y + 68 * L.cups.scale + 8).setScale(Math.min(1, L.cups.scale + 0.2));
+      const cx = c.x + L.cups.x + (i - (k - 1) / 2) * L.cups.step;
+      const cy = c.y + L.cups.y;
+      cup.img.setPosition(cx, cy).setScale(L.cups.scale);
+      cup.label.setPosition(cx, cy + 68 * L.cups.scale + 8).setScale(Math.min(1, L.cups.scale + 0.2));
+      if (cup.lockedUntil !== null) {
+        // A dotted outline where the cup will be.
+        const w = 120 * L.cups.scale;
+        const h = 130 * L.cups.scale;
+        const pts = [
+          { x: -w / 2, y: -h / 2 },
+          { x: w / 2, y: -h / 2 },
+          { x: w / 2, y: h / 2 },
+          { x: -w / 2, y: h / 2 },
+          { x: -w / 2, y: -h / 2 },
+        ];
+        this.lockedCups.lineStyle(4, COLORS.cream, 0.5);
+        drawDashedPath(this.lockedCups, cx, cy, 1, pts, 10, 8);
+      }
     });
     this.handCup.setScale(1);
 
     this.instruction.setPosition(c.x + L.instruction.x, c.y + L.instruction.y);
     this.readout.setPosition(c.x + L.readout.x, c.y + L.readout.y);
-    this.flashText.setPosition(x, y);
+    this.flashText.setPosition(c.x + B.x, c.y + B.y);
     this.redoButton.setPosition(c.x + L.buttons.redoX, c.y + L.buttons.y).setScale(L.buttons.scale);
     this.doneButton.setPosition(c.x + L.buttons.doneX, c.y + L.buttons.y).setScale(L.buttons.scale);
-    this.shownWork = null; // force a canvas redraw at the new size
     this.refresh();
   }
 
   // ---- State → screen -----------------------------------------------------------
 
+  private work(i: number): GlazeWork | null {
+    return session().glazeBoards[i] ?? null;
+  }
+
+  private get anyWork(): boolean {
+    return session().glazeBoards.some((w) => w);
+  }
+
   private refresh(): void {
     const s = session();
-    const work = s.glazeWork;
 
     // Tray (rack donuts) and shelf (glazed donuts)
     this.trayImgs.forEach((img, i) => {
@@ -352,32 +462,41 @@ export class GlazeScene extends StationScene {
       }
     });
 
-    // Board
-    this.board.setVisible(!!work);
-    this.paint.setVisible(!!work);
-    this.bubbles.setVisible(!!work);
-    if (work) this.board.setTint(fryTint(work.fry));
-    if (work !== this.shownWork) {
-      this.shownWork = work;
-      this.redrawCanvas();
+    // The donuts on the tray
+    this.boards.forEach((b, i) => {
+      const w = this.work(i);
+      b.img.setVisible(!!w);
+      b.paint.setVisible(!!w);
+      b.bubbles.setVisible(!!w);
+      if (w) b.img.setTint(fryTint(w.fry));
+      if (w !== b.shownWork) {
+        b.shownWork = w;
+        this.redrawCanvas(b, w);
+      }
+    });
+    if (!this.work(this.active)) {
+      const other = s.glazeBoards.findIndex((w) => w);
+      if (other >= 0) this.active = other;
     }
 
     this.setSubtitle(`rack ${s.rack.length} · glazed shelf ${s.shelf.length}/${balance.glaze.shelfCapacity}`);
-    if (!work) {
-      const st = session();
-      if (st.phase === 'closing' && st.messOn('glaze') > 0) this.instruction.setText('closing time: scrub the tray clean');
-      else this.instruction.setText((s.rack.length ? 'tap a donut on the rack to glaze it' : 'no fried donuts: fry some first!') + (st.messOn('glaze') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : ''));
-    }
-    else if (!work.hasGlaze) this.instruction.setText('pick a cup, then pour over the donut');
+    const work = this.work(this.active);
+    if (!this.anyWork) {
+      if (s.phase === 'closing' && s.messOn('glaze') > 0) this.instruction.setText('closing time: scrub the tray clean');
+      else {
+        const base = s.rack.length ? 'tap a donut on the rack (or two) to glaze it' : s.shelf.length ? 'no fried donuts: fry some first! (or tap a glazed one to touch it up)' : 'no fried donuts: fry some first!';
+        this.instruction.setText(base + (s.messOn('glaze') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : ''));
+      }
+    } else if (!work?.hasGlaze) this.instruction.setText('pick a cup, then pour over the donut');
     else this.instruction.setText('add a drizzle, or tap Done');
     this.refreshControls();
   }
 
   private refreshControls(): void {
     const s = session();
-    const work = s.glazeWork;
-    this.redoButton.setEnabled(!!work);
-    this.doneButton.setEnabled(!!work && work.hasGlaze && !s.shelfFull);
+    const work = this.work(this.active);
+    this.redoButton.setEnabled(this.anyWork);
+    this.doneButton.setEnabled(s.glazeBoards.some((w) => w?.hasGlaze) && !s.shelfFull);
 
     this.cupHighlight.clear();
     const cup = this.cups.find((c) => c.glaze.id === this.selected);
@@ -387,7 +506,15 @@ export class GlazeScene extends StationScene {
       this.cupHighlight.strokeRoundedRect(cup.img.x - w / 2, cup.img.y - 95 * this.cupScale, w, 260 * this.cupScale, 20);
     }
 
-    this.refreshGuides();
+    // With two donuts on the tray, ring the one you're working on.
+    this.activeRing.clear();
+    const b = this.boards[this.active];
+    if (b && work && s.glazeBoards.filter((w) => w).length > 1) {
+      this.activeRing.lineStyle(6, COLORS.pink, 0.8);
+      this.activeRing.strokeCircle(b.x, b.y, b.size * 0.53);
+    }
+
+    this.boards.forEach((bv, i) => this.refreshGuides(bv, this.work(i)));
     const layer = work?.currentLayer ?? work?.layers[work.layers.length - 1];
     if (!work) this.readout.setText('');
     else if (!layer) this.readout.setText(this.selected ? 'press on the donut to pour' : 'pick a cup');
@@ -396,15 +523,43 @@ export class GlazeScene extends StationScene {
       this.readout.setText(
         cover !== null ? `drizzle: ${Math.round(cover * 100)}% of the stripes` : `drizzle ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`,
       );
-    }
-    else this.readout.setText(`glaze ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`);
+    } else this.readout.setText(`glaze ${Math.round(layer.coverage * 100)}% · spill ${Math.round(layer.spill * 100)}%`);
   }
 
   // ---- Pouring ----------------------------------------------------------------
 
-  private toNorm(x: number, y: number): { nx: number; ny: number } {
-    const { x: bx, y: by, size } = this.boardPos;
-    return { nx: (x - bx) / (size / 2), ny: (y - by) / (size / 2) };
+  private toNorm(b: BoardView, x: number, y: number): { nx: number; ny: number } {
+    return { nx: (x - b.x) / (b.size / 2), ny: (y - b.y) / (b.size / 2) };
+  }
+
+  /** The spot with a donut nearest (x, y), or -1 if the tray is empty. */
+  private nearestWorkSpot(x: number, y: number): number {
+    let best = -1;
+    let bestD = Infinity;
+    this.boards.forEach((b, i) => {
+      if (!this.work(i)) return;
+      const d = Phaser.Math.Distance.Between(x, y, b.x, b.y);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  }
+
+  /** The free spot nearest (x, y) (undefined: let the session pick). */
+  private nearestFreeSpot(x: number, y: number): number | undefined {
+    let best: number | undefined;
+    let bestD = Infinity;
+    this.boards.forEach((b, i) => {
+      if (this.work(i)) return;
+      const d = Phaser.Math.Distance.Between(x, y, b.x, b.y);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
   }
 
   /** The cup that's picked (the tutorial checks it). */
@@ -418,20 +573,24 @@ export class GlazeScene extends StationScene {
   }
 
   private startPour(p: Phaser.Input.Pointer): void {
-    const work = session().glazeWork;
-    if (!work) {
-      // No donut on the board: scrub the tray if it's messy.
+    if (!this.anyWork) {
+      // No donut on the tray: scrub it if it's messy.
       if (this.wiper.dirty) this.wiper.start(p);
       else this.flash(session().rack.length ? 'take a donut from the rack first' : 'fry some donuts first');
       return;
     }
+    const spot = this.nearestWorkSpot(p.worldX, p.worldY);
+    const work = this.work(spot)!;
+    this.active = spot;
     if (!this.selected) {
       this.flash('pick a cup first!');
+      this.refreshControls();
       return;
     }
     const check = work.canPour(this.selected);
     if (check !== 'ok') {
       this.flash(this.pourMessage(check));
+      this.refreshControls();
       return;
     }
     this.pouring = true;
@@ -449,6 +608,7 @@ export class GlazeScene extends StationScene {
     this.tweens.add({ targets: this.handCup, angle: sifter ? 0 : TILT, duration: 120 });
     // The sifter shakes instead of tilting.
     if (sifter) this.tweens.add({ targets: this.handCup, angle: { from: -8, to: 8 }, duration: 70, yoyo: true, repeat: -1 });
+    this.refreshControls();
   }
 
   private stopPour(): void {
@@ -479,7 +639,6 @@ export class GlazeScene extends StationScene {
   }
 
   override update(time: number): void {
-    const work = session().glazeWork;
     const fallMs = balance.glaze.fallMs;
 
     // Follow the pouring finger directly: if it strays over the ticket rail or tab
@@ -495,7 +654,7 @@ export class GlazeScene extends StationScene {
     }
 
     // While pouring, the cup follows the finger (spout right above it) and emits a drop each frame.
-    if (this.pouring && work && this.selected) {
+    if (this.pouring && this.selected && this.anyWork) {
       const a = Phaser.Math.DegToRad(this.handCup.angle);
       const sx = SPOUT.x * Math.cos(a) - SPOUT.y * Math.sin(a);
       const sy = SPOUT.x * Math.sin(a) + SPOUT.y * Math.cos(a);
@@ -514,7 +673,8 @@ export class GlazeScene extends StationScene {
       d.stroke = this.stroke;
       d.glazeId = this.selected;
       const g = menu.glazes.find((x) => x.id === this.selected)!;
-      d.circle.setFillStyle(hexToNumber(g.color)).setRadius(g.style === 'dust' ? 5 : 15).setVisible(true);
+      // A thin stream for icing, a thick one for glaze, grains for sugar.
+      d.circle.setFillStyle(hexToNumber(g.color)).setRadius(g.style === 'dust' ? 5 : g.style === 'drizzle' ? 7 : 15).setVisible(true);
     }
 
     // Drops fall (accelerating) and land after fallMs.
@@ -531,95 +691,97 @@ export class GlazeScene extends StationScene {
       d.circle.setPosition(lx, ly + (d.y - ly) * t * t);
     }
 
-    if (this.dirty) {
-      this.dirty = false;
-      this.canvas.refresh();
-      this.refreshControls();
+    let changed = false;
+    for (const b of this.boards) {
+      if (b.dirty) {
+        b.dirty = false;
+        b.canvas.refresh();
+        changed = true;
+      }
+      if (b.messDirty) {
+        b.messDirty = false;
+        b.mess.refresh();
+      }
     }
-    if (this.messDirty) {
-      this.messDirty = false;
-      this.mess.refresh();
-    }
+    if (changed) this.refreshControls();
   }
 
-  /** A drop reaches the donut: glaze along the path from the previous drop of this pour. */
+  /** A drop lands on the donut under it (the nearest one): glaze along the path from the previous drop there. */
   private land(d: Drop): void {
-    const work = session().glazeWork;
-    if (!work) return;
-    const { nx, ny } = this.toNorm(d.x, d.y);
-    const same = this.lastLand.stroke === d.stroke;
-    const x0 = same ? this.lastLand.nx : nx;
-    const y0 = same ? this.lastLand.ny : ny;
-    this.lastLand.stroke = d.stroke;
-    this.lastLand.nx = nx;
-    this.lastLand.ny = ny;
+    const spot = this.nearestWorkSpot(d.x, d.y);
+    if (spot < 0) return;
+    const work = this.work(spot)!;
+    const b = this.boards[spot]!;
+    const { nx, ny } = this.toNorm(b, d.x, d.y);
+    const same = b.lastLand.stroke === d.stroke;
+    const x0 = same ? b.lastLand.nx : nx;
+    const y0 = same ? b.lastLand.ny : ny;
+    b.lastLand.stroke = d.stroke;
+    b.lastLand.nx = nx;
+    b.lastLand.ny = ny;
     if (!work.pour(d.glazeId, x0, y0, nx, ny)) return;
     const layer = work.currentLayer!;
     const seed = layer.segments.length;
     // On the donut: clipped to the balls. Whatever missed lands on the tray, and stays there.
-    const ctx = this.canvas.context;
+    const ctx = b.canvas.context;
     ctx.save();
     clipToRing(ctx, CANVAS);
     drawGlazeSegment(ctx, CANVAS, d.glazeId, x0, y0, nx, ny, seed);
     ctx.restore();
-    drawOnTray(this.mess.context, (m, size) => drawGlazeSegment(m, size, d.glazeId, x0, y0, nx, ny, seed));
+    drawOnTray(b.mess.context, (m, size) => drawGlazeSegment(m, size, d.glazeId, x0, y0, nx, ny, seed));
     // Glaze that missed the donut is mess on the tray (to wipe at closing).
     if (ballAt(nx, ny, balance.glaze, balance.glaze.edgeMargin) < 0) session().addMess('glaze', 1);
-    this.dirty = true;
-    this.messDirty = true;
+    b.dirty = true;
+    b.messDirty = true;
     if (layer.segments.length === 4) this.refresh(); // first glaze on this donut: update the instruction
   }
 
   // ---- Drawing ----------------------------------------------------------------
 
-  private redrawCanvas(): void {
-    const ctx = this.canvas.context;
+  private redrawCanvas(b: BoardView, work: GlazeWork | null): void {
+    const ctx = b.canvas.context;
     ctx.clearRect(0, 0, CANVAS, CANVAS);
-    const work = session().glazeWork;
     if (work) {
       ctx.save();
       clipToRing(ctx, CANVAS);
       drawGlazeLayers(ctx, CANVAS, work.allLayers);
       ctx.restore();
     }
-    this.canvas.refresh();
+    b.canvas.refresh();
   }
 
-  /** Dashed guides: two loops round the ring (base coat) and the drizzle stripes. */
-  private drawGuides(): void {
-    const { x, y, size } = this.boardPos;
-    const half = size / 2;
+  /** Two dashed loops round the ring (base coat). */
+  private drawBaseGuide(b: BoardView): void {
+    const half = b.size / 2;
     const r = balance.glaze.ringRadius;
-    this.guideBase.clear();
+    b.guideBase.clear();
     for (const rr of [r - 0.1, r + 0.1]) {
-      this.guideBase.lineStyle(10, COLORS.ink, 0.25);
-      drawDashedPath(this.guideBase, x, y, half, circlePoints(rr));
-      this.guideBase.lineStyle(5, COLORS.cream, 0.9);
-      drawDashedPath(this.guideBase, x, y, half, circlePoints(rr));
+      b.guideBase.lineStyle(10, COLORS.ink, 0.25);
+      drawDashedPath(b.guideBase, b.x, b.y, half, circlePoints(rr));
+      b.guideBase.lineStyle(5, COLORS.cream, 0.9);
+      drawDashedPath(b.guideBase, b.x, b.y, half, circlePoints(rr));
     }
-    this.drawDrizzleGuide(this.guidePattern ?? GENERIC_STRIPES);
   }
 
-  private drawDrizzleGuide(stripes: readonly Stripe[]): void {
-    const { x, y, size } = this.boardPos;
-    const g = this.guideDrizzle;
+  private drawDrizzleGuide(b: BoardView, stripes: readonly Stripe[]): void {
+    const g = b.guideDrizzle;
     g.clear();
     for (const s of stripes) {
       const pts = [
         { x: s.x0, y: s.y0 },
         { x: s.x1, y: s.y1 },
       ];
-      g.lineStyle(10, COLORS.ink, 0.25);
-      drawDashedPath(g, x, y, size / 2, pts);
-      g.lineStyle(5, 0xffffff, 0.95);
-      drawDashedPath(g, x, y, size / 2, pts);
+      g.lineStyle(8, COLORS.ink, 0.25);
+      drawDashedPath(g, b.x, b.y, b.size / 2, pts, 14, 10);
+      g.lineStyle(4, 0xffffff, 0.95);
+      drawDashedPath(g, b.x, b.y, b.size / 2, pts, 14, 10);
     }
   }
 
   /**
-   * The drizzle stripes for the donut on the board: the shop's pattern for the
-   * flavour its base glaze belongs to (strawberry, chocolate hazelnut, cookie
-   * butter), or null if that flavour has no drizzle.
+   * The drizzle stripes for a donut: the shop's pattern for the flavour its
+   * base glaze belongs to (strawberry, chocolate hazelnut, cookie butter), or
+   * null if that flavour has no drizzle.
    */
   private patternFor(work: GlazeWork | null): readonly Stripe[] | null {
     if (!work) return null;
@@ -630,7 +792,7 @@ export class GlazeScene extends StationScene {
     return menu.flavors.find((fl) => fl.glaze === baseId && fl.drizzlePattern)?.drizzlePattern ?? null;
   }
 
-  /** The drizzle layer on the board, if any. */
+  /** A donut's drizzle layer, if any. */
   private drizzleLayer(work: GlazeWork | null): GlazeLayer | undefined {
     if (!work) return undefined;
     if (work.currentLayer?.kind === 'drizzle') return work.currentLayer;
@@ -645,15 +807,14 @@ export class GlazeScene extends StationScene {
     return d ? paintOnPattern(d, pattern, balance.glaze).coverage : 0;
   }
 
-  /** Show the guide for the selected cup until that layer is done well enough. */
-  private refreshGuides(): void {
-    const work = session().glazeWork;
+  /** Show a donut's guide for the selected cup until that layer is done well enough. */
+  private refreshGuides(b: BoardView, work: GlazeWork | null): void {
     const g = this.selected ? menu.glazes.find((x) => x.id === this.selected) : undefined;
     const gb = balance.glaze;
     const pattern = this.patternFor(work);
-    if (pattern !== this.guidePattern) {
-      this.guidePattern = pattern;
-      this.drawDrizzleGuide(pattern ?? GENERIC_STRIPES);
+    if (pattern !== b.guidePattern) {
+      b.guidePattern = pattern;
+      this.drawDrizzleGuide(b, pattern ?? GENERIC_STRIPES);
     }
     let baseDone = false;
     if (work) {
@@ -664,21 +825,20 @@ export class GlazeScene extends StationScene {
     const cover = this.patternCoverage(work);
     const d = this.drizzleLayer(work);
     const drizzleDone = cover !== null ? cover >= gb.patternGoodCoverage : !!d && d.coverage >= gb.drizzleAmount.idealMin;
-    this.guideBase.setVisible(!!work && !!g && g.style !== 'drizzle' && !baseDone);
-    this.guideDrizzle.setVisible(!!work && !!g && g.style === 'drizzle' && !drizzleDone);
+    b.guideBase.setVisible(!!work && !!g && g.style !== 'drizzle' && !baseDone);
+    b.guideDrizzle.setVisible(!!work && !!g && g.style === 'drizzle' && !drizzleDone);
   }
 
   /** Outline and gloss on each of the 8 balls (same geometry as the glaze maths). */
-  private drawBubbles(): void {
-    const { x, y, size } = this.boardPos;
-    const half = size / 2;
+  private drawBubbles(b: BoardView): void {
+    const half = b.size / 2;
     const gb = balance.glaze;
     const r = ringBallRadius(gb.ringRadius, 8, gb.ballOverlap) * half;
-    const g = this.bubbles;
+    const g = b.bubbles;
     g.clear();
     for (const p of ringBallCenters(0, 0, gb.ringRadius)) {
-      const cx = x + p.x * half;
-      const cy = y + p.y * half;
+      const cx = b.x + p.x * half;
+      const cy = b.y + p.y * half;
       g.lineStyle(5, COLORS.ink, 0.35);
       g.strokeCircle(cx, cy, r);
       g.lineStyle(8, 0xffffff, 0.35);
@@ -690,64 +850,83 @@ export class GlazeScene extends StationScene {
 
   // ---- Actions ----------------------------------------------------------------
 
-  private takeFromTray(i: number): void {
+  /** Put a donut on the tray: from the rack (fried), or back from the shelf (to touch up its glaze). */
+  private place(from: 'rack' | 'shelf', index: number, spot?: number): void {
     const s = session();
-    if (s.glazeWork) {
-      this.flash('finish (or redo) the donut on the board first');
+    if (!s.glazeBoards.includes(null)) {
+      this.flash('the tray is full: finish (or redo) a donut first');
       return;
     }
-    const img = this.trayImgs[i]!;
-    const from = { x: img.x, y: img.y, size: img.displayWidth, tint: img.tintTopLeft };
-    if (!s.startGlazing(i)) return;
-    // A new donut on the tray: the old mess fades a bit.
-    fadeTray(this.mess.context, TRAY_KEEP);
+    const img = (from === 'rack' ? this.trayImgs : this.shelfImgs)[index]!;
+    const src = { x: img.x, y: img.y, size: img.displayWidth, key: img.texture.key, tint: img.isTinted ? img.tintTopLeft : null };
+    const before = s.glazeBoards.slice();
+    const w = from === 'rack' ? s.startGlazing(index, spot) : s.reglaze(index, spot);
+    if (!w) return;
+    const at = s.glazeBoards.findIndex((x, i) => x === w && before[i] !== w);
+    const b = this.boards[at]!;
+    this.active = at;
+    // A new donut on the tray: the old mess under it fades a bit.
+    fadeTray(b.mess.context, TRAY_KEEP);
     s.fadeMess('glaze', TRAY_KEEP);
-    this.mess.refresh();
-    // Slide it from the tray onto the board.
-    const ghost = this.add.image(from.x, from.y, TextureKeys.DonutFry).setDisplaySize(from.size, from.size).setTint(from.tint).setDepth(15);
-    this.board.setAlpha(0);
+    b.mess.refresh();
+    // Slide it onto its spot.
+    const ghost = this.add.image(src.x, src.y, src.key).setDisplaySize(src.size, src.size).setDepth(15);
+    if (src.tint !== null) ghost.setTint(src.tint);
+    b.img.setAlpha(0);
+    b.paint.setAlpha(0);
     this.tweens.add({
       targets: ghost,
-      x: this.boardPos.x,
-      y: this.boardPos.y,
-      displayWidth: this.boardPos.size,
-      displayHeight: this.boardPos.size,
+      x: b.x,
+      y: b.y,
+      displayWidth: b.size,
+      displayHeight: b.size,
       duration: 280,
       ease: 'Cubic.Out',
       onComplete: () => {
         ghost.destroy();
-        this.board.setAlpha(1);
+        b.img.setAlpha(1);
+        b.paint.setAlpha(1);
       },
     });
+    this.refreshControls();
   }
 
   private redo(): void {
     const s = session();
-    if (!s.glazeWork) return;
+    const spot = this.work(this.active) ? this.active : s.glazeBoards.findIndex((w) => w);
+    if (spot < 0) return;
     this.stopPour();
-    const snap = this.add.image(this.boardPos.x, this.boardPos.y, TextureKeys.DonutFry).setDisplaySize(this.boardPos.size, this.boardPos.size).setTint(this.board.tintTopLeft).setDepth(15);
-    s.trashGlazing();
+    const b = this.boards[spot]!;
+    const snap = this.add.image(b.x, b.y, TextureKeys.DonutFry).setDisplaySize(b.size, b.size).setTint(b.img.tintTopLeft).setDepth(15);
+    s.trashGlazing(spot);
     this.toTrash(snap.x, snap.y, snap, true);
     this.flash('trashed: take another from the rack');
   }
 
+  /** Every glazed donut on the tray goes to the shelf. */
   private done(): void {
     const s = session();
-    const before = s.shelf.length;
     this.stopPour();
-    const d = s.finishGlazing();
-    if (!d) {
-      if (s.shelfFull) this.flash('the glazed shelf is full!');
-      return;
-    }
-    {
-      const ghost = this.add.image(this.boardPos.x, this.boardPos.y, donutIcon(this, d)).setDisplaySize(this.boardPos.size, this.boardPos.size).setDepth(15);
+    let sent = 0;
+    for (let i = 0; i < this.boards.length; i++) {
+      const w = this.work(i);
+      if (!w?.hasGlaze) continue;
+      const before = s.shelf.length;
+      const d = s.finishGlazing(i);
+      if (!d) {
+        if (s.shelfFull) this.flash('the glazed shelf is full!');
+        break;
+      }
+      sent++;
+      const b = this.boards[i]!;
+      const ghost = this.add.image(b.x, b.y, donutIcon(this, d)).setDisplaySize(b.size, b.size).setDepth(15);
       this.tweens.add({
         targets: ghost,
         x: this.shelfPos.x + before * this.shelfPos.step,
         y: this.shelfPos.y,
         displayWidth: this.shelfPos.size,
         displayHeight: this.shelfPos.size,
+        delay: sent * 60,
         duration: 380,
         ease: 'Cubic.InOut',
         onComplete: () => ghost.destroy(),
@@ -762,8 +941,9 @@ export class GlazeScene extends StationScene {
     return g;
   }
 
-  private overBoard(x: number, y: number): boolean {
-    return Phaser.Math.Distance.Between(x, y, this.boardPos.x, this.boardPos.y) < this.boardPos.size * 0.6;
+  private overTray(x: number, y: number): boolean {
+    const z = this.boardZone;
+    return Math.abs(x - z.x) < z.width / 2 + 20 && Math.abs(y - z.y) < z.height / 2 + 20;
   }
 
   private overTrash(x: number, y: number): boolean {
