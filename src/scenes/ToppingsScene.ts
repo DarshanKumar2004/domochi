@@ -215,11 +215,23 @@ export class ToppingsScene extends StationScene {
       this.fingerY = p.worldY;
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, () => this.stopShake());
-    this.wiper = new TrayWiper(this, 'toppings', () => [this.mess], () => [this.boardPos], () => {
-      audio().play('ding');
-      this.flash('sparkling clean!');
-      this.refresh();
-    });
+    this.wiper = new TrayWiper(
+      this,
+      'toppings',
+      () => [this.mess],
+      () => [this.boardPos],
+      () => {
+        audio().play('ding');
+        this.flash('sparkling clean!');
+        this.refresh();
+      },
+      // Picking up the sponge puts the jar down.
+      () => {
+        this.selected = null;
+        this.autoPicked = false;
+        this.refresh();
+      },
+    );
     this.events.on(Phaser.Scenes.Events.SLEEP, this.stopShake, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.SLEEP, this.stopShake, this);
@@ -327,6 +339,7 @@ day ${lockedUntil}`, {
     this.drawGuides();
     // Shaking is accepted a bit outside the donut too (those pieces fall off).
     this.boardZone.setPosition(x, y).setSize(size * 1.3, size * 1.3);
+    this.wiper.placeIcon(x + size * 0.58, y - size * 0.55, 0.8);
 
     const sh = L.shelf;
     this.shelfBg.clear();
@@ -374,6 +387,7 @@ day ${lockedUntil}`, {
   // ---- State → screen -----------------------------------------------------------
 
   private refresh(): void {
+    this.wiper?.refreshIcon();
     // Servings left under each jar (when supplies are counted).
     for (const jar of this.jars) {
       if (jar.lockedUntil !== null) continue;
@@ -501,6 +515,11 @@ day ${lockedUntil}`, {
 
   /** Tap a jar to pick it up; tap it again to put it down (then a finger on the bare tray wipes it). */
   private select(toppingId: string): void {
+    // Picking a jar puts the sponge down.
+    if (this.wiper.holding) {
+      this.wiper.holding = false;
+      this.wiper.refreshIcon();
+    }
     if (this.selected !== toppingId && session().stockOf(toppingStockId(toppingId)) < 1) {
       const t = menu.toppings.find((x) => x.id === toppingId);
       this.flash(`out of ${t?.name ?? 'that'}!\nbuy more at the store`);
@@ -513,6 +532,11 @@ day ${lockedUntil}`, {
 
   private startShake(p: Phaser.Input.Pointer): void {
     const s = session();
+    // Sponge in hand: scrub.
+    if (this.wiper.holding) {
+      this.wiper.start(p);
+      return;
+    }
     if (!s.toppingWork) {
       // No donut on the board: scrub the tray if it's messy (only with no jar in hand).
       if (this.wiper.dirty && !this.selectedTopping()) {
@@ -627,6 +651,7 @@ day ${lockedUntil}`, {
     if (this.messDirty) {
       this.messDirty = false;
       this.mess.refresh();
+      this.wiper.refreshIcon();
     }
   }
 

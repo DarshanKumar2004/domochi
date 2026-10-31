@@ -234,6 +234,11 @@ export class GlazeScene extends StationScene {
         this.flash('sparkling clean!');
         this.refresh();
       },
+      // Picking up the sponge puts the cup down.
+      () => {
+        this.selected = null;
+        this.refreshControls();
+      },
     );
     this.events.on(Phaser.Scenes.Events.SLEEP, this.stopPour, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -380,6 +385,7 @@ export class GlazeScene extends StationScene {
     const trayH = B.size * (1 + 2 * TRAY_PAD);
     drawTrayRect(this.boardTray, c.x + B.x, c.y + B.y, trayW, trayH);
     this.boardZone.setPosition(c.x + B.x, c.y + B.y).setSize(trayW, trayH);
+    this.wiper.placeIcon(c.x + B.x + trayW / 2 - 70, c.y + B.y - trayH / 2 + 50, 0.8);
 
     const t = L.tray;
     this.trayBg.clear();
@@ -495,6 +501,7 @@ export class GlazeScene extends StationScene {
 
   private refreshControls(): void {
     const s = session();
+    this.wiper?.refreshIcon();
     // Servings left under each cup (when supplies are counted).
     for (const cup of this.cups) {
       if (cup.lockedUntil !== null) continue;
@@ -577,6 +584,11 @@ export class GlazeScene extends StationScene {
 
   /** Tap a cup to pick it up; tap it again to put it down (then a finger on the tray wipes it). */
   private select(glazeId: string): void {
+    // Picking a cup puts the sponge down.
+    if (this.wiper.holding) {
+      this.wiper.holding = false;
+      this.wiper.refreshIcon();
+    }
     if (this.selected !== glazeId && session().stockOf(glazeStockId(glazeId)) < 1) {
       const g = menu.glazes.find((x) => x.id === glazeId);
       this.flash(`out of ${g?.name ?? 'that'}!\nbuy more at the store`);
@@ -587,6 +599,11 @@ export class GlazeScene extends StationScene {
   }
 
   private startPour(p: Phaser.Input.Pointer): void {
+    // Sponge in hand: scrub.
+    if (this.wiper.holding) {
+      this.wiper.start(p);
+      return;
+    }
     if (!this.selected) {
       // No cup in hand. On a donut: you need a cup. On the bare tray: scrub it, if it's messy.
       const spot = this.nearestSpot(p.worldX, p.worldY);
@@ -713,6 +730,7 @@ export class GlazeScene extends StationScene {
       if (b.messDirty) {
         b.messDirty = false;
         b.mess.refresh();
+        this.wiper.refreshIcon();
       }
     }
     if (changed) this.refreshControls();

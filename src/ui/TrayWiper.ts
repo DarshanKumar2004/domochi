@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { audio, balance, session } from '../systems/services';
 import { MESS_SIZE, TRAY_PAD } from './donutArt';
+import { FONT_FAMILY } from './theme';
 
 /**
  * Scrubbing a tray with a sponge (Glaze and Toppings stations): press on the
@@ -11,6 +12,11 @@ import { MESS_SIZE, TRAY_PAD } from './donutArt';
  */
 export class TrayWiper {
   private readonly sponge: Phaser.GameObjects.Image;
+  /** The sponge sitting on the tray's corner when it's messy: tap to pick it up. */
+  private readonly icon: Phaser.GameObjects.Image;
+  private readonly iconLabel: Phaser.GameObjects.Text;
+  /** Picked up: the next press on the tray scrubs (whatever cup or jar was in hand). */
+  holding = false;
   private pointer: Phaser.Input.Pointer | null = null;
   private lastX = 0;
   private lastY = 0;
@@ -24,8 +30,40 @@ export class TrayWiper {
     /** Each spot: centre and donut size (its mess canvas is a little bigger). */
     private readonly boards: () => readonly { x: number; y: number; size: number }[],
     private readonly onClean: () => void,
+    /** Picking the sponge up (the station puts its cup or jar down). */
+    private readonly onPick: () => void = () => undefined,
   ) {
     this.sponge = scene.add.image(0, 0, TextureKeys.Sponge).setDepth(22).setVisible(false).setName(`sponge-${tray}`);
+    this.icon = scene.add.image(0, 0, TextureKeys.Sponge).setDepth(18).setVisible(false).setName(`sponge-pick-${tray}`).setInteractive({ useHandCursor: true });
+    this.iconLabel = scene.add
+      .text(0, 0, 'tap to clean', { fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold', color: '#fbf6ec', backgroundColor: '#1f1a17cc', padding: { x: 8, y: 3 } })
+      .setOrigin(0.5, 0)
+      .setDepth(18)
+      .setVisible(false);
+    this.icon.on(Phaser.Input.Events.POINTER_UP, () => {
+      this.holding = !this.holding;
+      if (this.holding) this.onPick();
+      audio().play('tap');
+      this.refreshIcon();
+    });
+    scene.tweens.add({ targets: this.icon, angle: { from: -6, to: 6 }, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+  }
+
+  /** Put the sponge icon on the tray's corner. */
+  placeIcon(x: number, y: number, scale = 1): void {
+    this.icon.setPosition(x, y).setScale(scale);
+    this.iconLabel.setPosition(x, y + 40 * scale).setScale(scale);
+    this.refreshIcon();
+  }
+
+  /** Shown while the tray is messy (or the sponge is in hand); lit up when picked. */
+  refreshIcon(): void {
+    const show = this.dirty || this.holding;
+    if (!show) this.holding = false;
+    this.icon.setVisible(show).setAlpha(this.holding ? 1 : 0.85);
+    this.iconLabel.setVisible(show).setText(this.holding ? 'scrub the tray!' : 'tap to clean');
+    if (this.holding) this.icon.setTint(0xfff2a8);
+    else this.icon.clearTint();
   }
 
   get active(): boolean {
@@ -75,6 +113,8 @@ export class TrayWiper {
     const m = s.messOn(this.tray);
     if (s.wipe(this.tray, dist / balance.cleanup.wipePerUnit + m * dist * 0.5) && m > 0) {
       this.clearAll();
+      this.holding = false;
+      this.refreshIcon();
       this.onClean();
     }
   }
