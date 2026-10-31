@@ -17,6 +17,7 @@ export const SceneKeys = {
   TicketView: 'TicketViewScene',
   DaySummary: 'DaySummaryScene',
   Invite: 'InviteScene',
+  Store: 'StoreScene',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

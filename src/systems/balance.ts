@@ -5,6 +5,7 @@ import type { GlazeBalance } from '../stations/glaze';
 import type { ToppingsBalance } from '../stations/toppings';
 import type { DoughBalance } from '../stations/dough';
 import { validateScoring, type ScoringBalance } from './score';
+import type { GuideItem, PaymentBalance, SuppliesBalance } from './supplies';
 
 export interface Range {
   min: number;
@@ -33,6 +34,11 @@ export interface Balance {
   deliveries: { byDay: number[]; size: Range };
   events: { inviteChance: Record<'great' | 'good' | 'okay' | 'bad', number>; giftBonus: number };
   cleanup: { messDoneAt: number; tidyBonus: number; oilDirtMax: number; wipePerUnit: number };
+  /** A day at the window lasts this long once you open. */
+  day: { lengthSec: number };
+  payment: PaymentBalance;
+  supplies: SuppliesBalance;
+  guides: { items: GuideItem[] };
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */

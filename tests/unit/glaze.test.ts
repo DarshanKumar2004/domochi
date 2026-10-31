@@ -5,7 +5,7 @@ import type { Balance } from '../../src/systems/balance';
 import type { Flavor, Menu, Stripe } from '../../src/systems/menu';
 import { ringBallCenters } from '../../src/stations/donutGeometry';
 import type { FriedDonut } from '../../src/stations/fry';
-import { drizzlePatternQuality, drizzleQuality, GlazeWork, glazeScoreFor, layerScore, PaintMask, ringMask } from '../../src/stations/glaze';
+import { drizzlePatternQuality, drizzleQuality, GlazeWork, glazeScoreFor, layerScore, PaintMask, ringMask, topLayers } from '../../src/stations/glaze';
 
 const B = (balanceJson as Balance).glaze;
 const menu = menuJson as Menu;
@@ -97,26 +97,28 @@ describe('scores', () => {
 });
 
 describe('GlazeWork', () => {
-  it('one base glaze (first) and one drizzle per donut', () => {
+  it('any glaze can go on, any time: a new one goes on top, and the top one is what counts', () => {
     const w = new GlazeWork(1, fried, menu, B);
-    expect(w.canPour('white-icing')).toBe('ok');
     w.pour('strawberry', 0, -0.6, 0.1, -0.6);
-    expect(w.canPour('cookies-and-cream')).toBe('hasBase');
     w.pour('white-icing', -0.5, 0, 0.5, 0);
-    expect(w.canPour('strawberry')).toBe('drizzleFirst');
-    expect(w.pour('cookies-and-cream', 0, 0, 0.1, 0)).toBe(false);
+    expect(w.canPour('cookies-and-cream')).toBe('ok');
+    expect(w.pour('cookies-and-cream', 0, 0, 0.1, 0)).toBe(true);
+    const d = w.finish();
+    expect(d.layers.map((l) => l.glazeId)).toEqual(['strawberry', 'white-icing', 'cookies-and-cream']);
+    // The cookies & cream coat went on last: it's the base now, and it covers the icing.
+    expect(topLayers(d.layers)).toMatchObject({ base: { glazeId: 'cookies-and-cream' }, drizzle: undefined });
   });
 
-  it('switching back to a started layer keeps adding to it', () => {
+  it('going back to the glaze you just poured keeps adding to that layer', () => {
     const w = new GlazeWork(1, fried, menu, B);
     w.pour('strawberry', 0, -0.65, 0.2, -0.65);
     const first = w.currentLayer!.coverage;
-    w.pour('white-icing', -0.5, 0, 0.5, 0);
-    expect(w.canPour('strawberry')).toBe('drizzleFirst');
-    expect(first).toBeGreaterThan(0);
+    w.pour('strawberry', 0.2, -0.65, 0.4, -0.6);
+    expect(w.allLayers).toHaveLength(1);
+    expect(w.currentLayer!.coverage).toBeGreaterThan(first);
   });
 
-  it('finish puts the base coat first', () => {
+  it('finish keeps the pouring order', () => {
     const w = new GlazeWork(5, fried, menu, B);
     w.pour('strawberry', 0, -0.6, 0.1, -0.6);
     w.pour('white-icing', -0.5, 0, 0.5, 0);

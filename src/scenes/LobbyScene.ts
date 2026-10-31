@@ -47,8 +47,10 @@ const LAYOUT = {
     groundY: 380,
     truck: { x: 420, y: 205, scale: 0.65 },
     sign: { x: 820, feetY: 470, scale: 0.6 },
-    line: { x: [980, 1130, 1280, 1430], feetY: 700, scale: 0.8 },
-    panel: { x: 1205, y: 420, buttonY: 680, width: 600 },
+    // The line starts at the serving window and runs right, along the front of the trailer.
+    line: { x: [300, 450, 600, 750], feetY: 720, scale: 0.8 },
+    // Checklists and buttons in the open middle of the lot, clear of the line and the patio.
+    panel: { x: 1240, y: 330, buttonY: 640, width: 520 },
     pickups: { x: 1730, y: 215 },
     waiting: {
       x: 1730,
@@ -88,6 +90,8 @@ export class LobbyScene extends Phaser.Scene {
   private panelText!: Phaser.GameObjects.Text;
   private openButton!: Button;
   private closeButton!: Button;
+  /** After time's up: send whoever's still waiting home (unpaid). */
+  private sendHomeButton!: Button;
   private pickupsText!: Phaser.GameObjects.Text;
 
   constructor() {
@@ -143,6 +147,7 @@ export class LobbyScene extends Phaser.Scene {
       .setName('lobby-checklist');
     this.openButton = new Button(this, 0, 0, 'Open the window', () => this.openShop(), { width: 520, name: 'btn-open' }).setDepth(21);
     this.closeButton = new Button(this, 0, 0, 'Close up', () => this.closeUp(), { width: 520, name: 'btn-close-up' }).setDepth(21);
+    this.sendHomeButton = new Button(this, 0, 0, 'Send them home', () => this.sendHome(), { width: 520, fill: COLORS.dough, name: 'btn-send-home' }).setDepth(21);
     this.pickupsText = this.add
       .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '32px', color: CSS.ink, backgroundColor: '#fffaf0cc', padding: { x: 18, y: 12 }, align: 'left' })
       .setOrigin(0.5)
@@ -152,6 +157,7 @@ export class LobbyScene extends Phaser.Scene {
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.syncPanels() });
 
     listen(this, session().events, 'changed', () => this.sync(false));
+    listen(this, session().events, 'friend', (e) => this.friendVisit(e.line));
 
     onLayout(this, (v: Viewport) => {
       const L = LAYOUT[v.orientation];
@@ -173,6 +179,7 @@ export class LobbyScene extends Phaser.Scene {
       this.panelText.setPosition(c.x + L.panel.x, c.y + L.panel.y).setWordWrapWidth(L.panel.width);
       this.openButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
       this.closeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
+      this.sendHomeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
       this.pickupsText.setPosition(c.x + L.pickups.x, c.y + L.pickups.y);
       this.sync(true);
     });
@@ -226,11 +233,13 @@ export class LobbyScene extends Phaser.Scene {
   private syncPanels(): void {
     const s = session();
     this.scenery.setPhase(s.phase);
-    this.truck?.setOpen(s.phase === 'open');
+    this.truck?.setOpen(s.phase === 'open' && !s.timeUp);
     const prep = s.phase === 'prep';
     const closing = s.phase === 'closing';
+    const lastOrders = s.phase === 'open' && s.timeUp && s.unserved > 0;
     this.openButton.setVisible(prep);
     this.closeButton.setVisible(closing);
+    this.sendHomeButton.setVisible(lastOrders);
     if (prep) {
       const dough = Number.isFinite(s.dough) ? s.dough : 0;
       const lines = [
@@ -240,6 +249,11 @@ export class LobbyScene extends Phaser.Scene {
       if (s.pickups.length) lines.push(`• ${s.pickups.length} pickup${s.pickups.length === 1 ? '' : 's'} on the rail`);
       lines.push('then open the window!');
       this.panelText.setText(lines.join('\n')).setVisible(true);
+    } else if (lastOrders) {
+      const n = s.unserved;
+      this.panelText
+        .setText(["time's up! the window's closed.", `• finish the last ${n === 1 ? 'order' : `${n} orders`}`, "• can't? send them home", "  (they won't pay)"].join('\n'))
+        .setVisible(true);
     } else if (closing) {
       const c = s.cleanup;
       const tick = (done: boolean) => (done ? '(done)' : '');
@@ -286,6 +300,44 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private confirmOpen = false;
+
+  private sendHome(): void {
+    if (session().sendHome() > 0) audio().play('tap');
+  }
+
+  /** One of Ethan's friends walks up to the window with supplies, says hi, and heads off. */
+  private friendVisit(line: string): void {
+    const v = getViewport(this);
+    const L = LAYOUT[v.orientation];
+    const c = v.content;
+    const keys = [TextureKeys.CustomerRegular, TextureKeys.CustomerStudent, TextureKeys.CustomerOffice, TextureKeys.CustomerParent];
+    const key = keys[Math.floor(Math.random() * keys.length)]!;
+    const y = c.y + L.groundY + (v.orientation === 'landscape' ? 150 : 200);
+    const x = c.x + L.truck.x + (v.orientation === 'landscape' ? 120 : 160);
+    const scale = L.line.scale * 0.95;
+    const friend = this.add.image(v.width + 120, y, key).setOrigin(0.5, 1).setScale(scale).setDepth(7).setName('lobby-friend');
+    // Carrying a supply crate.
+    const crate = this.add.rectangle(friend.x, y - CUSTOMER_H * scale * 0.42, 110 * scale, 80 * scale, 0xc8955f).setStrokeStyle(5, COLORS.ink).setDepth(8);
+    const follow = () => crate.setPosition(friend.x, y - CUSTOMER_H * scale * 0.42);
+    this.tweens.chain({
+      targets: friend,
+      tweens: [
+        { x, duration: Math.max(400, ((friend.x - x) / WALK_SPEED) * 1000), onUpdate: follow },
+        {
+          x: x - 1,
+          duration: 2600,
+          onStart: () => {
+            crate.setVisible(false);
+            const w = 600;
+            const bx = Phaser.Math.Clamp(x, w / 2 + 20, v.width - w / 2 - 20);
+            const bubble = new SpeechBubble(this, bx, y - CUSTOMER_H * scale - 110, w, line, Phaser.Math.Clamp(x - bx, -200, 200), 36).setDepth(30);
+            this.time.delayedCall(2500, () => bubble.destroy());
+          },
+        },
+        { x: -200, duration: Math.max(400, ((x + 200) / WALK_SPEED) * 1000), onComplete: () => (friend.destroy(), crate.destroy()) },
+      ],
+    });
+  }
 
   private closeUp(): void {
     if (session().closeUp()) this.scene.launch(SceneKeys.DaySummary);

@@ -52,6 +52,7 @@ export class AudioService {
   /** Next eighth note to schedule (counts up forever) and when it plays. */
   private step = 0;
   private nextNoteAt = 0;
+  private hidden = false;
 
   constructor(
     private settings: AudioSettings,
@@ -108,8 +109,21 @@ export class AudioService {
   /** Pause everything (the page was hidden) or carry on. */
   setSuspended(suspended: boolean): void {
     if (!this.ctx) return;
+    this.hidden = suspended;
     if (suspended) void this.ctx.suspend?.();
-    else void this.ctx.resume?.();
+    else this.wake();
+  }
+
+  /**
+   * Call on every tap. Phones suspend (or "interrupt") an audio context on their
+   * own, for a notification, another app's sound or a long stretch without taps,
+   * and only a tap may resume it: so the music carries on after the next one.
+   */
+  wake(): void {
+    const ctx = this.ctx;
+    if (!ctx || this.hidden) return;
+    if (ctx.state !== 'running') void ctx.resume?.();
+    if (this.settings.music) this.startMusic();
   }
 
   play(name: Sfx): void {
@@ -215,6 +229,8 @@ export class AudioService {
     const ctx = this.ctx;
     if (!ctx || !this.musicGain) return;
     const eighth = 60 / BPM / 2;
+    // Fell behind (the context was paused or the timer throttled): pick up from now, not with a burst of old notes.
+    if (this.nextNoteAt < ctx.currentTime - 0.1) this.nextNoteAt = ctx.currentTime + 0.05;
     while (this.nextNoteAt < ctx.currentTime + 0.25) {
       const bar = Math.floor(this.step / 8) % CHORDS.length;
       const beat = this.step % 8;

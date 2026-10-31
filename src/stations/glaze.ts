@@ -289,9 +289,20 @@ export function drizzleQuality(layer: Pick<GlazeLayer, 'coverage' | 'spill' | 'b
 }
 
 /** How well a glazed donut matches a flavour (0–1). */
+/**
+ * What shows on a donut: the top base coat, and a drizzle only if it went on
+ * after that coat (a later glaze pours over an earlier drizzle and hides it).
+ */
+export function topLayers(layers: readonly GlazeLayer[]): { base?: GlazeLayer; drizzle?: GlazeLayer } {
+  let bi = -1;
+  for (let i = 0; i < layers.length; i++) if (layers[i]!.kind === 'base') bi = i;
+  let drizzle: GlazeLayer | undefined;
+  for (let i = bi + 1; i < layers.length; i++) if (layers[i]!.kind === 'drizzle') drizzle = layers[i];
+  return { base: bi >= 0 ? layers[bi] : undefined, drizzle };
+}
+
 export function glazeScoreFor(d: GlazedDonut, flavor: Flavor, b: GlazeBalance): number {
-  const base = d.layers.find((l) => l.kind === 'base');
-  const drizzle = d.layers.find((l) => l.kind === 'drizzle');
+  const { base, drizzle } = topLayers(d.layers);
   const baseScore = base && base.style !== 'drizzle' ? layerScore(base.coverage, base.spill, base.style, base.glazeId === flavor.glaze, b) : 0;
   if (flavor.drizzle) {
     const quality = drizzle ? (flavor.drizzlePattern ? drizzlePatternQuality(drizzle, flavor.drizzlePattern, b) : drizzleQuality(drizzle, b)) : 0;
@@ -301,7 +312,7 @@ export function glazeScoreFor(d: GlazedDonut, flavor: Flavor, b: GlazeBalance): 
   return baseScore * (drizzle ? b.unwantedDrizzleFactor : 1);
 }
 
-export type PourCheck = 'ok' | 'hasBase' | 'hasDrizzle' | 'drizzleFirst' | 'unknown';
+export type PourCheck = 'ok' | 'unknown';
 
 /** One donut on the glazing board. */
 export class GlazeWork {
@@ -350,15 +361,12 @@ export class GlazeWork {
     return this.b.brushRadius[g?.style ?? 'dip'];
   }
 
-  /** Can this glaze be poured now? One base coat (first) and one drizzle per donut. */
+  /**
+   * Can this glaze be poured? Any glaze, any time: a new one goes on top of
+   * what's there (and what's on top is what counts; see topLayers).
+   */
   canPour(glazeId: string): PourCheck {
-    const kind = this.kindOf(glazeId);
-    if (!kind) return 'unknown';
-    const all = this.allLayers;
-    const sameKind = all.find((l) => l.kind === kind);
-    if (sameKind && sameKind.glazeId !== glazeId) return kind === 'base' ? 'hasBase' : 'hasDrizzle';
-    if (kind === 'base' && all.some((l) => l.kind === 'drizzle')) return 'drizzleFirst';
-    return 'ok';
+    return this.kindOf(glazeId) ? 'ok' : 'unknown';
   }
 
   /** Glaze landing along a segment. Returns false if this glaze can't be poured now. */
@@ -366,9 +374,9 @@ export class GlazeWork {
     if (this.canPour(glazeId) !== 'ok') return false;
     if (this.current?.layer.glazeId !== glazeId) {
       this.closeCurrent();
-      const existing = this.layers.findIndex((l) => l.glazeId === glazeId);
-      if (existing >= 0) {
-        // Back to a layer you'd already started: keep adding to it.
+      // Back to the glaze you poured last (nothing else on top since): keep adding to that layer.
+      const existing = this.layers.length - 1;
+      if (existing >= 0 && this.layers[existing]!.glazeId === glazeId) {
         const layer = this.layers.splice(existing, 1)[0]!;
         const mask = new PaintMask(this.tpl, this.b.gridSize, layer.kind === 'drizzle');
         const r = this.brushFor(glazeId);
@@ -393,11 +401,10 @@ export class GlazeWork {
     return true;
   }
 
-  /** Done: the finished donut, base coat first. */
+  /** Done: the finished donut, its layers in the order they were poured. */
   finish(): GlazedDonut {
     this.closeCurrent();
-    const layers = [...this.layers].sort((a, c) => (a.kind === c.kind ? 0 : a.kind === 'base' ? -1 : 1));
-    return { ...this.extra, id: this.id, fry: this.fry, layers };
+    return { ...this.extra, id: this.id, fry: this.fry, layers: [...this.layers] };
   }
 
   private closeCurrent(): void {

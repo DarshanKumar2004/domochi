@@ -7,6 +7,7 @@
 // the flavour it's matched to (matchDonuts).
 
 import type { Menu } from '../systems/menu';
+import { topLayers } from './glaze';
 import type { FinishedDonut } from './toppings';
 import { toppingsOn } from './toppings';
 
@@ -19,8 +20,9 @@ export interface BoxBalance {
 
 /** Which menu flavour a donut is (base glaze, drizzle and toppings all match), or null. */
 export function identifyFlavor(d: FinishedDonut, menu: Menu): string | null {
-  const base = d.layers.find((l) => l.kind === 'base')?.glazeId;
-  const drizzle = d.layers.find((l) => l.kind === 'drizzle')?.glazeId;
+  const top = topLayers(d.layers);
+  const base = top.base?.glazeId;
+  const drizzle = top.drizzle?.glazeId;
   const tops = toppingsOn(d);
   for (const f of menu.flavors) {
     if (f.glaze !== base || f.drizzle !== drizzle) continue;

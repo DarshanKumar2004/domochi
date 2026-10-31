@@ -231,7 +231,7 @@ export class FryScene extends StationScene {
     this.dropButton = new Button(this, 0, 0, 'Drop', () => this.drop(), { width: 260, height: 150, fontSize: 52, name: 'btn-drop' });
     this.pullAllButton = new Button(this, 0, 0, 'Pull all', () => this.pullAll(), { width: 300, height: 150, fontSize: 48, name: 'btn-pull-all' });
     this.filterButton = new Button(this, 0, 0, 'Filter oil', () => this.filterOil(), { width: 300, height: 150, fontSize: 46, fill: COLORS.dough, name: 'btn-filter-oil' }).setVisible(false);
-    this.oilButton = new Button(this, 0, 0, '+ oil', () => session().fryer.addOil(), {
+    this.oilButton = new Button(this, 0, 0, '+ oil', () => this.addOil(), {
       width: 200,
       height: 120,
       fontSize: 40,
@@ -658,6 +658,8 @@ export class FryScene extends StationScene {
       this.dirtOverlay.setAlpha(dirt * 0.45);
     }
     this.oilButton.setEnabled(f.oil < 1);
+    const jugs = session().stockOf('oil');
+    this.oilButton.setLabel(Number.isFinite(jugs) ? `+ oil (${jugs})` : '+ oil');
     this.updateHint();
   }
 
@@ -757,6 +759,11 @@ export class FryScene extends StationScene {
     v.dx = x - home.x;
     v.dy = y - home.y;
     this.tweens.add({ targets: v, dx: 0, dy: 0, duration: 220, ease: 'Back.Out' });
+  }
+
+  /** Top up the oil with a jug (if there's one left). */
+  private addOil(): void {
+    if (session().addOil() === 'none') this.flash('out of oil! buy more at the store');
   }
 
   /** Filter the oil: it drains and comes back clean. */

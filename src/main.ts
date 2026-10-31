@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config';
 import { SaveService } from './systems/SaveService';
-import { audio, hasSession, session, setClockPaused, setSave, setSeed } from './systems/services';
+import { audio, hasSession, save, session, setClockPaused, setSave, setSeed } from './systems/services';
 import { createDefaultStorage } from './systems/storage';
 import { measureGameSize, watchContainerSize } from './ui/viewport';
 
@@ -19,10 +19,13 @@ async function start(): Promise<void> {
   watchContainerSize(game, container);
   // Hush when the tab or app goes to the background.
   document.addEventListener('visibilitychange', () => audio().setSuspended(document.hidden));
+  // ...and pick the sound back up on the next tap if the phone paused it.
+  document.addEventListener('pointerdown', () => audio().wake(), { capture: true, passive: true });
 
   // Exposed for Playwright tests.
-  const w = window as unknown as { __game: Phaser.Game; __session?: unknown; __setClockPaused: (p: boolean) => void };
+  const w = window as unknown as { __game: Phaser.Game; __session?: unknown; __save: unknown; __setClockPaused: (p: boolean) => void };
   w.__game = game;
+  w.__save = save();
   w.__setClockPaused = setClockPaused;
   Object.defineProperty(w, '__session', { get: () => (hasSession() ? session() : undefined) });
 }

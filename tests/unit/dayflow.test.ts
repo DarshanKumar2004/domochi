@@ -10,6 +10,7 @@ import { GameSession, type PopupEvent } from '../../src/systems/GameSession';
 import type { Menu } from '../../src/systems/menu';
 import { createRng } from '../../src/systems/rng';
 import { tipFor } from '../../src/systems/score';
+import { boxStockId, clockText, doughCostPerDonut, fillStock, paymentFor, priceOn, startingStock } from '../../src/systems/supplies';
 
 const balance = balanceJson as Balance;
 const menu = menuJson as Menu;
@@ -17,7 +18,7 @@ const customers = customersJson as CustomersData;
 const events = eventsJson.events as PopupEvent[];
 const D = balance.dough;
 
-function day(n = 2, opts: { event?: PopupEvent; seed?: number; over?: Partial<Balance> } = {}): GameSession {
+function day(n = 2, opts: { event?: PopupEvent; seed?: number; over?: Partial<Balance>; stock?: Record<string, number> } = {}): GameSession {
   return new GameSession({
     menu,
     customers,
@@ -27,6 +28,7 @@ function day(n = 2, opts: { event?: PopupEvent; seed?: number; over?: Partial<Ba
     dayFlow: true,
     events,
     ...(opts.event ? { event: opts.event } : {}),
+    ...(opts.stock ? { stock: opts.stock } : {}),
   });
 }
 
@@ -146,8 +148,8 @@ describe('a full day: prep, open, closing', () => {
     expect(lumpy.rack[0]!.score).toBeGreaterThanOrEqual(Math.floor(good.rack[0]!.score * (1 - balance.fry.doughEffect)));
   });
 
-  it('after the last order it is closing time; clean up for the tidy bonus, then close', () => {
-    const s = day(1, { over: { customersPerDay: [1] } });
+  it('after the window closes and the last order is out, it is closing time; clean up for the tidy bonus, then close', () => {
+    const s = day(1, { over: { day: { lengthSec: 10 } } });
     s.openShop();
     s.tick(5000);
     const c = s.line[0]!;
@@ -160,6 +162,8 @@ describe('a full day: prep, open, closing', () => {
     s.dropDonut(); // dirties the oil
     let complete = 0;
     s.events.on('dayComplete', () => complete++);
+    s.tick(6000); // time's up
+    expect(s.timeUp).toBe(true);
     s.serveActiveTicket();
     expect(s.phase).toBe('closing');
     expect(s.isDayComplete).toBe(false);
@@ -177,13 +181,14 @@ describe('a full day: prep, open, closing', () => {
   });
 
   it('closing without cleaning is allowed, just no bonus', () => {
-    const s = day(1, { over: { customersPerDay: [1] } });
+    const s = day(1, { over: { day: { lengthSec: 10 } } });
     s.openShop();
     s.tick(5000);
     const c = s.line[0]!;
     s.takeOrder(c.id);
     s.finishOrdering(c.id);
     s.addMess('glaze', 10);
+    s.tick(6000);
     s.serveActiveTicket();
     s.closeUp();
     expect(s.summary()).toMatchObject({ tidy: false, tidyBonus: 0 });
@@ -245,7 +250,12 @@ describe('event invites and pop-up days', () => {
   it('a pop-up day has more customers, arriving faster, tipping more, and no pickups', () => {
     const ev = events.find((e) => e.id === 'wedding')!;
     const normal = day(2);
-    const popup = day(2, { event: ev });
+    // Every order counts as great and gets paid (this checks the tip multiplier, not payment).
+    const generous = {
+      scoring: { ...balance.scoring, tiers: { great: 0, good: 0, okay: 0 } },
+      payment: { ...balance.payment, awfulBelow: -1 },
+    };
+    const popup = day(2, { event: ev, over: generous });
     expect(popup.event?.name).toBe(ev.name);
     expect(popup.pickups).toHaveLength(0);
     expect(popup.walkUpsToday).toBe(Math.round(normal.walkUpsToday * ev.customersMultiplier));
@@ -259,5 +269,201 @@ describe('event invites and pop-up days', () => {
     const score = popup.serveActiveTicket().score;
     const usual = tipFor(score.total, t.order.flavors.length, balance.scoring) + score.giftTip;
     expect(score.tip).toBeCloseTo(Math.round(usual * ev.tipMultiplier * 100) / 100);
+  });
+});
+
+describe('the timed day', () => {
+  it('walk-ups keep coming until time is up; then the line goes home and the window shuts', () => {
+    const s = day(1, { over: { day: { lengthSec: 60 } } });
+    expect(s.timeLeftMs).toBe(60_000);
+    s.openShop();
+    s.tick(5000);
+    expect(s.timeLeftMs).toBe(55_000);
+    expect(clockText(s.timeLeftMs)).toBe('0:55');
+    const c = s.line[0]!;
+    s.takeOrder(c.id);
+    s.finishOrdering(c.id);
+    for (let t = 0; t < 54_000; t += 1000) s.tick(1000);
+    expect(s.timeUp).toBe(false);
+    const inLine = s.line.length;
+    let ups = 0;
+    s.events.on('timeUp', () => ups++);
+    s.tick(2000);
+    expect(s.timeUp).toBe(true);
+    expect(ups).toBe(1);
+    expect(s.timeLeftMs).toBe(0);
+    expect(s.line).toHaveLength(0);
+    // Whoever was still in line went home; the one who ordered is still waiting.
+    expect(s.summary().wentHome).toBe(inLine);
+    expect(s.waiting).toHaveLength(1);
+    expect(s.phase).toBe('open');
+    // No one new comes.
+    s.tick(60_000);
+    expect(s.line).toHaveLength(0);
+  });
+
+  it("can't finish the last orders? send them home (unpaid), and it's closing time", () => {
+    const s = day(1, { over: { day: { lengthSec: 10 } } });
+    s.openShop();
+    s.tick(5000);
+    const c = s.line[0]!;
+    s.takeOrder(c.id);
+    s.finishOrdering(c.id);
+    expect(s.sendHome()).toBe(0); // not before time's up
+    s.tick(6000);
+    expect(s.sendHome()).toBe(1);
+    expect(s.phase).toBe('closing');
+    expect(s.servedCount).toBe(0);
+    expect(s.summary()).toMatchObject({ served: 0, sales: 0 });
+  });
+
+  it('days never run out: day 99 is a normal day', () => {
+    const s = day(99);
+    expect(s.openShop()).toBe(true);
+    s.tick(5000);
+    expect(s.line.length).toBeGreaterThan(0);
+  });
+});
+
+describe('supplies', () => {
+  const S = balance.supplies;
+
+  it('a new game starts with the starting stock; a saved stock gets new items at 0', () => {
+    const st = startingStock(S);
+    expect(st['rice-flour']).toBe(S.start['rice-flour']);
+    expect(Object.keys(st).sort()).toEqual(S.items.map((i) => i.id).sort());
+    expect(fillStock({ milk: 3 }, S)).toMatchObject({ milk: 3, egg: 0 });
+  });
+
+  it('every scoop uses an ingredient; out of one, you can\'t scoop it', () => {
+    const s = day(1, { stock: { ...startingStock(S), egg: 1 } });
+    expect(s.tracksSupplies).toBe(true);
+    expect(s.scoop('egg')).toBe(true);
+    expect(s.stockOf('egg')).toBe(0);
+    expect(s.doughBatch!.scoopsOf('egg')).toBe(1);
+    expect(s.scoop('egg')).toBe(false);
+    expect(s.doughBatch!.scoopsOf('egg')).toBe(1);
+    expect(s.scoop('glitter')).toBe(false);
+  });
+
+  it('without a stock (tutorial, tests), supplies never run out', () => {
+    const s = day(1);
+    expect(s.tracksSupplies).toBe(false);
+    expect(s.stockOf('egg')).toBe(Infinity);
+    for (let i = 0; i < 50; i++) expect(s.scoop('egg')).toBe(true);
+  });
+
+  it('+ oil uses a jug (not when the vat is full, nor when you are out)', () => {
+    const s = day(1, { stock: { ...startingStock(S), oil: 1 } });
+    expect(s.addOil()).toBe('full');
+    s.fryer.oil = 0.5;
+    expect(s.addOil()).toBe('ok');
+    expect(s.stockOf('oil')).toBe(0);
+    s.fryer.oil = 0.5;
+    expect(s.addOil()).toBe('none');
+  });
+
+  it('serving uses up the box; out of that box it goes in a napkin, for half the box score', () => {
+    const run = (boxes: number) => {
+      const s = day(1, { over: { day: { lengthSec: 10 } }, stock: { ...startingStock(S), [boxStockId('single')]: boxes, [boxStockId('trio')]: boxes, [boxStockId('flight')]: boxes, [boxStockId('domochi-box')]: boxes } });
+      s.openShop();
+      s.tick(5000);
+      const c = s.line[0]!;
+      const t = s.takeOrder(c.id);
+      s.finishOrdering(c.id);
+      const id = boxStockId(t.packBoxId ?? t.order.boxId);
+      s.serveActiveTicket();
+      return { s, t, id };
+    };
+    const ok = run(1);
+    expect(ok.s.stockOf(ok.id)).toBe(0);
+    expect(ok.t.results.napkin).toBeUndefined();
+    const out = run(0);
+    expect(out.t.results.napkin).toBe(true);
+    expect(out.s.stockOf(out.id)).toBe(0);
+  });
+
+  it("when you're low, one of Ethan's friends may drop off a pack", () => {
+    const sure = { ...S, friendChance: 1, friendCheckSec: 10, friendsPerDay: 1 };
+    const s = day(1, { over: { supplies: sure }, stock: { ...startingStock(S), egg: 0 } });
+    const drops: { itemId: string; qty: number; line: string; name: string }[] = [];
+    s.events.on('friend', (e) => drops.push(e));
+    s.tick(60_000); // not before opening
+    expect(drops).toHaveLength(0);
+    s.openShop();
+    s.tick(10_500);
+    expect(drops).toHaveLength(1);
+    const egg = S.items.find((i) => i.id === 'egg')!;
+    expect(drops[0]).toMatchObject({ itemId: 'egg', qty: egg.pack });
+    expect(drops[0]!.line).not.toContain('{');
+    expect(s.stockOf('egg')).toBe(egg.pack);
+    s.tick(60_000);
+    expect(drops).toHaveLength(1); // friendsPerDay
+  });
+
+  it("nobody's low, nobody drops anything off", () => {
+    const sure = { ...S, friendChance: 1, friendCheckSec: 10 };
+    const plenty = Object.fromEntries(S.items.map((i) => [i.id, i.pack * 5]));
+    const s = day(1, { over: { supplies: sure }, stock: plenty });
+    let n = 0;
+    s.events.on('friend', () => n++);
+    s.openShop();
+    s.tick(30_000);
+    expect(n).toBe(0);
+  });
+
+  it('store prices swing a bit day to day, the same each time you look', () => {
+    const egg = S.items.find((i) => i.id === 'egg')!;
+    const prices = new Set<number>();
+    for (let d = 1; d <= 20; d++) {
+      const p = priceOn(egg, d, S.priceSwing);
+      expect(p).toBe(priceOn(egg, d, S.priceSwing));
+      expect(p).toBeGreaterThanOrEqual(egg.price * (1 - S.priceSwing) - 0.05);
+      expect(p).toBeLessThanOrEqual(egg.price * (1 + S.priceSwing) + 0.05);
+      prices.add(p);
+    }
+    expect(prices.size).toBeGreaterThan(3);
+  });
+});
+
+describe('payment and waste', () => {
+  const P = balance.payment;
+
+  it('good orders pay in full; okay a bit less; bad half and no tip; awful nothing, and they take from the tip jar', () => {
+    expect(paymentFor(95, 'great', P)).toEqual({ share: P.full, tips: true, takesFromJar: 0 });
+    expect(paymentFor(75, 'good', P)).toEqual({ share: P.full, tips: true, takesFromJar: 0 });
+    expect(paymentFor(50, 'okay', P)).toEqual({ share: P.okay, tips: true, takesFromJar: 0 });
+    expect(paymentFor(30, 'bad', P)).toEqual({ share: P.bad, tips: false, takesFromJar: 0 });
+    expect(paymentFor(P.awfulBelow - 1, 'bad', P)).toEqual({ share: 0, tips: false, takesFromJar: P.awfulTipJar });
+  });
+
+  it('an awful order (an empty box) pays nothing and takes back from the tip jar, never more than is in it', () => {
+    const s = day(1, { over: { day: { lengthSec: 100 }, maxActiveByDay: [99], spawn: { ...balance.spawn, intervalSec: { min: 1, max: 1 }, maxInLine: 9 } } });
+    s.openShop();
+    s.tick(5000);
+    const c = s.line[0]!;
+    s.takeOrder(c.id);
+    s.finishOrdering(c.id);
+    const e = s.serveActiveTicket();
+    expect(e.score.total).toBeLessThan(P.awfulBelow);
+    expect(e.sale).toBe(0);
+    expect(e.ticket.results.price).toBeGreaterThan(0);
+    // The jar was empty: nothing to take.
+    expect(e.score.tip).toBeCloseTo(0);
+  });
+
+  it('the summary counts unsold donuts and dough as waste, and takes the supplies used off the profit', () => {
+    const s = day(1, { stock: startingStock(balance.supplies) });
+    for (const [id, n] of Object.entries(D.recipe)) for (let i = 0; i < n; i++) expect(s.scoop(id)).toBe(true);
+    s.doughBatch!.stir(Math.PI * 2 * D.stirTurns);
+    s.finishDough();
+    s.fryer.temp = 350;
+    s.dropDonut();
+    const sum = s.summary();
+    // 1 frying + the rest of the batch still in the tub.
+    expect(sum.wasted).toBe(D.batchSize);
+    expect(sum.wasteCost).toBeCloseTo(D.batchSize * doughCostPerDonut(balance.supplies, D), 2);
+    expect(sum.suppliesCost).toBeCloseTo(sum.wasteCost, 2); // all of it went to waste
+    expect(sum.profit).toBeCloseTo(-sum.suppliesCost, 2);
   });
 });

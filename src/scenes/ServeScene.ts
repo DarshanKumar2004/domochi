@@ -46,7 +46,7 @@ export class ServeScene extends Phaser.Scene {
       ['Fry', val(r?.fry)],
       ['Glaze', val(r?.glaze)],
       ['Toppings', val(r?.toppings)],
-      ['Box', val(r?.box)],
+      ['Box', r?.napkin ? `${val(r.box)}  (napkin!)` : val(r?.box)],
       ['Wait', score ? `${score.wait}  (${Math.round(this.waitMs / 1000)}s)` : `${Math.round(this.waitMs / 1000)}s`],
     ];
     rows.forEach(([label, value], i) => {
@@ -59,15 +59,15 @@ export class ServeScene extends Phaser.Scene {
     line.lineBetween(-360, 95, 360, 95);
     card.add(line);
 
-    if (score) {
+    if (score && r) {
       card.add(text(0, 160, `${score.total}  ·  ${orderVerdict(score.total, balance.scoring)}`, 64, { fontStyle: 'bold' }).setOrigin(0.5).setName('serve-total'));
       card.add(
         text(
           0,
           245,
-          `tip $${score.tip.toFixed(2)}${score.giftTip > 0 ? ` (+$${score.giftTip.toFixed(2)} for the gift)` : ''}   ·   sold for $${(r?.sale ?? 0).toFixed(2)}`,
-          score.giftTip > 0 ? 34 : 40,
-          { color: '#6b5d52' },
+          this.payLine(score.tip, score.giftTip, r.sale ?? 0, r.price ?? r.sale ?? 0),
+          score.giftTip > 0 || (r.sale ?? 0) < (r.price ?? 0) ? 32 : 40,
+          { color: (r.sale ?? 0) < (r.price ?? 0) ? '#b03a3a' : '#6b5d52', align: 'center', wordWrap: { width: CARD_W - 80 } },
         )
           .setOrigin(0.5)
           .setName('serve-tip'),
@@ -80,6 +80,14 @@ export class ServeScene extends Phaser.Scene {
       const scale = Math.min(1, (v.height - 40) / CARD_H, (v.width - 40) / CARD_W);
       card.setPosition(v.width / 2, v.height / 2).setScale(scale);
     });
+  }
+
+  /** What they paid: full price and a tip, less for a poor order, nothing (and a dip in the tip jar) for an awful one. */
+  private payLine(tip: number, giftTip: number, sale: number, price: number): string {
+    const $ = (n: number) => `$${n.toFixed(2)}`;
+    if (sale === 0 && price > 0) return `they wouldn't pay for that!${tip < 0 ? `\nand took ${$(-tip)} back out of the tip jar` : ''}`;
+    if (sale < price) return `they only paid ${$(sale)} of ${$(price)}${tip > 0 ? ` · tip ${$(tip)}` : ' · no tip'}`;
+    return `tip ${$(tip)}${giftTip > 0 ? ` (+${$(giftTip)} for the gift)` : ''}   ·   sold for ${$(sale)}`;
   }
 
   /** Back to the lobby (via an invite, if they made one); if that was the last customer, the day is done. */

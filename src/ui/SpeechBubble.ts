@@ -5,8 +5,9 @@ const PADDING = 44;
 const TAIL = 50;
 
 /**
- * Speech bubble centred on (x, y), with a tail on the bottom edge.
- * `tailX` moves the tail left/right from the bubble's centre.
+ * Speech bubble centred on (x, y), with a tail on the bottom edge (`tailX`
+ * moves it left/right from the bubble's centre), or on the left edge, low
+ * down, pointing at whoever stands to its left.
  */
 export class SpeechBubble extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Graphics;
@@ -20,6 +21,7 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
     text: string,
     private readonly tailX = 0,
     fontSize = 52,
+    private readonly tailSide: 'bottom' | 'left' = 'bottom',
   ) {
     super(scene, x, y);
     this.bg = scene.make.graphics({}, false);
@@ -59,6 +61,9 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
     g.fillRoundedRect(-w / 2, -h / 2 + 10, w, h, 40);
     g.fillStyle(COLORS.card);
     g.fillRoundedRect(-w / 2, -h / 2, w, h, 40);
-    g.fillTriangle(this.tailX - 30, h / 2 - 2, this.tailX + 30, h / 2 - 2, this.tailX - 10, h / 2 + TAIL);
+    if (this.tailSide === 'left') {
+      const ty = Math.max(-h / 2 + 45, h / 2 - 70);
+      g.fillTriangle(-w / 2 + 2, ty - 28, -w / 2 + 2, ty + 28, -w / 2 - TAIL * 0.8, ty + 22);
+    } else g.fillTriangle(this.tailX - 30, h / 2 - 2, this.tailX + 30, h / 2 - 2, this.tailX - 10, h / 2 + TAIL);
   }
 }

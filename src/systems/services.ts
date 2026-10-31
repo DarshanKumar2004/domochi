@@ -11,6 +11,7 @@ import { boxFor } from './orders';
 import { createRng, randomSeed } from './rng';
 import { AudioService } from './AudioService';
 import type { SaveService } from './SaveService';
+import { fillStock } from './supplies';
 
 // Game-wide services, set up once in main.ts before Phaser starts.
 
@@ -75,7 +76,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
     rng: createRng(seedOverride ?? randomSeed()),
     ...(opts.tutorial
       ? { script: { orders: [{ flavors, boxId: boxFor(menu, flavors.length).id }] }, trackDough: true }
-      : { dayFlow: true, events: popupEvents, ...(event ? { event } : {}) }),
+      : { dayFlow: true, events: popupEvents, stock: fillStock(saveService?.data.stock, balance.supplies), ...(event ? { event } : {}) }),
   });
   return currentSession;
 }

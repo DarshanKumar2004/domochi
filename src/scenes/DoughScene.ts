@@ -176,6 +176,11 @@ export class DoughScene extends StationScene {
     for (const b of this.bins) {
       const n = w?.scoopsOf(b.id) ?? 0;
       b.count.setText(n ? `×${n}` : '');
+      // How much is left in stock (when supplies are counted).
+      const have = s.stockOf(b.id);
+      const name = balance.dough.ingredients.find((i) => i.id === b.id)!.name;
+      b.name.setText(Number.isFinite(have) ? `${name}\n${have} left` : name).setColor(have < 1 ? '#ff9b9b' : CSS.cream);
+      b.img.setAlpha(have < 1 ? 0.45 : 1);
     }
 
     this.setSubtitle(s.phase === 'prep' ? 'morning prep: make the day’s dough' : `tub ${left}/${D.tubCapacity}`);
@@ -256,8 +261,11 @@ export class DoughScene extends StationScene {
       this.flash('the tub is full: fry some first');
       return;
     }
-    const w = s.startDough()!;
-    w.scoop(id);
+    if (!s.scoop(id)) {
+      const ing = balance.dough.ingredients.find((i) => i.id === id);
+      this.flash(`out of ${ing?.name ?? id}! buy more at the store`);
+      return;
+    }
     audio().play('shake');
     // A scoop flies from the bin into the bowl.
     const bin = this.bins.find((b) => b.id === id)!;

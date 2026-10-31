@@ -293,11 +293,12 @@ export async function openDay(page: Page, batches = 2): Promise<void> {
     ([rec, turns, n]) => {
       type W = { scoop(id: string): boolean; stir(r: number): void };
       const s = (window as unknown as {
-        __session: { phase: string; startDough(): W; finishDough(): unknown; openShop(): boolean };
+        __session: { phase: string; startDough(): W; scoop(id: string): boolean; finishDough(): unknown; openShop(): boolean };
       }).__session;
       for (let b = 0; b < n; b++) {
         const w = s.startDough();
-        for (const [id, k] of Object.entries(rec)) for (let i = 0; i < k; i++) w.scoop(id);
+        // Through the session, so the scoops come out of stock like a player's would.
+        for (const [id, k] of Object.entries(rec)) for (let i = 0; i < k; i++) s.scoop(id);
         w.stir(Math.PI * 2 * turns);
         s.finishDough();
       }

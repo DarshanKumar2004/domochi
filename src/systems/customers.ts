@@ -28,6 +28,8 @@ export interface CustomersData {
   types: CustomerType[];
   /** What a customer says when you put extra donuts in their box. */
   giftLines: string[];
+  /** Ethan's friends, who drop off supplies you're low on ({item}, {qty}). */
+  friends?: { names: string[]; lines: string[] };
 }
 
 /** Replace {name} placeholders. Unknown placeholders are left as-is so typos are visible. */

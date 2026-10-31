@@ -56,9 +56,7 @@ function paintTruck(g: G): void {
   g.fillRect(48, 392, 404, 22);
   g.lineStyle(4, ink);
   g.strokeRect(48, 392, 404, 22);
-  // OPEN sign (text added by ui/Truck.ts)
-  g.fillStyle(ink);
-  g.fillEllipse(TRUCK_SPEC.openSignCenter.x, TRUCK_SPEC.openSignCenter.y, 150, 66);
+  // The OPEN sign's hanging wires (the sign itself is drawn by ui/Truck.ts, so it can flip)
   g.lineStyle(3, 0x777777);
   g.lineBetween(TRUCK_SPEC.openSignCenter.x - 30, 140, TRUCK_SPEC.openSignCenter.x, 120);
   g.lineBetween(TRUCK_SPEC.openSignCenter.x + 30, 140, TRUCK_SPEC.openSignCenter.x, 120);
@@ -71,6 +69,17 @@ function paintTruck(g: G): void {
     g.fillStyle(0x999999);
     g.fillCircle(x, 540, 8);
   }
+  // Stabiliser jack at the back corner, so the trailer stands level
+  g.fillStyle(0x55595e);
+  g.fillRect(776, 506, 26, 86);
+  g.fillStyle(0x7d8288);
+  g.fillRect(770, 506, 38, 22);
+  g.fillRect(806, 512, 30, 8); // crank
+  g.fillStyle(0x3c3f43);
+  g.fillRoundedRect(754, 588, 70, 16, 4); // foot pad
+  g.lineStyle(4, ink);
+  g.strokeRect(776, 506, 26, 86);
+  g.strokeRoundedRect(754, 588, 70, 16, 4);
 }
 
 /** Sidewalk A-frame sign: a poster of real domochi flavors (after Kumar's photo). */

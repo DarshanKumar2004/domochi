@@ -97,4 +97,31 @@ describe('AudioService', () => {
     expect(counts.suspended).toBe(1);
     expect(counts.resumed).toBe(2);
   });
+
+
+  it('a tap wakes it back up if the phone paused it (but not while the page is hidden)', () => {
+    const { ctx, counts } = fakeContext();
+    const a = new AudioService({ sound: true, music: false }, () => ctx);
+    a.unlock();
+    const c = ctx as unknown as { state: string };
+    c.state = 'running';
+    a.wake();
+    expect(counts.resumed).toBe(1);
+    c.state = 'suspended';
+    a.wake();
+    expect(counts.resumed).toBe(2);
+    a.setSuspended(true);
+    a.wake();
+    expect(counts.resumed).toBe(2);
+  });
+
+  it('music that fell behind picks up from now instead of a burst of old notes', () => {
+    vi.useFakeTimers();
+    const { ctx, counts } = fakeContext();
+    const a = new AudioService({ sound: true, music: true }, () => ctx);
+    a.unlock();
+    (ctx as unknown as { currentTime: number }).currentTime = 600;
+    vi.advanceTimersByTime(60);
+    expect(counts.oscillators).toBeLessThan(20);
+  });
 });

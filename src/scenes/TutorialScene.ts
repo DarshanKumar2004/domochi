@@ -83,7 +83,7 @@ export class TutorialScene extends Phaser.Scene {
     this.mascot = this.add.image(0, 0, TextureKeys.Mascot).setOrigin(0.5, 1).setScale(0.75).setDepth(4).setName('tutorial-mascot');
     // mochi bobs and squishes a little while it talks.
     this.tweens.add({ targets: this.mascot, scaleY: 0.7, scaleX: 0.8, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.bubble = new SpeechBubble(this, 0, 0, BUBBLE_W, '', -BUBBLE_W / 2 + 60, 36).setDepth(4).setName('tutorial-bubble');
+    this.bubble = new SpeechBubble(this, 0, 0, BUBBLE_W, '', 0, 36, 'left').setDepth(4).setName('tutorial-bubble');
     this.next = new Button(this, 0, 0, 'Next', () => this.advance(), { width: 280, height: 120, fontSize: 46, name: 'btn-tutorial-next' }).setDepth(5);
     this.skip = this.add
       .text(0, 0, 'skip tutorial', { fontFamily: FONT_FAMILY, fontSize: '34px', color: CSS.cream, backgroundColor: '#1f1a17cc', padding: { x: 18, y: 12 } })

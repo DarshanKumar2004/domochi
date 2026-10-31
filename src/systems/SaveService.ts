@@ -24,6 +24,10 @@ export interface SaveData {
   bestOrder: number;
   /** A pop-up event you accepted, and the day it's on. */
   event?: { id: string; day: number };
+  /** Supplies on hand (balance.supplies ids). Missing: a new game's starting stock. */
+  stock?: Record<string, number>;
+  /** Glaze guides bought at the supply store (balance.guides ids). */
+  guides: string[];
   settings: {
     sound: boolean;
     music: boolean;
@@ -38,6 +42,7 @@ export function defaultSave(): SaveData {
     money: 0,
     served: 0,
     bestOrder: 0,
+    guides: [],
     settings: { sound: true, music: true },
   };
 }
@@ -63,6 +68,13 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (isRecord(raw.event) && typeof raw.event.id === 'string' && typeof raw.event.day === 'number' && Number.isInteger(raw.event.day)) {
     data.event = { id: raw.event.id, day: raw.event.day };
   }
+
+  if (isRecord(raw.stock)) {
+    const stock: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw.stock)) if (typeof v === 'number' && Number.isInteger(v) && v >= 0) stock[k] = v;
+    data.stock = stock;
+  }
+  if (Array.isArray(raw.guides)) data.guides = [...new Set(raw.guides.filter((g): g is string => typeof g === 'string'))];
 
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;

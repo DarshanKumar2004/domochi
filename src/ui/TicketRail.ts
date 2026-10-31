@@ -4,6 +4,7 @@ import type { Menu } from '../systems/menu';
 import { addDonutIcon } from './DonutIcon';
 import type { Viewport } from './layout';
 import { COLORS, CSS, FONT_FAMILY } from './theme';
+import { clockText } from '../systems/supplies';
 
 const TICKET_W = 150;
 /** Two taps on the same ticket within this time open the big view (the common double-click time). */
@@ -61,14 +62,35 @@ export class TicketRail extends Phaser.GameObjects.Container {
     this.refresh(session);
   }
 
+  /**
+   * Day, then the clock (with the full day: time left at the window) or how
+   * many are served, then money. Called every second for the clock.
+   */
+  refreshDay(session: GameSession): void {
+    const v = this.viewport;
+    if (!v) return;
+    const left = session.timeLeftMs;
+    const middle = !Number.isFinite(left)
+      ? `${session.servedCount}/${session.customersToday} served`
+      : session.phase === 'prep'
+        ? `${clockText(left)} day`
+        : session.timeUp
+          ? 'closed'
+          : `${clockText(left)} left`;
+    this.dayText.setText(`Day ${session.day}\n${middle}\n$${this.money().toFixed(2)}`);
+    this.dayText.setLineSpacing(-8).setFontSize(v.orientation === 'landscape' ? 28 : 34);
+    // The last 30 seconds glow pink.
+    this.dayText.setColor(Number.isFinite(left) && session.phase === 'open' && !session.timeUp && left <= 30_000 ? CSS.pink : CSS.cream);
+  }
+
   refresh(session: GameSession): void {
     const v = this.viewport;
     if (!v) return;
-    this.dayText.setText(`Day ${session.day}\n${session.servedCount}/${session.customersToday} served\n$${this.money().toFixed(2)}`);
-    this.dayText.setLineSpacing(-8).setFontSize(v.orientation === 'landscape' ? 28 : 34);
+    this.refreshDay(session);
 
     const h = v.railHeight - 30;
-    const startX = LEFT_PAD + 170;
+    // Tickets start just right of the day/money text, however wide it is.
+    const startX = LEFT_PAD + Math.max(150, this.dayText.width) + 18;
     const room = v.width - startX - RAIL_RIGHT_RESERVE;
     const fit = Math.max(1, Math.floor((room + GAP) / (TICKET_W + GAP)));
     const open = session.openTickets;

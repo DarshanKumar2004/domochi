@@ -120,6 +120,47 @@
     "oilDirtMax": 30,
     "wipePerUnit": 0.35
   },
+  "day": {
+    "_note": "With the full day (not the tutorial): the window is open for lengthSec. Walk-ups keep coming until then; when time's up, anyone still in line goes home, and the orders already taken still get served (or sent home). Days never run out. customersPerDay only applies without the full day (tests).",
+    "lengthSec": 300
+  },
+  "payment": {
+    "_note": "What a customer pays (share of the order price) by reaction tier (scoring.tiers): great and good pay full, okay pays okay, bad pays bad and leaves no tip. An order scoring below awfulBelow isn't paid for at all, and they take up to awfulTipJar back out of today's tip jar.",
+    "full": 1,
+    "okay": 0.85,
+    "bad": 0.5,
+    "awfulBelow": 20,
+    "awfulTipJar": 2
+  },
+  "supplies": {
+    "_note": "Stock: dough ingredients (one per scoop), boxes (one per order served) and oil jugs (one per + oil). Bought in packs at the supply store after each day; prices swing up to priceSwing either way, day to day. start = what a new game begins with. Ethan's friends may drop off a pack of something running low (friendChance per check, every friendCheckSec, at most friendsPerDay).",
+    "items": [
+      { "id": "rice-flour", "name": "rice flour", "kind": "ingredient", "pack": 6, "price": 3 },
+      { "id": "tapioca", "name": "tapioca starch", "kind": "ingredient", "pack": 4, "price": 2 },
+      { "id": "sugar", "name": "sugar", "kind": "ingredient", "pack": 4, "price": 1.5 },
+      { "id": "milk", "name": "milk", "kind": "ingredient", "pack": 6, "price": 2.5 },
+      { "id": "egg", "name": "eggs", "kind": "ingredient", "pack": 4, "price": 2.5 },
+      { "id": "box-single", "name": "single bags", "kind": "box", "pack": 10, "price": 1.5 },
+      { "id": "box-trio", "name": "trio boxes", "kind": "box", "pack": 10, "price": 3 },
+      { "id": "box-flight", "name": "flight boxes", "kind": "box", "pack": 6, "price": 3 },
+      { "id": "box-domochi-box", "name": "domochi boxes", "kind": "box", "pack": 4, "price": 3 },
+      { "id": "oil", "name": "fryer oil", "kind": "oil", "pack": 2, "price": 4 }
+    ],
+    "start": { "rice-flour": 12, "tapioca": 4, "sugar": 4, "milk": 8, "egg": 4, "box-single": 6, "box-trio": 6, "box-flight": 3, "box-domochi-box": 1, "oil": 2 },
+    "priceSwing": 0.25,
+    "friendCheckSec": 30,
+    "friendChance": 0.5,
+    "friendsPerDay": 1
+  },
+  "guides": {
+    "_note": "Dashed guides at the Glaze station, bought once at the supply store (the tutorial shows them all). 'base' is the loops for any base coat; the others are a flavour's drizzle stripes.",
+    "items": [
+      { "id": "base", "name": "base coat guide", "price": 6 },
+      { "id": "strawberry", "name": "strawberry drizzle guide", "price": 5 },
+      { "id": "chocolate-hazelnut", "name": "chocolate hazelnut drizzle guide", "price": 5 },
+      { "id": "cookie-butter", "name": "cookie butter drizzle guide", "price": 5 }
+    ]
+  },
   "box": {
     "_note": "Each ordered slot holding its flavour = 1, that flavour in the wrong slot = wrongSpotCredit, minus extraPenalty per extra donut that isn't a real flavour (extra real flavours are gifts, scored in scoring.gift).",
     "wrongSpotCredit": 0.5,

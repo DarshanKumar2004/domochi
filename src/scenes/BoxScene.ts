@@ -11,6 +11,7 @@ import { getHud } from './flow';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
+import { boxStockId } from '../systems/supplies';
 
 const SHELF_SLOTS = 6;
 /** Most slots any box has (the domochi box). */
@@ -308,7 +309,12 @@ export class BoxScene extends StationScene {
     const shown = this.sizeButtons.filter((b) => ordered > 0 && (b.size <= 6 || (ordered > 6 && b.size >= ordered)));
     const p = this.sizesPos;
     this.sizeRing.clear();
-    for (const b of this.sizeButtons) b.button.setVisible(shown.includes(b));
+    for (const b of this.sizeButtons) {
+      b.button.setVisible(shown.includes(b));
+      const left = session().stockOf(boxStockId(b.id));
+      const name = menu.boxes.find((x) => x.id === b.id)!.name.replace(/^the /, '');
+      b.button.setLabel(Number.isFinite(left) ? `${name} (${left})` : `${b.size}  ${name}`);
+    }
     shown.forEach((b, i) => {
       b.button.setPosition(p.x + (i - (shown.length - 1) / 2) * p.step * p.scale, p.y).setScale(p.scale);
       if (b.id === choice) {
@@ -321,6 +327,7 @@ export class BoxScene extends StationScene {
   private pickBox(id: string): void {
     if (this.closing) return;
     session().chooseBox(id);
+    if (session().stockOf(boxStockId(id)) < 1) this.flash('out of those! it would go out in a napkin');
   }
 
   // ---- Actions ----------------------------------------------------------------

@@ -16,6 +16,7 @@ import { Emitter } from './events';
 import type { Menu } from './menu';
 import { describeOrder, generateOrder, orderPrice, orderSizeRange, type Order } from './orders';
 import { scoreOrder, type OrderScore } from './score';
+import { boxStockId, doughCostPerDonut, paymentFor, unitCost, type Stock } from './supplies';
 import type { Rng } from './rng';
 
 export type CustomerState = 'inLine' | 'ordering' | 'waiting' | 'served';
@@ -29,6 +30,8 @@ export interface Customer {
   ticketNo?: number;
   /** A morning pickup (a courier collects it); never stands in line. */
   delivery?: boolean;
+  /** Left without being served (the window closed, or sent home). */
+  wentHome?: boolean;
 }
 
 /**
@@ -84,8 +87,12 @@ export interface Ticket {
     missing?: number;
     /** The weighted order score, the customer's reaction tier and their tip. */
     score?: OrderScore;
-    /** What the order sold for (dollars). */
+    /** What the order sold for (dollars): the price, less for a poor order, nothing for an awful one. */
     sale?: number;
+    /** The menu price of the order. */
+    price?: number;
+    /** Out of that box: it went out in a napkin (box score halved). */
+    napkin?: boolean;
     /** The customer invited domochi to this event (an events.json id). */
     invite?: string;
   };
@@ -110,6 +117,16 @@ export interface DaySummary {
   tips: number;
   /** Donuts thrown away (trashed or burnt). */
   trashed: number;
+  /** Donuts' worth wasted: thrown away, plus unsold at closing (made, or dough left in the tub). */
+  wasted: number;
+  /** What the wasted donuts cost to make. */
+  wasteCost: number;
+  /** What the supplies used today cost (dough ingredients, boxes, oil), the waste included. */
+  suppliesCost: number;
+  /** Sales + tips + clean-up bonus − supplies used. */
+  profit: number;
+  /** Walk-ups who went home without being served. */
+  wentHome: number;
   /** Orders by reaction tier. */
   tiers: Record<'great' | 'good' | 'okay' | 'bad', number>;
   /** Extra donuts given away as gifts. */
@@ -134,6 +151,10 @@ export interface SessionEvents extends Record<string, unknown> {
   dayComplete: undefined;
   /** The day moved on (prep → open → closing → closed). */
   phase: DayPhase;
+  /** The window closed for the day (time's up): the last orders are still to finish. */
+  timeUp: undefined;
+  /** One of Ethan's friends dropped off a pack of something you were low on. */
+  friend: { name: string; line: string; itemId: string; qty: number };
 }
 
 export interface SessionDeps {
@@ -160,6 +181,11 @@ export interface SessionDeps {
   trackDough?: boolean;
   /** Events a happy customer might invite you to. */
   events?: PopupEvent[];
+  /**
+   * Supplies on hand (dough ingredients, boxes, oil): used up as you go. The
+   * session keeps its own copy (see `stock`). Without it, supplies never run out.
+   */
+  stock?: Stock;
 }
 
 export class GameSession {
@@ -204,6 +230,14 @@ export class GameSession {
   private inviteId: string | null = null;
   private inviteAccepted = false;
   private tidyClose: boolean | null = null;
+  /** When the window closes (with dayFlow, once open). */
+  private dayEndsAtMs = Infinity;
+  private windowClosed = false;
+  private readonly supplies: Stock | null;
+  /** Supplies used today, by id. */
+  private readonly used: Stock = {};
+  private friendsToday = 0;
+  private nextFriendCheckMs = Infinity;
 
   constructor(private readonly deps: SessionDeps) {
     this.day = deps.day;
@@ -219,6 +253,7 @@ export class GameSession {
     this.dayPhase = deps.dayFlow ? 'prep' : 'open';
     this.doughLeft = deps.dayFlow || deps.trackDough ? 0 : Infinity;
     for (let i = 0; i < pickups; i++) this.addPickup();
+    this.supplies = deps.stock ? { ...deps.stock } : null;
   }
 
   /** A morning pickup order: on the rail from the start, collected by a courier. */
@@ -309,12 +344,97 @@ export class GameSession {
   }
 
   get servedCount(): number {
-    return this.allCustomers.filter((c) => c.state === 'served').length;
+    return this.allCustomers.filter((c) => c.state === 'served' && !c.wentHome).length;
   }
 
-  /** Every walk-up has come and everyone (pickups too) has been served. */
+  /** Every walk-up has come (the window's closed, with dayFlow) and everyone (pickups too) is done. */
   get allServed(): boolean {
-    return this.spawned === this.walkUpsToday && this.allCustomers.every((c) => c.state === 'served');
+    const allCame = this.deps.dayFlow ? this.windowClosed : this.spawned === this.walkUpsToday;
+    return allCame && this.allCustomers.every((c) => c.state === 'served');
+  }
+
+  /** Time left before the window closes (with dayFlow): the whole day before opening, 0 once it's closed. */
+  get timeLeftMs(): number {
+    const len = this.deps.balance.day.lengthSec * 1000;
+    if (!this.deps.dayFlow) return Infinity;
+    if (this.dayPhase === 'prep') return len;
+    if (this.windowClosed) return 0;
+    return Math.max(0, this.dayEndsAtMs - this.now);
+  }
+
+  /** The window has closed for the day: no more walk-ups. */
+  get timeUp(): boolean {
+    return this.windowClosed;
+  }
+
+  // ---- Supplies ----------------------------------------------------------------
+
+  /** Are supplies counted today? (Not in the tutorial or tests.) */
+  get tracksSupplies(): boolean {
+    return this.supplies !== null;
+  }
+
+  /** How many of a supply are on hand (Infinity when supplies aren't counted). */
+  stockOf(id: string): number {
+    return this.supplies ? (this.supplies[id] ?? 0) : Infinity;
+  }
+
+  /** What's on hand now, to save at the end of the day (null when not counted). */
+  get stock(): Readonly<Stock> | null {
+    return this.supplies;
+  }
+
+  /** Use one of a supply. False if there's none left. */
+  private use(id: string): boolean {
+    if (!this.supplies) return true;
+    if ((this.supplies[id] ?? 0) < 1) return false;
+    this.supplies[id]!--;
+    this.used[id] = (this.used[id] ?? 0) + 1;
+    return true;
+  }
+
+  /** Scoop an ingredient into the bowl (starting a batch if needed). False if you're out of it. */
+  scoop(id: string): boolean {
+    if (!this.deps.balance.dough.ingredients.some((i) => i.id === id)) return false;
+    if (this.stockOf(id) < 1) return false;
+    const w = this.startDough()!;
+    this.use(id);
+    w.scoop(id);
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
+  /** Top up the fryer with a jug of oil: 'ok', 'full' (no need), or 'none' (out of oil). */
+  addOil(): 'ok' | 'full' | 'none' {
+    if (this.fryer.oil >= 1) return 'full';
+    if (this.stockOf('oil') < 1) return 'none';
+    this.fryer.addOil();
+    this.use('oil');
+    this.events.emit('changed', undefined);
+    return 'ok';
+  }
+
+  /** One of Ethan's friends drops off a pack of whatever you're lowest on (if anything's low). */
+  private friendVisit(): void {
+    const s = this.supplies;
+    const friends = this.deps.customers.friends;
+    if (!s || !friends?.names.length || !friends.lines.length) return;
+    let low: { id: string; name: string; pack: number } | null = null;
+    let lowest = 1;
+    for (const it of this.deps.balance.supplies.items) {
+      const r = (s[it.id] ?? 0) / it.pack;
+      if (r < lowest) {
+        lowest = r;
+        low = it;
+      }
+    }
+    if (!low) return;
+    s[low.id] = (s[low.id] ?? 0) + low.pack;
+    this.friendsToday++;
+    const name = this.deps.rng.pick(friends.names);
+    const line = pickLine(friends.lines, this.deps.rng, { item: low.name, qty: low.pack });
+    this.events.emit('friend', { name, line, itemId: low.id, qty: low.pack });
+    this.events.emit('changed', undefined);
   }
 
   /** The day is over: closed up (with dayFlow), or everyone served. */
@@ -357,11 +477,19 @@ export class GameSession {
       this.events.emit('changed', undefined);
     }
     const { spawn } = this.deps.balance;
+    if (this.dayPhase === 'open' && this.deps.dayFlow && !this.windowClosed) {
+      if (this.now >= this.dayEndsAtMs) this.closeWindow();
+      else if (this.now >= this.nextFriendCheckMs) {
+        const sb = this.deps.balance.supplies;
+        this.nextFriendCheckMs += sb.friendCheckSec * 1000;
+        if (this.friendsToday < sb.friendsPerDay && this.deps.rng.next() < sb.friendChance) this.friendVisit();
+      }
+    }
     // If the line is full (or enough people are already here), the next customer
     // arrives as soon as there's room; serving someone pushes that a little later.
     if (
       this.dayPhase === 'open' &&
-      this.spawned < this.walkUpsToday &&
+      (this.deps.dayFlow ? !this.windowClosed : this.spawned < this.walkUpsToday) &&
       this.now >= this.nextSpawnAtMs &&
       this.lineLength < spawn.maxInLine &&
       this.activeCustomers < forDay(this.deps.balance.maxActiveByDay, this.day)
@@ -381,14 +509,72 @@ export class GameSession {
 
   // ---- The day ---------------------------------------------------------------
 
-  /** Open the window: walk-up customers start coming. */
+  /** Open the window: walk-up customers start coming, until the day's time is up. */
   openShop(): boolean {
     if (this.dayPhase !== 'prep') return false;
     this.dayPhase = 'open';
     this.nextSpawnAtMs = this.now + this.deps.balance.spawn.firstDelaySec * 1000;
+    this.dayEndsAtMs = this.now + this.deps.balance.day.lengthSec * 1000;
+    this.nextFriendCheckMs = this.now + this.deps.balance.supplies.friendCheckSec * 1000;
     this.events.emit('phase', this.dayPhase);
     this.events.emit('changed', undefined);
     return true;
+  }
+
+  /**
+   * Time's up: the window closes. Anyone still in line (not ordered yet) goes
+   * home; orders already taken still need finishing (or sending home).
+   */
+  private closeWindow(): void {
+    this.windowClosed = true;
+    for (const c of this.allCustomers) {
+      if (c.state === 'inLine') {
+        c.state = 'served';
+        c.wentHome = true;
+      }
+    }
+    this.events.emit('timeUp', undefined);
+    this.events.emit('changed', undefined);
+    this.checkClosing();
+  }
+
+  /** Customers whose orders are taken but not served yet. */
+  get unserved(): number {
+    let n = 0;
+    for (const c of this.allCustomers) if (c.state === 'waiting' || c.state === 'ordering') n++;
+    return n;
+  }
+
+  /**
+   * After time's up: send everyone still waiting home without their order
+   * (they don't pay). For when you can't finish them (out of dough, say).
+   */
+  sendHome(): number {
+    if (!this.windowClosed || this.dayPhase !== 'open') return 0;
+    let n = 0;
+    for (const c of this.allCustomers) {
+      if (c.state !== 'waiting' && c.state !== 'ordering') continue;
+      c.state = 'served';
+      c.wentHome = true;
+      const t = c.ticketNo !== undefined ? this.ticket(c.ticketNo) : undefined;
+      if (t) t.status = 'served';
+      n++;
+    }
+    this.activeNo = null;
+    this.boxSlots.length = 0;
+    this.events.emit('changed', undefined);
+    this.checkClosing();
+    return n;
+  }
+
+  /** Everyone's done (with dayFlow): time to clean up and close. */
+  private checkClosing(): void {
+    if (this.dayPhase !== 'open' || !this.allServed) return;
+    if (this.deps.dayFlow) {
+      this.dayPhase = 'closing';
+      this.events.emit('phase', this.dayPhase);
+      this.events.emit('changed', undefined);
+    } else this.events.emit('dayComplete', undefined);
   }
 
   /** What still needs cleaning before closing (true = done). */
@@ -877,6 +1063,8 @@ export class GameSession {
     const needed = expected.length;
     const donuts = [...this.boxSlots];
     this.boxSlots.length = 0;
+    // The box comes out of stock; out of that box, it goes out in a napkin.
+    const napkin = !this.use(boxStockId(t.packBoxId ?? t.order.boxId));
     const identified = donuts.map((d) => (d ? identifyFlavor(d, menu) : undefined));
     const flavorById = (id: string) => menu.flavors.find((f) => f.id === id)!;
     const glazeQ = (d: FinishedDonut, id: string) => glazeScoreFor(d, flavorById(id), balance.glaze);
@@ -900,6 +1088,7 @@ export class GameSession {
       toppings: { score: avg((p) => p.toppingScore) },
       box: scoreBox(expected, identified, balance.box),
       packed,
+      ...(napkin ? { napkin } : {}),
       missing: needed - fried.length,
     };
 
@@ -909,6 +1098,7 @@ export class GameSession {
     t.servedAtMs = this.now;
     c.state = 'served';
     this.activeNo = this.allTickets.find((x) => x.status === 'open')?.no ?? null;
+    if (napkin) t.results.box!.score = Math.round(t.results.box!.score / 2);
     const waitMs = this.now - t.takenAtMs;
     const score = scoreOrder(
       { fry: t.results.fry!.score, glaze: t.results.glaze!.score, toppings: t.results.toppings!.score, box: t.results.box!.score },
@@ -920,7 +1110,16 @@ export class GameSession {
     );
     // A pop-up crowd tips more.
     if (this.deps.event) score.tip = Math.round(score.tip * this.deps.event.tipMultiplier * 100) / 100;
-    const sale = orderPrice(menu, t.order);
+    // A poor order pays less (and no tip); an awful one pays nothing and takes some back out of the tip jar.
+    const price = orderPrice(menu, t.order);
+    const pay = paymentFor(score.total, score.tier, balance.payment);
+    const sale = Math.round(price * pay.share * 100) / 100;
+    if (!pay.tips) {
+      score.tip = 0;
+      score.giftTip = 0;
+    }
+    if (pay.takesFromJar > 0) score.tip = -Math.min(pay.takesFromJar, Math.max(0, this.tipJar));
+    t.results.price = price;
     t.results.score = score;
     // A happy walk-up customer may invite you to their event (one invite a day).
     if (this.deps.dayFlow && !c.delivery && !this.deps.event && !this.inviteId && this.deps.events?.length) {
@@ -934,17 +1133,26 @@ export class GameSession {
     const event: ServedEvent = { customer: c, ticket: t, waitMs, score, sale };
     this.events.emit('served', event);
     this.events.emit('changed', undefined);
-    if (this.allServed) {
-      if (this.deps.dayFlow) {
-        // Last order out: time to clean up and close.
-        this.dayPhase = 'closing';
-        this.events.emit('phase', this.dayPhase);
-        this.events.emit('changed', undefined);
-      } else {
-        this.events.emit('dayComplete', undefined);
-      }
-    }
+    // Last order out: time to clean up and close.
+    this.checkClosing();
     return event;
+  }
+
+  /** Tips so far today (what an awful order can take back). */
+  private get tipJar(): number {
+    let tips = 0;
+    for (const t of this.allTickets) if (t.results.score) tips += t.results.score.tip;
+    return tips;
+  }
+
+  /** Donuts' worth made but not sold: on the rack, shelf, trays and in the box, frying, and dough left in the tub or bowl. */
+  get unsold(): number {
+    let n = this.rackDonuts.length + this.shelfDonuts.length + this.fryer.count + (this.topWork ? 1 : 0);
+    for (const w of this.boards) if (w) n++;
+    for (const d of this.boxSlots) if (d) n++;
+    if (Number.isFinite(this.doughLeft)) n += this.doughLeft;
+    if (this.doughWork) n += this.doughWork.yield;
+    return n;
   }
 
   /** The invite a customer made today (an events.json event), if any. */
@@ -989,6 +1197,8 @@ export class GameSession {
       sales: Math.round(sales * 100) / 100,
       tips: Math.round(tips * 100) / 100,
       trashed: this.trashedCount,
+      ...this.costs(),
+      wentHome: this.allCustomers.filter((c) => c.wentHome).length,
       tiers,
       gifts,
       pickups: served.filter((t) => t.delivery).length,
@@ -996,6 +1206,24 @@ export class GameSession {
       ...(this.inviteAccepted && this.invite ? { nextEvent: this.invite.name } : {}),
       tidy: this.tidyClose,
       tidyBonus: this.tidyClose ? this.deps.balance.cleanup.tidyBonus : 0,
+    };
+  }
+
+  /** Waste and what today's supplies cost (only when supplies are counted). */
+  private costs(): { wasted: number; wasteCost: number; suppliesCost: number; profit: number } {
+    const sb = this.deps.balance.supplies;
+    const wasted = this.trashedCount + this.unsold;
+    const round = (n: number) => Math.round(n * 100) / 100;
+    let suppliesCost = 0;
+    for (const [id, n] of Object.entries(this.used)) suppliesCost += unitCost(sb, id) * n;
+    const counted = this.supplies !== null;
+    let earned = this.deps.balance.cleanup.tidyBonus * (this.tidyClose ? 1 : 0);
+    for (const t of this.allTickets) if (t.results.score) earned += t.results.score.tip + (t.results.sale ?? 0);
+    return {
+      wasted,
+      wasteCost: counted ? round(wasted * doughCostPerDonut(sb, this.deps.balance.dough)) : 0,
+      suppliesCost: counted ? round(suppliesCost) : 0,
+      profit: round(earned - (counted ? suppliesCost : 0)),
     };
   }
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import balanceJson from '../../src/data/balance.json' with { type: 'json' };
 import { SceneKeys } from '../../src/scenes/sceneKeys';
 import { advance, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, waitForScene, openDay } from './helpers';
 
@@ -6,6 +7,9 @@ interface SessionView {
   day: number;
   customersToday: number;
   servedCount: number;
+  timeUp: boolean;
+  phase: string;
+  stockOf(id: string): number;
   line: { id: number; state: string }[];
   activeTicket?: { no: number };
   takeOrder(id: number): { no: number };
@@ -36,7 +40,7 @@ async function orderAndPack(page: Page): Promise<void> {
   });
 }
 
-test('a whole day: serve everyone, see the summary, bank the money and start day 2', async ({ page }) => {
+test('a whole day: serve until the clock runs out, close, see the summary, shop for supplies and start day 2', async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -48,17 +52,22 @@ test('a whole day: serve everyone, see the summary, bank the money and start day
   await waitForScene(page, SceneKeys.Lobby);
   await pauseClock(page);
   await openDay(page); // dough made and the window open (helpers)
-  const total = await s((x) => x.customersToday);
 
-  // Everyone but the last customer is served straight through the session.
-  for (let i = 0; i < total - 1; i++) {
-    await orderAndPack(page);
-    await s((x) => x.serveActiveTicket());
-    await advance(page, 8000); // the next customer comes a little after a serve
-  }
+  // Two customers: the first served straight through the session...
+  await orderAndPack(page);
+  await s((x) => x.serveActiveTicket());
+  await advance(page, 8000); // the next customer comes a little after a serve
+  // ...the second's order taken, then the clock runs out: the window closes, the line goes home.
+  await orderAndPack(page);
+  expect(await s((x) => x.timeUp)).toBe(false);
+  await advance(page, balanceJson.day.lengthSec * 1000, 250);
+  expect(await s((x) => x.timeUp)).toBe(true);
+  expect(await s((x) => x.phase)).toBe('open'); // one order still to finish
+  await findNamed(page, SceneKeys.Lobby, 'btn-send-home');
+  await shot(page, 'day-0-time-up');
+  const total = 2;
 
   // The last one through the Box station: the result card shows the order score and tip.
-  await orderAndPack(page);
   await tapNamed(page, SceneKeys.Hud, 'tab-Box');
   await waitForScene(page, SceneKeys.Box);
   await tapNamed(page, SceneKeys.Box, 'btn-serve');
@@ -83,16 +92,30 @@ test('a whole day: serve everyone, see the summary, bank the money and start day
   });
   expect(unlocks).toContain('chocolate hazelnut'); // unlocks on day 2
 
+  // On to the supply store: buy a pack of eggs (with a little cash slipped in to be sure there's enough).
+  await page.evaluate(() => ((window as unknown as { __save: { data: { money: number } } }).__save.data.money += 20));
   await tapNamed(page, SceneKeys.DaySummary, 'btn-next-day');
   await waitForScene(page, SceneKeys.DaySummary, false);
+  await waitForScene(page, SceneKeys.Store);
+  const before = JSON.parse((await page.evaluate(() => localStorage.getItem('domochi.save'))) ?? '{}');
+  await shot(page, 'day-2b-store');
+  await tapNamed(page, SceneKeys.Store, 'store-egg');
+  const egg = balanceJson.supplies.items.find((i) => i.id === 'egg')!;
+  await expect.poll(async () => JSON.parse((await page.evaluate(() => localStorage.getItem('domochi.save'))) ?? '{}').stock?.egg).toBe(before.stock.egg + egg.pack);
+  const after = JSON.parse((await page.evaluate(() => localStorage.getItem('domochi.save'))) ?? '{}');
+  expect(after.money).toBeLessThan(before.money);
+  await tapNamed(page, SceneKeys.Store, 'btn-store-done');
+  await waitForScene(page, SceneKeys.Store, false);
   await waitForScene(page, SceneKeys.Lobby);
   await waitForScene(page, SceneKeys.Hud);
   expect(await s((x) => x.day)).toBe(2);
   expect(await s((x) => x.servedCount)).toBe(0);
   const saved = JSON.parse((await page.evaluate(() => localStorage.getItem('domochi.save'))) ?? '{}');
   expect(saved.day).toBe(2);
-  expect(saved.money).toBeGreaterThan(0);
+  expect(saved.money).toBeCloseTo(after.money, 2);
   expect(saved.served).toBe(total);
+  // Day 2 starts with what was left of yesterday's stock, plus what was bought.
+  expect(await s((x) => x.stockOf('egg'))).toBe(after.stock.egg);
   await shot(page, 'day-3-day-two');
 
   // Reloading keeps you on day 2.

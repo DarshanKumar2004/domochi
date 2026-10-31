@@ -258,5 +258,21 @@
     "wait, for me? aww, thank you!!",
     "ooh, a little something extra. love it!",
     "you didn't have to do that! thank you!"
-  ]
+  ],
+  "friends": {
+    "_note": "Ethan's friends who drop off supplies you're low on, mid-day. Names are generic. {item} and {qty} are filled in.",
+    "names": [
+      "Maya",
+      "Jordan",
+      "Tran",
+      "Sophie",
+      "Marcus",
+      "Linh"
+    ],
+    "lines": [
+      "hey! Ethan said you're low on {item}. here's {qty}!",
+      "brought you {qty} {item}, Ethan says hi!",
+      "special delivery: {qty} {item}. go get em!"
+    ]
+  }
 }

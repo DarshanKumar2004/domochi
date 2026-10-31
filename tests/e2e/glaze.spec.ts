@@ -71,6 +71,14 @@ test('glaze from the tray: pour with the tilted cup, drizzle, done → shelf; re
   await tapNamed(page, SceneKeys.Glaze, 'glaze-tray-0');
   await expect.poll(s.working).toBe(true);
   await tapNamed(page, SceneKeys.Glaze, 'cup-strawberry');
+  // Guides come from the supply store: none yet, so none showing.
+  await page.waitForTimeout(200);
+  expect(await isVisibleNamed(page, SceneKeys.Glaze, 'glaze-guide-base')).toBe(false);
+  await page.evaluate(() => {
+    const w = window as unknown as { __save: { data: { guides: string[] } }; __session: { events: { emit(e: string, d?: unknown): void } } };
+    w.__save.data.guides.push('base', 'strawberry');
+    w.__session.events.emit('changed');
+  });
   await expect.poll(() => isVisibleNamed(page, SceneKeys.Glaze, 'glaze-guide-base')).toBe(true); // dashed loops to pour along
   // Hold mid-pour for a screenshot of the tilted cup and falling glaze.
   const { cx, cy, half } = await board(page);

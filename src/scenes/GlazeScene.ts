@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { ringBallCenters, ringBallRadius } from '../stations/donutGeometry';
-import { paintOnPattern, type GlazeLayer, type GlazeWork, type PourCheck } from '../stations/glaze';
+import { paintOnPattern, type GlazeLayer, type GlazeWork, type PourCheck, topLayers } from '../stations/glaze';
 import { ballAt } from '../stations/toppings';
 import type { Glaze, Stripe } from '../systems/menu';
-import { audio, balance, menu, session } from '../systems/services';
+import { audio, balance, menu, save, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import { hexToNumber } from '../ui/DonutIcon';
 import {
@@ -532,12 +532,11 @@ export class GlazeScene extends StationScene {
     return { nx: (x - b.x) / (b.size / 2), ny: (y - b.y) / (b.size / 2) };
   }
 
-  /** The spot with a donut nearest (x, y), or -1 if the tray is empty. */
-  private nearestWorkSpot(x: number, y: number): number {
-    let best = -1;
+  /** The tray spot (empty or not) nearest (x, y). */
+  private nearestSpot(x: number, y: number): number {
+    let best = 0;
     let bestD = Infinity;
     this.boards.forEach((b, i) => {
-      if (!this.work(i)) return;
       const d = Phaser.Math.Distance.Between(x, y, b.x, b.y);
       if (d < bestD) {
         bestD = d;
@@ -567,31 +566,32 @@ export class GlazeScene extends StationScene {
     return this.selected;
   }
 
+  /** Tap a cup to pick it up; tap it again to put it down (then a finger on the tray wipes it). */
   private select(glazeId: string): void {
-    this.selected = glazeId;
+    this.selected = this.selected === glazeId ? null : glazeId;
     this.refreshControls();
   }
 
   private startPour(p: Phaser.Input.Pointer): void {
-    if (!this.anyWork) {
-      // No donut on the tray: scrub it if it's messy.
-      if (this.wiper.dirty) this.wiper.start(p);
-      else this.flash(session().rack.length ? 'take a donut from the rack first' : 'fry some donuts first');
-      return;
-    }
-    const spot = this.nearestWorkSpot(p.worldX, p.worldY);
-    const work = this.work(spot)!;
-    this.active = spot;
     if (!this.selected) {
-      this.flash('pick a cup first!');
+      // No cup in hand: scrub the tray if it's messy.
+      if (this.wiper.dirty) this.wiper.start(p);
+      else if (!this.anyWork) this.flash(session().rack.length ? 'take a donut from the rack first' : 'fry some donuts first');
+      else this.flash('pick a cup first!');
       this.refreshControls();
       return;
     }
-    const check = work.canPour(this.selected);
-    if (check !== 'ok') {
-      this.flash(this.pourMessage(check));
-      this.refreshControls();
-      return;
+    // Pouring works anywhere on the tray: on a donut it glazes it, on an empty spot it just makes a mess.
+    const spot = this.nearestSpot(p.worldX, p.worldY);
+    const work = this.work(spot);
+    if (work) {
+      this.active = spot;
+      const check = work.canPour(this.selected);
+      if (check !== 'ok') {
+        this.flash(this.pourMessage(check));
+        this.refreshControls();
+        return;
+      }
     }
     this.pouring = true;
     this.pourPointer = p;
@@ -620,17 +620,8 @@ export class GlazeScene extends StationScene {
     this.handCup.setVisible(false);
   }
 
-  private pourMessage(check: PourCheck): string {
-    switch (check) {
-      case 'hasBase':
-        return 'this donut already has a glaze.\nRedo to start over';
-      case 'hasDrizzle':
-        return 'it already has a drizzle';
-      case 'drizzleFirst':
-        return 'glaze goes on before the drizzle';
-      default:
-        return "can't pour that";
-    }
+  private pourMessage(_check: PourCheck): string {
+    return "can't pour that";
   }
 
   /** Where the stream leaves the cup (above the finger). */
@@ -654,7 +645,7 @@ export class GlazeScene extends StationScene {
     }
 
     // While pouring, the cup follows the finger (spout right above it) and emits a drop each frame.
-    if (this.pouring && this.selected && this.anyWork) {
+    if (this.pouring && this.selected) {
       const a = Phaser.Math.DegToRad(this.handCup.angle);
       const sx = SPOUT.x * Math.cos(a) - SPOUT.y * Math.sin(a);
       const sy = SPOUT.x * Math.sin(a) + SPOUT.y * Math.cos(a);
@@ -706,11 +697,13 @@ export class GlazeScene extends StationScene {
     if (changed) this.refreshControls();
   }
 
-  /** A drop lands on the donut under it (the nearest one): glaze along the path from the previous drop there. */
+  /**
+   * A drop lands on the tray spot under it: glaze along the path from the previous
+   * drop there. On a donut it glazes it; on an empty spot it's all mess.
+   */
   private land(d: Drop): void {
-    const spot = this.nearestWorkSpot(d.x, d.y);
-    if (spot < 0) return;
-    const work = this.work(spot)!;
+    const spot = this.nearestSpot(d.x, d.y);
+    const work = this.work(spot);
     const b = this.boards[spot]!;
     const { nx, ny } = this.toNorm(b, d.x, d.y);
     const same = b.lastLand.stroke === d.stroke;
@@ -719,6 +712,12 @@ export class GlazeScene extends StationScene {
     b.lastLand.stroke = d.stroke;
     b.lastLand.nx = nx;
     b.lastLand.ny = ny;
+    if (!work) {
+      drawOnTray(b.mess.context, (m, size) => drawGlazeSegment(m, size, d.glazeId, x0, y0, nx, ny, d.stroke * 31 + Math.round(nx * 97)));
+      session().addMess('glaze', 1);
+      b.messDirty = true;
+      return;
+    }
     if (!work.pour(d.glazeId, x0, y0, nx, ny)) return;
     const layer = work.currentLayer!;
     const seed = layer.segments.length;
@@ -792,11 +791,11 @@ export class GlazeScene extends StationScene {
     return menu.flavors.find((fl) => fl.glaze === baseId && fl.drizzlePattern)?.drizzlePattern ?? null;
   }
 
-  /** A donut's drizzle layer, if any. */
+  /** A donut's showing drizzle layer (on top of its base coat), if any. */
   private drizzleLayer(work: GlazeWork | null): GlazeLayer | undefined {
     if (!work) return undefined;
     if (work.currentLayer?.kind === 'drizzle') return work.currentLayer;
-    return work.layers.find((l) => l.kind === 'drizzle');
+    return topLayers(work.layers).drizzle;
   }
 
   /** How much of the flavour's stripes the drizzle covers (0–1), or null without a pattern. */
@@ -825,8 +824,28 @@ export class GlazeScene extends StationScene {
     const cover = this.patternCoverage(work);
     const d = this.drizzleLayer(work);
     const drizzleDone = cover !== null ? cover >= gb.patternGoodCoverage : !!d && d.coverage >= gb.drizzleAmount.idealMin;
-    b.guideBase.setVisible(!!work && !!g && g.style !== 'drizzle' && !baseDone);
-    b.guideDrizzle.setVisible(!!work && !!g && g.style === 'drizzle' && !drizzleDone);
+    b.guideBase.setVisible(!!work && !!g && g.style !== 'drizzle' && !baseDone && this.hasGuide('base'));
+    b.guideDrizzle.setVisible(!!work && !!g && g.style === 'drizzle' && !drizzleDone && this.hasGuide(this.patternFlavor(work)));
+  }
+
+  /**
+   * Guides are bought at the supply store ('base' for every base coat, a
+   * flavour id for its drizzle stripes). The tutorial shows them all, and so
+   * does a day that doesn't count supplies.
+   */
+  private hasGuide(id: string | null): boolean {
+    const s = session();
+    if (s.isTutorial || !s.tracksSupplies) return true;
+    return !!id && save().data.guides.includes(id);
+  }
+
+  /** The flavour whose drizzle stripes this donut's base coat calls for, if any. */
+  private patternFlavor(work: GlazeWork | null): string | null {
+    if (!work) return null;
+    let baseId: string | undefined;
+    for (const l of work.layers) if (l.kind === 'base') baseId = l.glazeId;
+    if (work.currentLayer?.kind === 'base') baseId = work.currentLayer.glazeId;
+    return menu.flavors.find((fl) => fl.glaze === baseId && fl.drizzlePattern)?.id ?? null;
   }
 
   /** Outline and gloss on each of the 8 balls (same geometry as the glaze maths). */

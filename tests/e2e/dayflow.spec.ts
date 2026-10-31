@@ -92,19 +92,15 @@ test('a full day: make the dough, open the window, then clean up and close for t
     x.addMess('toppings', 20);
     return 0;
   });
-  for (let i = 0; i < 10; i++) {
-    const done = await s((x) => {
-      const front = x.line.find((c) => c.state === 'inLine');
-      if (front) {
-        x.takeOrder(front.id);
-        x.finishOrdering(front.id);
-        x.serveActiveTicket();
-      }
-      return x.phase;
-    });
-    if (done === 'closing') break;
-    await advance(page, 8000);
-  }
+  // Serve the first customer, then let the clock run out: the line goes home, and it's closing time.
+  await s((x) => {
+    const front = x.line.find((c) => c.state === 'inLine')!;
+    x.takeOrder(front.id);
+    x.finishOrdering(front.id);
+    x.serveActiveTicket();
+    return 0;
+  });
+  await advance(page, balanceJson.day.lengthSec * 1000, 250);
   expect(await s((x) => x.phase)).toBe('closing');
   await findNamed(page, SceneKeys.Lobby, 'btn-close-up');
   await shot(page, 'close-1-checklist');

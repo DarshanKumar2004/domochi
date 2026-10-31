@@ -4,6 +4,7 @@ import { BoxScene } from './scenes/BoxScene';
 import { DaySummaryScene } from './scenes/DaySummaryScene';
 import { DoughScene } from './scenes/DoughScene';
 import { InviteScene } from './scenes/InviteScene';
+import { StoreScene } from './scenes/StoreScene';
 import { FryScene } from './scenes/FryScene';
 import { GlazeScene } from './scenes/GlazeScene';
 import { HudScene } from './scenes/HudScene';
@@ -31,6 +32,9 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
+    // All sound is our own Web Audio (AudioService): a second audio context from Phaser
+    // only competes with it on phones.
+    audio: { noAudio: true },
     input: {
       activePointers: 2,
     },
@@ -52,6 +56,7 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       TicketViewScene,
       DaySummaryScene,
       InviteScene,
+      StoreScene,
     ],
   };
 }

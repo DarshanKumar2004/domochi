@@ -380,3 +380,43 @@ Kumar's next batch of feedback.
   - **The patio:** waiting customers stand on a **wooden patio with a picnic table and a pink umbrella**, with a chalkboard "waiting patio" sign.
   - **Planter:** flowers in a planter by the A-frame.
   - **Art:** all placeholder art under the new keys `cloud`, `oak-tree`, `patio-table` and `planter` (MANIFEST updated).
+
+## The business side: a 5-minute day, supplies, the store, pay by quality, waste; small fixes (2026-10-31)
+
+Kumar's "almost ready for launch" batch.
+
+- **Days run on a clock.** With the full day, the window is open for `day.lengthSec` (300 s). Walk-ups keep coming until then.
+  - When time's up, the sign flips to CLOSED, anyone still in line goes home, and the orders already taken still get made.
+  - If you can't finish them (out of dough, say), **Send them home** sends them off unpaid.
+  - Closing starts once everyone's done. Days never run out: there's no last day. The rail shows the time left, in pink for the last 30 s.
+  - `customersPerDay` now only applies without the full day (unit tests).
+- **Supplies are counted** (`balance.json` `supplies`, saved as `save.stock`):
+  - Each **scoop** uses an ingredient. Each order served uses its **box**; out of that size, it goes in a **napkin** for half the box score. Each **+ oil** uses a jug.
+  - A new game starts with `supplies.start`. The tutorial and unit tests don't count supplies.
+  - The stations show what's left: under each canister, on each box size, and on the oil button.
+- **The supply store** (StoreScene) comes after the day summary.
+  - It sells packs of everything, with prices that swing up to ±25% from day to day. The swing is deterministic per day and item (`priceOn`), with ▲/▼ marks.
+  - It also sells **glaze guides**, bought once (`save.guides`): the base coat loops, plus each flavour's drizzle stripes. The guides no longer come free. The tutorial (and any day that doesn't count supplies) still shows them all.
+  - Spending comes out of banked cash.
+- **Paid by quality** (`balance.json` `payment`):
+  - great/good pay full price;
+  - okay pays 85%;
+  - bad pays half and leaves no tip;
+  - below 20 they don't pay at all and take up to $2 back out of today's tip jar.
+  - The serve card says which.
+- **Waste and profit in the day summary.** "Wasted" counts donuts thrown away, plus everything made and unsold at closing: rack, shelf, trays, box, fryer, and the dough left in the tub or bowl. Dough doesn't keep overnight. It's valued at the dough's ingredient cost per donut.
+  - The summary shows the waste, the other supplies used, and **profit = sales + tips + clean-up bonus − supplies used**.
+  - **Why profit and not cash:** supplies are paid for at the store. Taking the waste off the cash as well would charge for it twice. So the cash banked is sales + tips + bonus, and the waste shows up in the profit.
+- **Ethan's friends** (`customers.json` `friends`). While the window's open, every `friendCheckSec` there's a `friendChance` that a friend drops off a pack of whatever you're lowest on (below one pack), at most `friendsPerDay`.
+  - They walk up with a crate and say a line, and a note appears under the rail. The names are generic.
+- **End-of-day cleaning** stays as built: wipe both trays and filter the oil, with the tidy bonus.
+- **Glazing:**
+  - Any glaze can go over another; the one on top counts (`topLayers`). A drizzle counts only if it's above the top base coat.
+  - Pouring on an empty tray spot splatters it.
+  - Tap the selected cup again to put it down; with no cup in hand, a finger on the tray wipes it.
+- **Small fixes:**
+  - Music picks up again on the next tap if the phone paused the audio. Phaser's own (unused) audio context is off.
+  - The invite card is taller, with room around its buttons.
+  - The tutorial bubble's tail points sideways at mochi, not down at the tab bar.
+  - The trailer's OPEN/CLOSED sign flips over when it changes. A stabiliser jack now stands under the trailer's right end.
+  - The rail's text no longer runs under the tickets.
