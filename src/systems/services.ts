@@ -89,6 +89,17 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
           ...(event ? { event } : {}),
         }),
   });
+  // A day that was in progress (the page reloaded, or the phone dropped it) picks up where it was.
+  const ip = saveService?.data.inProgress;
+  let resumedStickers: string[] = [];
+  if (!opts.tutorial && ip?.day === day) {
+    try {
+      currentSession.restore(ip.snap);
+      resumedStickers = ip.stickers;
+    } catch {
+      // A save from an older version that doesn't fit: start the day fresh.
+    }
+  }
   // mochi's journal watches every real day (not the tutorial).
   currentTracker?.detach();
   currentTracker = null;
@@ -100,6 +111,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
       guideCount: balance.guides.items.length,
     });
     currentTracker.watch(currentSession);
+    currentTracker.today.push(...resumedStickers);
     // Earned stickers are saved straight away.
     currentTracker.events.on('earned', (st) => void s.update((d) => void (d.journal.stickers.includes(st.id) || d.journal.stickers.push(st.id))));
   }
@@ -108,6 +120,15 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
 
 export const journalData = journalJson as JournalData;
 let currentTracker: StickerTracker | null = null;
+
+/** Save the day so far (not the tutorial, and not once it's over). */
+export function saveDayInProgress(): void {
+  const s = currentSession;
+  if (!s || s.isTutorial || !saveService || s.phase === 'closed' || !s.tracksSupplies) return;
+  const snap = s.snapshot();
+  const stickersToday = [...(currentTracker?.today ?? [])];
+  void saveService.update((d) => void (d.inProgress = { day: s.day, snap, stickers: stickersToday }));
+}
 
 /** Today's sticker tracker (null on the tutorial day). */
 export function stickers(): StickerTracker | null {

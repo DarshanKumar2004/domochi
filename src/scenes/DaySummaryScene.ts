@@ -140,6 +140,7 @@ export class DaySummaryScene extends Phaser.Scene {
       if (s.stock) d.stock = { ...s.stock };
       if (s.regularsLevels) d.regulars = { ...s.regularsLevels };
       d.journal.pages = addPage(d.journal.pages, page);
+      delete d.inProgress; // the day's done: tomorrow starts fresh
     });
     if (s.tracksSupplies) {
       this.scene.launch(SceneKeys.Store);

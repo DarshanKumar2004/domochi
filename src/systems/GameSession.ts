@@ -148,6 +148,41 @@ export interface DaySummary {
   tidyBonus: number;
 }
 
+/**
+ * A day in progress, saved so a reload (or the phone dropping the page) picks
+ * up where you were: the clock, customers and orders, money earned, supplies
+ * and the dough tub. Donuts mid-way through the kitchen (in the oil, on the
+ * rack, trays, shelf or in the box) aren't kept: they count as thrown away.
+ */
+export interface DaySnapshot {
+  v: 1;
+  now: number;
+  phase: DayPhase;
+  dayEndsAtMs: number | null;
+  windowClosed: boolean;
+  nextSpawnAtMs: number;
+  spawned: number;
+  nextCustomerId: number;
+  nextTicketNo: number;
+  customers: Customer[];
+  tickets: Ticket[];
+  activeNo: number | null;
+  trashed: number;
+  doughLeft: number;
+  doughQ: number;
+  trayMess: { glaze: number; toppings: number };
+  dirt: number;
+  inviteId: string | null;
+  inviteAccepted: boolean;
+  supplies: Stock | null;
+  used: Stock;
+  friendsToday: number;
+  nextFriendCheckMs: number | null;
+  friendship: Record<string, number> | null;
+  regularsToday: string[];
+  fryer: { oil: number; temp: number; target: number };
+}
+
 export interface SessionEvents extends Record<string, unknown> {
   /** Anything visible changed (customers, tickets, selection, rack, shelf). */
   changed: undefined;
@@ -278,6 +313,83 @@ export class GameSession {
     for (let i = 0; i < pickups; i++) this.addPickup();
     this.supplies = deps.stock ? { ...deps.stock } : null;
     this.friendship = deps.regulars ? { ...deps.regulars } : null;
+  }
+
+  /** Everything worth keeping about the day so far (see DaySnapshot). */
+  snapshot(): DaySnapshot {
+    // Donuts in the kitchen don't survive a reload: count them as thrown away.
+    let kitchen = this.rackDonuts.length + this.shelfDonuts.length + this.fryer.count + (this.topWork ? 1 : 0);
+    for (const w of this.boards) if (w) kitchen++;
+    for (const d of this.boxSlots) if (d) kitchen++;
+    const finite = (n: number) => (Number.isFinite(n) ? n : null);
+    return {
+      v: 1,
+      now: this.now,
+      phase: this.dayPhase,
+      dayEndsAtMs: finite(this.dayEndsAtMs),
+      windowClosed: this.windowClosed,
+      nextSpawnAtMs: this.nextSpawnAtMs,
+      spawned: this.spawned,
+      nextCustomerId: this.nextCustomerId,
+      nextTicketNo: this.nextTicketNo,
+      customers: this.allCustomers.map((c) => ({ ...c })),
+      // Served orders keep their scores, not the donut drawings (they're big).
+      tickets: this.allTickets.map((t) => ({
+        ...t,
+        results: { ...t.results, ...(t.results.packed ? { packed: t.results.packed.map((p) => ({ flavorId: p.flavorId, glazeScore: p.glazeScore, toppingScore: p.toppingScore })) } : {}) },
+      })),
+      activeNo: this.activeNo,
+      trashed: this.trashedCount + kitchen,
+      doughLeft: Number.isFinite(this.doughLeft) ? this.doughLeft : 0,
+      doughQ: this.doughQ,
+      trayMess: { ...this.trayMess },
+      dirt: this.dirt,
+      inviteId: this.inviteId,
+      inviteAccepted: this.inviteAccepted,
+      supplies: this.supplies ? { ...this.supplies } : null,
+      used: { ...this.used },
+      friendsToday: this.friendsToday,
+      nextFriendCheckMs: finite(this.nextFriendCheckMs),
+      friendship: this.friendship ? { ...this.friendship } : null,
+      regularsToday: [...this.regularsToday],
+      fryer: { oil: this.fryer.oil, temp: this.fryer.temp, target: this.fryer.target },
+    };
+  }
+
+  /** Pick a saved day back up (call right after making the session for that day). */
+  restore(s: DaySnapshot): void {
+    this.now = s.now;
+    this.dayPhase = s.phase;
+    this.dayEndsAtMs = s.dayEndsAtMs ?? Infinity;
+    this.windowClosed = s.windowClosed;
+    this.nextSpawnAtMs = s.nextSpawnAtMs;
+    this.spawned = s.spawned;
+    this.nextCustomerId = s.nextCustomerId;
+    this.nextTicketNo = s.nextTicketNo;
+    this.allCustomers.length = 0;
+    // Someone mid-order when the page went away just waits for it now.
+    for (const c of s.customers) this.allCustomers.push({ ...c, state: c.state === 'ordering' ? 'waiting' : c.state });
+    this.allTickets.length = 0;
+    this.allTickets.push(...s.tickets);
+    this.activeNo = s.activeNo;
+    this.trashedCount = s.trashed;
+    if (Number.isFinite(this.doughLeft)) this.doughLeft = s.doughLeft;
+    this.doughQ = s.doughQ;
+    this.trayMess.glaze = s.trayMess.glaze;
+    this.trayMess.toppings = s.trayMess.toppings;
+    this.dirt = s.dirt;
+    this.inviteId = s.inviteId;
+    this.inviteAccepted = s.inviteAccepted;
+    if (this.supplies && s.supplies) Object.assign(this.supplies, s.supplies);
+    Object.assign(this.used, s.used);
+    this.friendsToday = s.friendsToday;
+    this.nextFriendCheckMs = s.nextFriendCheckMs ?? Infinity;
+    if (this.friendship && s.friendship) Object.assign(this.friendship, s.friendship);
+    for (const id of s.regularsToday) this.regularsToday.add(id);
+    this.fryer.oil = s.fryer.oil;
+    this.fryer.temp = s.fryer.temp;
+    this.fryer.target = s.fryer.target;
+    this.events.emit('changed', undefined);
   }
 
   /** Today's weather, if the day has any. */

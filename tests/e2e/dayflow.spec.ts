@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import balanceJson from '../../src/data/balance.json' with { type: 'json' };
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, drawPath, findNamed, isVisibleNamed, pauseClock, shot, tapNamed, toPage, waitForScene } from './helpers';
+import { advance, boundsNamed, drawPath, findNamed, isVisibleNamed, openDay, pauseClock, seedTutorialDone, shot, tapNamed, toPage, waitForScene } from './helpers';
 
 interface SessionView {
   phase: string;
@@ -172,4 +172,28 @@ test('day 2 has morning pickups on the rail; a pop-up day has the booth; invites
   expect(await s((x) => x.pickups.length)).toBe(0);
   await shot(page, 'popup-1-booth');
   expect(errors).toEqual([]);
+});
+
+test('a reload mid-day picks the day back up (clock, phase, orders)', async ({ page }) => {
+  test.setTimeout(90_000);
+  type V = { phase: string; timeLeftMs: number; openTickets: { no: number }[] };
+  const s = <T>(fn: (x: V) => T) => page.evaluate(`(${fn.toString()})(window.__session)`) as Promise<T>;
+  await seedTutorialDone(page);
+  await page.goto('/?seed=7');
+  await tapNamed(page, SceneKeys.Preload, 'prompt-start');
+  await waitForScene(page, SceneKeys.Lobby);
+  await pauseClock(page);
+  await openDay(page);
+  await advance(page, 40_000);
+  const left = await s((x) => x.timeLeftMs);
+  const tickets = await s((x) => x.openTickets.length);
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await page.waitForTimeout(300);
+  await page.reload();
+  await tapNamed(page, SceneKeys.Preload, 'prompt-start');
+  await waitForScene(page, SceneKeys.Lobby);
+  expect(await s((x) => x.phase)).toBe('open');
+  expect(await s((x) => x.timeLeftMs)).toBeLessThanOrEqual(left);
+  expect(await s((x) => x.timeLeftMs)).toBeGreaterThan(left - 15_000);
+  expect(await s((x) => x.openTickets.length)).toBe(tickets);
 });

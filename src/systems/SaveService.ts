@@ -1,3 +1,4 @@
+import type { DaySnapshot } from './GameSession';
 import type { JournalPage } from './journal';
 /**
  * Async key-value storage. Async so it can be backed by Capacitor Preferences
@@ -31,6 +32,8 @@ export interface SaveData {
   guides: string[];
   /** How well each regular knows you (customers.json regulars ids). */
   regulars: Record<string, number>;
+  /** The day being played, saved as you go so a reload picks it back up (gone once the day's done). */
+  inProgress?: { day: number; snap: DaySnapshot; stickers: string[] };
   /** mochi's journal: stickers earned (ids, in order) and a page per finished day. */
   journal: { stickers: string[]; pages: JournalPage[]; seen: number };
   settings: {
@@ -84,6 +87,10 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (Array.isArray(raw.guides)) data.guides = [...new Set(raw.guides.filter((g): g is string => typeof g === 'string'))];
   if (isRecord(raw.regulars)) {
     for (const [k, v] of Object.entries(raw.regulars)) if (typeof v === 'number' && Number.isInteger(v) && v >= 0) data.regulars[k] = v;
+  }
+  const ip = raw.inProgress;
+  if (isRecord(ip) && typeof ip.day === 'number' && isRecord(ip.snap) && ip.snap.v === 1 && Array.isArray(ip.snap.customers) && Array.isArray(ip.snap.tickets)) {
+    data.inProgress = { day: ip.day, snap: ip.snap as unknown as DaySnapshot, stickers: Array.isArray(ip.stickers) ? ip.stickers.filter((s): s is string => typeof s === 'string') : [] };
   }
   if (isRecord(raw.journal)) {
     const j = raw.journal;

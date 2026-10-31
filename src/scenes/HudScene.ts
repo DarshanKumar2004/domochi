@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { audio, isClockPaused, menu, save, session, stickers } from '../systems/services';
+import { audio, isClockPaused, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
 import { Button } from '../ui/Button';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
@@ -56,6 +56,15 @@ export class HudScene extends Phaser.Scene {
       this.rail.refresh(session());
       if (session().arrivals > arrived) audio().play('chime');
       arrived = session().arrivals;
+    });
+    // The day so far is saved every few seconds, and whenever the page is hidden.
+    this.time.addEvent({ delay: 5000, loop: true, callback: () => saveDayInProgress() });
+    const onHide = () => document.hidden && saveDayInProgress();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', saveDayInProgress);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', saveDayInProgress);
     });
     // The day's clock on the rail ticks every second.
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.rail.refreshDay(session()) });

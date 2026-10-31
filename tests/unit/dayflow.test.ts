@@ -500,3 +500,41 @@ describe('a calm start', () => {
     expect(s.invite).toBeUndefined();
   });
 });
+
+describe('saving a day in progress', () => {
+  it('a snapshot picks the day back up: clock, customers, orders, money, supplies, dough (kitchen donuts count as thrown away)', () => {
+    const stock = startingStock(balance.supplies);
+    const s = day(2, { over: { day: { lengthSec: 120 } }, stock });
+    perfectBatch(s);
+    s.finishDough();
+    s.openShop();
+    s.tick(5000);
+    const c = s.line[0]!;
+    const t = s.takeOrder(c.id);
+    s.finishOrdering(c.id);
+    s.selectTicket(t.no);
+    s.serveActiveTicket();
+    s.tick(8000);
+    s.fryer.temp = 350;
+    s.dropDonut(); // in the oil when the page goes away
+    const snap = JSON.parse(JSON.stringify(s.snapshot()));
+    const before = s.summary();
+
+    const r = day(2, { over: { day: { lengthSec: 120 } }, stock: startingStock(balance.supplies) });
+    r.restore(snap);
+    expect(r.phase).toBe('open');
+    expect(r.timeLeftMs).toBe(s.timeLeftMs);
+    expect(r.servedCount).toBe(1);
+    expect(r.openTickets.map((x) => x.no)).toEqual(s.openTickets.map((x) => x.no));
+    expect(r.line.map((x) => x.id)).toEqual(s.line.map((x) => x.id));
+    expect(r.dough).toBe(s.dough);
+    expect(r.stockOf('box-trio')).toBe(s.stockOf('box-trio'));
+    const after = r.summary();
+    expect(after.sales).toBe(before.sales);
+    expect(after.tips).toBe(before.tips);
+    expect(after.trashed).toBe(before.trashed + 1); // the donut in the oil
+    // And the day carries on: time runs out as before.
+    r.tick(130_000);
+    expect(r.timeUp).toBe(true);
+  });
+});
