@@ -563,13 +563,14 @@ describe('glazes and toppings are supplies', () => {
 
 describe('special of the day, streaks, patience', () => {
   it("the special is on today's menu, the same each time you play that day, and sells for more", () => {
-    const a = day(3);
-    const b = day(3, { seed: 99 });
+    expect(day(balance.special.fromDay! - 1).special).toBeUndefined(); // not before it's unlocked
+    const a = day(12);
+    const b = day(12, { seed: 99 });
     expect(a.special).toBeDefined();
     expect(a.special).toBe(b.special);
-    expect(menu.flavors.find((f) => f.id === a.special)!.unlockDay).toBeLessThanOrEqual(3);
+    expect(menu.flavors.find((f) => f.id === a.special)!.unlockDay).toBeLessThanOrEqual(12);
     // Over many days, more than one flavour gets a turn.
-    expect(new Set(Array.from({ length: 30 }, (_, i) => day(i + 1).special)).size).toBeGreaterThan(1);
+    expect(new Set(Array.from({ length: 30 }, (_, i) => day(i + 12).special)).size).toBeGreaterThan(1);
   });
 
   it('good orders in a row build a streak that tips more; a bad one ends it', () => {
@@ -615,19 +616,19 @@ describe('special of the day, streaks, patience', () => {
 });
 
 describe('daily goals', () => {
-  it('from day 2, each day has a goal (the same for that day) whose target grows', () => {
-    expect(day(1).goal).toBeUndefined();
+  it('from goals.fromDay, each day has a goal (the same for that day) whose target grows', () => {
+    expect(day(balance.goals.fromDay - 1).goal).toBeUndefined();
     const g = day(5).goal!;
     expect(g).toBeDefined();
     expect(day(5, { seed: 42 }).goal).toEqual(g);
     expect(g.text).not.toContain('{');
-    const ids = new Set(Array.from({ length: 40 }, (_, i) => day(i + 2).goal!.id));
+    const ids = new Set(Array.from({ length: 40 }, (_, i) => day(i + balance.goals.fromDay).goal!.id));
     expect(ids.size).toBeGreaterThan(2);
   });
 
   it('meeting it says so once and pays the reward with the day', () => {
     // Find a day whose goal is to serve orders.
-    let d = 2;
+    let d = balance.goals.fromDay;
     while (day(d).goal!.id !== 'serve') d++;
     const generous = { scoring: { ...balance.scoring, tiers: { great: 0, good: 0, okay: 0 } }, payment: { ...balance.payment, awfulBelow: -1 } };
     const s = day(d, { over: { ...generous, day: { lengthSec: 900 }, spawn: { ...balance.spawn, intervalSec: { min: 1, max: 1 } } } });

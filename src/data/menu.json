@@ -209,7 +209,7 @@
       "description": "rich, nutty chocolate hazelnut glaze on our chewy, pull-apart mochi ring. a chocolate lover's dream, made fresh daily.",
       "glaze": "chocolate-hazelnut",
       "toppings": [],
-      "unlockDay": 4,
+      "unlockDay": 3,
       "drizzle": "white-icing",
       "drizzlePattern": [
         {
@@ -289,7 +289,7 @@
       "toppings": [
         "fruity-cereal"
       ],
-      "unlockDay": 8
+      "unlockDay": 17
     },
     {
       "id": "cookie-butter",
@@ -301,7 +301,7 @@
       "toppings": [
         "cookie-butter-cookie"
       ],
-      "unlockDay": 12,
+      "unlockDay": 38,
       "drizzlePattern": [
         {
           "x0": -0.33,
@@ -378,7 +378,7 @@
       "description": "a louisiana classic, reimagined. our chewy, pull-apart mochi ring finished beignet-style with a snowy dusting of powdered sugar. light, fluffy and made fresh daily.",
       "glaze": "powdered-sugar",
       "toppings": [],
-      "unlockDay": 16
+      "unlockDay": 62
     }
   ],
   "boxes": [

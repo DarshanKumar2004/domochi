@@ -423,7 +423,7 @@ export class GameSession {
    * customers favour it.
    */
   get special(): string | undefined {
-    if (!this.deps.dayFlow || this.isTutorial) return undefined;
+    if (!this.deps.dayFlow || this.isTutorial || this.day < (this.deps.balance.special.fromDay ?? 1)) return undefined;
     const open = flavorsForDay(this.deps.menu, this.day);
     if (!open.length) return undefined;
     let h = Math.imul(this.day ^ 0x5bd1e995, 0x27d4eb2d);

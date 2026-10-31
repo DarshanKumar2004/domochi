@@ -42,7 +42,7 @@ export interface Balance {
   guides: { items: GuideItem[] };
   weather: WeatherBalance;
   regulars: { chance: number; usualAt: number; maxLevel: number };
-  special: { priceBonus: number };
+  special: { priceBonus: number; fromDay?: number };
   goals: { reward: number; fromDay: number; list: { id: string; text: string; base: number; perDay: number; max: number }[] };
   streak: { tipPerOrder: number; maxBonus: number };
 }
