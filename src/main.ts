@@ -21,6 +21,9 @@ async function start(): Promise<void> {
   document.addEventListener('visibilitychange', () => audio().setSuspended(document.hidden));
   // ...and pick the sound back up on the next tap if the phone paused it.
   document.addEventListener('pointerdown', () => audio().wake(), { capture: true, passive: true });
+  // Clicking back into the window (or returning to the tab) brings the music back too.
+  window.addEventListener('focus', () => audio().wake());
+  window.addEventListener('pageshow', () => audio().wake());
 
   // Exposed for Playwright tests.
   const w = window as unknown as { __game: Phaser.Game; __session?: unknown; __save: unknown; __setClockPaused: (p: boolean) => void };

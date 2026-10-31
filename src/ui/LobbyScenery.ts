@@ -134,7 +134,7 @@ export class LobbyScenery {
     for (let y = p.y - p.h / 2 + 34; y < p.y + p.h / 2; y += 34) pg.lineBetween(p.x - p.w / 2 + 6, y, p.x + p.w / 2 - 6, y);
     pg.lineStyle(5, COLORS.ink, 0.7);
     pg.strokeRoundedRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h, 18);
-    this.table.setPosition(p.x, p.y - p.h / 2 + (L ? 190 : 230)).setScale(L ? 0.6 : 0.75);
+    this.table.setPosition(p.x, p.y - p.h / 2 + (L ? 150 : 230)).setScale(L ? 0.45 : 0.75);
 
     this.planter.setPosition(l.sign.x + (L ? 95 : 110), l.sign.feetY + 6).setScale(L ? 0.65 : 0.8);
     this.clouds.forEach((c, i) => c.setPosition(((i * 0.37 + 0.1) % 1) * v.width, (v.content.y || 0) + (L ? 40 : 70) + i * (L ? 45 : 70)).setScale(L ? 0.7 : 0.9));
