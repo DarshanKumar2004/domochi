@@ -469,18 +469,35 @@ describe('payment and waste', () => {
 });
 
 describe('closing early', () => {
-  it('the window can close any time while open (then it is the last orders, as if time were up)', () => {
-    const s = day(1);
+  it('the window can only close early when you are out of baking materials (no skipping days)', () => {
+    const plenty = day(1, { stock: startingStock(balance.supplies) });
+    plenty.openShop();
+    plenty.tick(5000);
+    expect(plenty.outOfMaterials).toBe(false); // nothing in the tub, but a batch can still be made
+    expect(plenty.closeEarly()).toBe(false);
+
+    const s = day(1, { stock: { ...startingStock(balance.supplies), egg: 0 } });
     expect(s.closeEarly()).toBe(false); // not before opening
     s.openShop();
     s.tick(5000);
+    expect(s.missingIngredients).toEqual(['egg']);
+    expect(s.outOfMaterials).toBe(true);
     expect(s.closeEarly()).toBe(true);
     expect(s.timeUp).toBe(true);
     expect(s.line).toHaveLength(0);
     expect(s.closeEarly()).toBe(false);
   });
-});
 
+  it('dough in the tub means you can still bake: no closing early', () => {
+    const s = day(1, { stock: startingStock(balance.supplies) });
+    perfectBatch(s);
+    s.finishDough();
+    for (const id of Object.keys(balance.dough.recipe)) while (s.stockOf(id) > 0) s.useSupply(id);
+    s.openShop();
+    expect(s.missingIngredients.length).toBeGreaterThan(0);
+    expect(s.outOfMaterials).toBe(false);
+  });
+});
 describe('a calm start', () => {
   it('no friends drop by and nobody invites you before friendsFromDay / events.fromDay', () => {
     expect(balance.supplies.friendsFromDay).toBeGreaterThan(1);
@@ -648,5 +665,26 @@ describe('daily goals', () => {
     expect(hits).toHaveLength(1);
     expect(s.goalProgress!.done).toBe(true);
     expect(s.summary().goalBonus).toBe(balance.goals.reward);
+  });
+});
+
+describe("mochi's shopping plan", () => {
+  it('musts first, within the cash; what can not be afforded is flagged', async () => {
+    const { shopNeeds, shoppingPlan } = await import('../../src/systems/supplies');
+    const S = balance.supplies;
+    const needs = shopNeeds(S, D.recipe, new Set(['glaze-strawberry']), 1);
+    const empty = Object.fromEntries(S.items.map((i) => [i.id, 0]));
+    const price = (id: string) => S.items.find((i) => i.id === id)!.price;
+    const rich = shoppingPlan(S, needs, empty, 1000, price);
+    expect(rich.every((p) => p.affordable)).toBe(true);
+    expect(rich[0]!.priority).toBe(1);
+    expect(rich.some((p) => p.id === 'glaze-strawberry' && p.priority === 2)).toBe(true);
+    // Broke: nothing affordable, the musts still listed.
+    const broke = shoppingPlan(S, needs, empty, 0, price);
+    expect(broke.length).toBeGreaterThan(0);
+    expect(broke.every((p) => !p.affordable && p.priority === 1)).toBe(true);
+    // Well stocked: nothing to buy.
+    const full = Object.fromEntries(S.items.map((i) => [i.id, 999]));
+    expect(shoppingPlan(S, needs, full, 1000, price)).toEqual([]);
   });
 });

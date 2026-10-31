@@ -847,9 +847,27 @@ export class GameSession {
     this.checkClosing();
   }
 
-  /** Close the window now, before time's up (out of supplies, or just done for the day). */
+  /** Dough ingredients you have none of (supplies counted only). */
+  get missingIngredients(): string[] {
+    if (!this.supplies) return [];
+    return this.deps.balance.dough.ingredients.filter((i) => (this.supplies![i.id] ?? 0) < 1).map((i) => i.id);
+  }
+
+  /**
+   * Out of baking materials: the tub's empty, nothing usable in the bowl, and
+   * no batch can be made (an ingredient has run out). Only then can the day
+   * be closed early: no skipping days without playing them.
+   */
+  get outOfMaterials(): boolean {
+    if (!this.supplies || !this.deps.dayFlow) return false;
+    if (this.doughLeft >= 1) return false;
+    if (this.doughWork && this.doughWork.yield >= 1) return false;
+    return this.missingIngredients.length > 0;
+  }
+
+  /** Close the window now, before time's up: only when you're out of baking materials. */
   closeEarly(): boolean {
-    if (this.dayPhase !== 'open' || !this.deps.dayFlow || this.windowClosed) return false;
+    if (this.dayPhase !== 'open' || !this.deps.dayFlow || this.windowClosed || !this.outOfMaterials) return false;
     this.closeWindow();
     return true;
   }

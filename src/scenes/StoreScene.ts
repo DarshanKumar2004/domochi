@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { audio, balance, menu, save, stickers } from '../systems/services';
-import { fillStock, priceOn, type SupplyItem } from '../systems/supplies';
+import { flavorsForDay } from '../systems/menu';
+import { fillStock, glazeStockId, priceOn, shopNeeds, shoppingPlan, toppingStockId, type ShopPick, type SupplyItem } from '../systems/supplies';
+import { TextureKeys } from '../assets/keys';
 import { Button } from '../ui/Button';
 import { beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -14,10 +16,18 @@ const GAP = 18;
 /** Header (title, cash, mochi's tip) and footer (Open day) heights, design px. */
 const HEAD = 290;
 const FOOT = 240;
+/** mochi's colours by priority: must (pink, as is), should (gold), nice to have (grey). */
+const BADGE_TINT = { 1: 0xffffff, 2: 0xffd27a, 3: 0xbdb6ae } as const;
+
 /** A finger that moves this far is scrolling, not tapping. */
 const DRAG_PX = 14;
 
 interface Tile {
+  /** Supply id (guides have none). */
+  id?: string;
+  /** mochi sitting on the tile when it's one of mochi's picks. */
+  badge?: Phaser.GameObjects.Image;
+  badgeText?: Phaser.GameObjects.Text;
   box: Phaser.GameObjects.Container;
   bg: Phaser.GameObjects.Graphics;
   have: Phaser.GameObjects.Text;
@@ -49,6 +59,8 @@ const SECTIONS: { title: string; kinds: SupplyItem['kind'][] }[] = [
  */
 export class StoreScene extends Phaser.Scene {
   private tiles: Tile[] = [];
+  /** mochi's latest shopping plan (the tiles' "low!" and badges follow it). */
+  private currentPlan: ShopPick[] = [];
   private cash!: Phaser.GameObjects.Text;
   /** mochi's shopping tip: what you're short of for a day. */
   private tip!: Phaser.GameObjects.Text;
@@ -165,6 +177,8 @@ export class StoreScene extends Phaser.Scene {
           t.bg.fillRoundedRect(-tileW / 2, -TILE_H / 2, tileW, TILE_H, 24);
           t.bg.lineStyle(3, COLORS.ink, 0.15);
           t.bg.strokeRoundedRect(-tileW / 2, -TILE_H / 2, tileW, TILE_H, 24);
+          t.badge?.setPosition(-tileW / 2 + 34, -TILE_H / 2 + 30);
+          t.badgeText?.setPosition(-tileW / 2 + 34, -TILE_H / 2 + 72);
         });
         y += Math.ceil(sec.tiles.length / cols) * (TILE_H + GAP) + 20;
       }
@@ -200,7 +214,9 @@ export class StoreScene extends Phaser.Scene {
     const tile = this.makeTile(`store-${it.id}`, it.name, locked ? `day ${from}` : `+${it.pack} · ${money(price)}${trend}`, () => {
       if (locked) return { label: 'comes in later', low: false, can: false, owned: false };
       const have = this.stock()[it.id] ?? 0;
-      return { label: `have ${have}`, low: have < it.pack, can: save().data.money >= price, owned: false };
+      // "low!" = mochi wants more of it for tomorrow (a must or a should).
+      const low = this.currentPlan.some((p) => p.id === it.id && p.priority <= 2);
+      return { label: `have ${have}`, low, can: save().data.money >= price, owned: false };
     }, () => {
       void save().update((d) => {
         const stock = fillStock(d.stock, balance.supplies);
@@ -210,6 +226,13 @@ export class StoreScene extends Phaser.Scene {
       });
     });
     if (locked) tile.box.setAlpha(0.5);
+    tile.id = it.id;
+    tile.badge = this.add.image(0, 0, TextureKeys.Mascot).setScale(0.32).setVisible(false).setName(`store-pick-${it.id}`);
+    tile.badgeText = this.add
+      .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold', color: '#fbf6ec', backgroundColor: '#b0406a', padding: { x: 6, y: 1 } })
+      .setOrigin(0.5)
+      .setVisible(false);
+    tile.box.add([tile.badge, tile.badgeText]);
     return tile;
   }
 
@@ -229,24 +252,17 @@ export class StoreScene extends Phaser.Scene {
     });
   }
 
-  /**
-   * mochi looks at the stock: dough for two batches of the recipe, a few of each
-   * everyday box, a jug of oil, and anything on sale under one pack. Names what's short.
-   */
-  private shoppingTip(): string {
-    const st = this.stock();
-    const day = save().data.day;
-    const need: Record<string, number> = { oil: 1, 'box-single': 4, 'box-trio': 4, 'box-flight': 2 };
-    for (const [id, n] of Object.entries(balance.dough.recipe)) need[id] = n * 2;
-    // Short of a day's needs, or under one pack (what the tiles call "low"), the day's needs first.
-    const items = balance.supplies.items.filter((it) => (it.unlockDay ?? 1) <= day);
-    const short = [
-      ...items.filter((it) => (st[it.id] ?? 0) < (need[it.id] ?? 0)),
-      ...items.filter((it) => (st[it.id] ?? 0) >= (need[it.id] ?? 0) && (st[it.id] ?? 0) < it.pack),
-    ].map((it) => it.name);
-    if (!short.length) return "mochi says: you're all set for tomorrow!";
-    const list = short.length > 3 ? `${short.slice(0, 3).join(', ')} and more` : short.join(', ');
-    return `mochi says: grab some ${list} to keep going!`;
+  /** mochi's tip from the plan: what to get first, and what's short if money's tight. */
+  private shoppingTip(plan: readonly ShopPick[]): string {
+    const name = (id: string) => balance.supplies.items.find((i) => i.id === id)?.name ?? id;
+    const list = (ids: string[]) => (ids.length > 3 ? `${ids.slice(0, 3).join(', ')} and more` : ids.join(', '));
+    const short = plan.filter((p) => !p.affordable).map((p) => name(p.id));
+    const first = plan.filter((p) => p.affordable && p.priority === 1).map((p) => name(p.id));
+    const then = plan.filter((p) => p.affordable && p.priority > 1).map((p) => name(p.id));
+    if (short.length) return first.length ? `money's tight! get ${list(first)} first. still short: ${list(short)}` : `money's tight... we can't afford ${list(short)} yet`;
+    if (first.length) return `mochi says: get ${list(first)} first${then.length ? `, then ${list(then)}` : ''}!`;
+    if (then.length) return `mochi says: nice to have: ${list(then)}`;
+    return "mochi says: you're all set for tomorrow!";
   }
 
   private stock(): Record<string, number> {
@@ -300,8 +316,37 @@ export class StoreScene extends Phaser.Scene {
 
   private refresh(): void {
     this.cash.setText(`cash ${money(save().data.money)}`);
-    this.tip.setText(this.shoppingTip());
-    for (const t of this.tiles) t.refresh();
+    const plan = this.plan();
+    this.currentPlan = plan;
+    this.tip.setText(this.shoppingTip(plan));
+    for (const t of this.tiles) {
+      t.refresh();
+      // mochi sits on each pick, coloured by how much it matters, with how many packs.
+      const pick = plan.find((p) => p.id === t.id && p.affordable) ?? plan.find((p) => p.id === t.id);
+      t.badge?.setVisible(!!pick);
+      t.badgeText?.setVisible(!!pick);
+      if (pick && t.badge && t.badgeText) {
+        t.badge.setTint(BADGE_TINT[pick.priority]);
+        t.badgeText.setText(pick.affordable ? `×${pick.packs}` : 'need!').setBackgroundColor(pick.affordable ? '#b0406a' : '#7a2e2e');
+      }
+    }
+  }
+
+  /** mochi's shopping list for today's cash (see shoppingPlan). */
+  private plan(): ShopPick[] {
+    const day = save().data.day;
+    const onMenu = new Set<string>();
+    for (const f of flavorsForDay(menu, day)) {
+      onMenu.add(glazeStockId(f.glaze));
+      if (f.drizzle) onMenu.add(glazeStockId(f.drizzle));
+      for (const tp of f.toppings ?? []) onMenu.add(toppingStockId(tp));
+    }
+    const needs = shopNeeds(balance.supplies, balance.dough.recipe, onMenu, day);
+    const priceOf = (id: string) => {
+      const it = balance.supplies.items.find((i) => i.id === id)!;
+      return priceOn(it, day, balance.supplies.priceSwing);
+    };
+    return shoppingPlan(balance.supplies, needs, this.stock(), save().data.money, priceOf);
   }
 
   private openDay(): void {

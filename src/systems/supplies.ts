@@ -130,3 +130,62 @@ export function clockText(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/** Something mochi wants you to have in stock: at least \`want\` of it, and how much it matters. */
+export interface ShopNeed {
+  id: string;
+  want: number;
+  /** 1 = must have (you can't bake or serve without it), 2 = should have, 3 = nice to have. */
+  priority: 1 | 2 | 3;
+}
+
+/** mochi's pick: buy \`packs\` of it (\`affordable\` = fits the cash left after higher picks). */
+export interface ShopPick {
+  id: string;
+  packs: number;
+  priority: 1 | 2 | 3;
+  affordable: boolean;
+}
+
+/**
+ * What a day needs: dough for three batches, a few boxes, a jug of oil (musts);
+ * the glazes and toppings of the menu you can make, and flight boxes (shoulds);
+ * anything else on sale under a pack (nice to have).
+ */
+export function shopNeeds(b: SuppliesBalance, recipe: Record<string, number>, onMenu: ReadonlySet<string>, day: number): ShopNeed[] {
+  const needs: ShopNeed[] = [];
+  for (const [id, n] of Object.entries(recipe)) needs.push({ id, want: n * 3, priority: 1 });
+  needs.push({ id: 'box-trio', want: 6, priority: 1 }, { id: 'box-single', want: 5, priority: 1 }, { id: 'oil', want: 1, priority: 1 });
+  for (const id of onMenu) needs.push({ id, want: 6, priority: 2 });
+  needs.push({ id: 'box-flight', want: 2, priority: 2 });
+  const listed = new Set(needs.map((n) => n.id));
+  for (const it of b.items) if (!listed.has(it.id) && (it.unlockDay ?? 1) <= day) needs.push({ id: it.id, want: it.pack, priority: 3 });
+  return needs;
+}
+
+/**
+ * Turn the needs into packs to buy, most important first, out of the cash
+ * you have: a must you can't afford is still listed (not affordable), so
+ * mochi can say what's short; lower picks only use money left over.
+ */
+export function shoppingPlan(b: SuppliesBalance, needs: readonly ShopNeed[], stock: Stock, cash: number, priceOf: (id: string) => number): ShopPick[] {
+  const picks: ShopPick[] = [];
+  let left = cash;
+  const sorted = [...needs].sort((x, y) => x.priority - y.priority || (stock[x.id] ?? 0) / Math.max(1, x.want) - (stock[y.id] ?? 0) / Math.max(1, y.want));
+  for (const n of sorted) {
+    const it = b.items.find((i) => i.id === n.id);
+    if (!it) continue;
+    const short = n.want - (stock[n.id] ?? 0);
+    if (short <= 0) continue;
+    const packs = Math.ceil(short / it.pack);
+    const price = priceOf(it.id);
+    let can = 0;
+    while (can < packs && left >= price) {
+      left -= price;
+      can++;
+    }
+    if (can > 0) picks.push({ id: it.id, packs: can, priority: n.priority, affordable: true });
+    if (can < packs && n.priority === 1) picks.push({ id: it.id, packs: packs - can, priority: 1, affordable: false });
+  }
+  return picks;
+}

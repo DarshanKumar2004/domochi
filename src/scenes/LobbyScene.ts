@@ -316,7 +316,8 @@ export class LobbyScene extends Phaser.Scene {
     this.openButton.setVisible(prep);
     this.closeButton.setVisible(closing);
     this.sendHomeButton.setVisible(lastOrders);
-    const canClose = s.phase === 'open' && !s.timeUp && Number.isFinite(s.timeLeftMs);
+    // Close early only when there's nothing left to bake with.
+    const canClose = s.phase === 'open' && !s.timeUp && s.outOfMaterials;
     this.closeEarlyButton.setVisible(canClose);
     if (!canClose) this.confirmClose = false;
     if (prep) {
@@ -331,6 +332,13 @@ export class LobbyScene extends Phaser.Scene {
       if (s.pickups.length) lines.push(`• ${s.pickups.length} pickup${s.pickups.length === 1 ? '' : 's'} on the rail`);
       lines.push('then open the window!');
       this.panelText.setText(lines.join('\n')).setVisible(true);
+    } else if (canClose) {
+      // mochi's reminder: what ran out, and what to do about it.
+      const names = new Map(balance.dough.ingredients.map((i) => [i.id, i.name]));
+      const missing = s.missingIngredients.map((id) => names.get(id) ?? id).join(', ');
+      this.panelText
+        .setText([`mochi says: we're out of ${missing}!`, '• finish the orders you can', '• then close early and restock', '  at the supply store'].join('\n'))
+        .setVisible(true);
     } else if (lastOrders) {
       const n = s.unserved;
       this.panelText
