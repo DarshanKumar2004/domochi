@@ -42,6 +42,8 @@ export interface Balance {
   guides: { items: GuideItem[] };
   weather: WeatherBalance;
   regulars: { chance: number; usualAt: number; maxLevel: number };
+  special: { priceBonus: number };
+  streak: { tipPerOrder: number; maxBonus: number };
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */

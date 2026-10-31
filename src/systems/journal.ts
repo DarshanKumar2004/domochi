@@ -37,6 +37,24 @@ export interface JournalPage {
   note: string;
   /** A little picture of the day's best donut (a PNG data URL). */
   doodle?: string;
+  /** How the day went, 0–3 stars. */
+  stars?: number;
+}
+
+/**
+ * Stars for a day: none if nobody was served, then one, two for a good day
+ * (average 65+), three for a great one (average 85+ with 5 or more served).
+ */
+export function dayStars(sum: { served: number; averageScore: number }): number {
+  if (sum.served === 0) return 0;
+  if (sum.averageScore >= 85 && sum.served >= 5) return 3;
+  if (sum.averageScore >= 65) return 2;
+  return 1;
+}
+
+/** ★★☆ */
+export function starText(n: number): string {
+  return '★'.repeat(n) + '☆'.repeat(Math.max(0, 3 - n));
 }
 
 /** Things the tracker needs beyond the session. */
@@ -107,6 +125,13 @@ export class StickerTracker {
         if (e.quality >= 1) this.award('dough-perfect');
       }),
       ev.on('usual', () => this.award('regular')),
+      ev.on('streak', (e) => {
+        if (e.count >= 5) this.award('streak');
+      }),
+      ev.on('served', (e) => {
+        if (s.specialsSold >= 5) this.award('special');
+        void e;
+      }),
       ev.on('friend', () => this.award('friends')),
     );
   }

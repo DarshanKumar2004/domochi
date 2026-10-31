@@ -86,6 +86,9 @@ export class HudScene extends Phaser.Scene {
       // In the Lobby they walk up and say it themselves; elsewhere it's a note that stays until tapped.
       if (this.current !== SceneKeys.Lobby) this.showToast(`${e.name} (Ethan's friend) dropped by:\n"${e.line}"\n(tap to close)`, true);
     });
+    listen(this, session().events, 'streak', (e) => {
+      if (e.count === 2 || e.count % 3 === 0) this.showToast(`hot streak ×${e.count}! tips +${Math.round(e.bonus * 100)}%`);
+    });
     listen(this, session().events, 'timeUp', () => {
       audio().play('ding');
       this.showToast(session().unserved ? "time's up! the window's closed.\nfinish the last orders" : "time's up! the window's closed");

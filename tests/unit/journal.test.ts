@@ -148,7 +148,7 @@ describe("mochi's journal", () => {
   it('every sticker in the data is one the tracker knows how to award', () => {
     const awardable = [
       'first-order', 'first-day', 'golden', 'great', 'perfect-order', 'gift', 'dough-perfect', 'regular', 'tidy', 'zero-waste',
-      'busy', 'rainy', 'hot', 'pop-up', 'guides', 'week', 'full-house', 'speedy', 'comeback', 'friends',
+      'busy', 'rainy', 'hot', 'pop-up', 'guides', 'week', 'streak', 'special', 'full-house', 'speedy', 'comeback', 'friends',
     ];
     expect(journal.stickers.map((s) => s.id).sort()).toEqual(awardable.sort());
     expect(new Set(journal.stickers.map((s) => s.id)).size).toBe(journal.stickers.length);

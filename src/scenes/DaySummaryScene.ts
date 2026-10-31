@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import brand from '../data/brand.json';
 import { flavorsForDay } from '../systems/menu';
-import { addPage, dayNote, type JournalPage } from '../systems/journal';
+import { addPage, dayNote, dayStars, type JournalPage } from '../systems/journal';
 import { createRng } from '../systems/rng';
 import { audio, feedback, journalData, menu, save, session, stickers } from '../systems/services';
 import { drawFinishedDonut } from '../ui/donutArt';
@@ -13,7 +13,7 @@ import { startMainGame, stopMainGame } from './flow';
 import { SceneKeys } from './sceneKeys';
 
 const CARD_W = 860;
-const CARD_H = 1180;
+const CARD_H = 1320;
 
 /** Size of a journal doodle (the day's best donut), px. Small: it lives in the save. */
 const DOODLE_PX = 160;
@@ -50,6 +50,13 @@ export class DaySummaryScene extends Phaser.Scene {
       this.add.text(x, y, str, { fontFamily: FONT_FAMILY, fontSize: `${size}px`, color: CSS.ink, ...opts });
 
     card.add(text(0, -510, `day ${sum.day} done!`, 76, { fontStyle: 'bold' }).setOrigin(0.5));
+    // How the day went: up to three stars, popping in one by one.
+    const stars = dayStars(sum);
+    for (let i = 0; i < 3; i++) {
+      const st = text(-90 + i * 90, -590, i < stars ? '★' : '☆', 72, { color: i < stars ? '#e8a33a' : '#c9bfb4', fontStyle: 'bold' }).setOrigin(0.5).setScale(0);
+      card.add(st);
+      this.tweens.add({ targets: st, scale: 1, delay: 250 + i * 220, duration: 320, ease: 'Back.Out', onStart: () => i < stars && audio().play('ding') });
+    }
     card.add(text(0, -435, sum.event ? `what a pop-up at ${sum.event}!` : brand.tagline, 34, { fontStyle: 'italic', color: '#6b5d52' }).setOrigin(0.5));
 
     type Row = [string, string, string];
@@ -66,20 +73,22 @@ export class DaySummaryScene extends Phaser.Scene {
       counted
         ? ['wasted', `${sum.wasted} donut${sum.wasted === 1 ? '' : 's'}  −${money(sum.wasteCost)}`, 'waste']
         : ['donuts thrown away', `${sum.trashed}`, 'waste'],
+      ...(sum.bestStreak >= 2 ? [['best streak', `${sum.bestStreak} in a row`, 'streak'] as Row] : []),
+      ...(sum.specialsSold ? [["special sold", `${sum.specialsSold}`, 'specials'] as Row] : []),
       ...(earned.length ? [['new stickers', earned.map((st) => st.glyph).join(' '), 'stickers'] as Row] : []),
       ...(counted && sum.suppliesCost - sum.wasteCost >= 0.005 ? [['other supplies used', `−${money(Math.max(0, sum.suppliesCost - sum.wasteCost))}`, 'supplies'] as Row] : []),
     ];
     rows.forEach(([label, value, name], i) => {
-      const y = -365 + i * Math.min(60, 505 / Math.max(1, rows.length - 1));
+      const y = -365 + i * Math.min(60, 565 / Math.max(1, rows.length - 1));
       card.add(text(-360, y, label, 40).setOrigin(0, 0.5));
       card.add(text(360, y, value, 40, { fontStyle: 'bold' }).setOrigin(1, 0.5).setName(`summary-${name}`));
     });
     const line = this.add.graphics();
     line.lineStyle(4, COLORS.ink, 0.2);
-    line.lineBetween(-370, 165, 370, 165);
+    line.lineBetween(-370, 225, 370, 225);
     card.add(line);
     card.add(
-      text(0, 225, counted ? `profit ${money(sum.profit)}   ·   cash ${money(bank + today)}` : `today ${money(today)}   ·   total ${money(bank + today)}`, 44, {
+      text(0, 285, counted ? `profit ${money(sum.profit)}   ·   cash ${money(bank + today)}` : `today ${money(today)}   ·   total ${money(bank + today)}`, 44, {
         fontStyle: 'bold',
         color: sum.profit < 0 && counted ? '#b03a3a' : CSS.ink,
       })
@@ -87,7 +96,7 @@ export class DaySummaryScene extends Phaser.Scene {
         .setName('summary-total'),
     );
     card.add(
-      text(0, 315, [sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '', fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!
+      text(0, 378, [sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '', fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!
 (its glaze and toppings are at the supply store)` : sum.nextEvent ? '' : 'same menu tomorrow'].filter(Boolean).join('\n'), 38, {
         color: fresh.length || sum.nextEvent ? '#b0406a' : '#6b5d52',
         fontStyle: fresh.length || sum.nextEvent ? 'bold' : 'normal',
@@ -97,7 +106,7 @@ export class DaySummaryScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setName('summary-unlocks'),
     );
-    card.add(new Button(this, 0, 465, counted ? 'To the supply store' : `Start day ${sum.day + 1}`, () => this.nextDay(), { width: 620, name: 'btn-next-day' }));
+    card.add(new Button(this, 0, 530, counted ? 'To the supply store' : `Start day ${sum.day + 1}`, () => this.nextDay(), { width: 620, name: 'btn-next-day' }));
 
     onLayout(this, (v) => {
       const scale = Math.min(1, (v.height - 40) / CARD_H, (v.width - 40) / CARD_W);
@@ -128,6 +137,7 @@ export class DaySummaryScene extends Phaser.Scene {
       ...(s.tracksSupplies ? { profit: sum.profit } : {}),
       stickers: [...(stickers()?.today ?? [])],
       note: dayNote(journalData, sum, createRng(sum.day * 7919 + sum.served)),
+      stars: dayStars(sum),
       ...(doodle ? { doodle } : {}),
     };
     void save().update((d) => {

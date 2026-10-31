@@ -280,6 +280,15 @@
     "_note": "With the full day (not the tutorial): the window is open for lengthSec. Walk-ups keep coming until then; when time's up, anyone still in line goes home, and the orders already taken still get served (or sent home). Days never run out. customersPerDay only applies without the full day (tests).",
     "lengthSec": 300
   },
+  "special": {
+    "_note": "Special of the day (full day only): one flavour on today's menu, the same for a given day. It sells for priceBonus more per donut, and customers favour it like one of their favourites.",
+    "priceBonus": 0.5
+  },
+  "streak": {
+    "_note": "Good or great orders in a row: each one after the first adds tipPerOrder to the tip (× tip), up to maxBonus. An okay or bad order ends the streak.",
+    "tipPerOrder": 0.1,
+    "maxBonus": 0.5
+  },
   "payment": {
     "_note": "What a customer pays (share of the order price) by reaction tier (scoring.tiers): great and good pay full, okay pays okay, bad pays bad and leaves no tip. An order scoring below awfulBelow isn't paid for at all, and they take up to awfulTipJar back out of today's tip jar.",
     "full": 1,

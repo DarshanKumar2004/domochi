@@ -560,3 +560,56 @@ describe('glazes and toppings are supplies', () => {
     expect(st['glaze-cookie-butter']).toBe(0);
   });
 });
+
+describe('special of the day, streaks, patience', () => {
+  it("the special is on today's menu, the same each time you play that day, and sells for more", () => {
+    const a = day(3);
+    const b = day(3, { seed: 99 });
+    expect(a.special).toBeDefined();
+    expect(a.special).toBe(b.special);
+    expect(menu.flavors.find((f) => f.id === a.special)!.unlockDay).toBeLessThanOrEqual(3);
+    // Over many days, more than one flavour gets a turn.
+    expect(new Set(Array.from({ length: 30 }, (_, i) => day(i + 1).special)).size).toBeGreaterThan(1);
+  });
+
+  it('good orders in a row build a streak that tips more; a bad one ends it', () => {
+    const generous = { scoring: { ...balance.scoring, tiers: { great: 0, good: 0, okay: 0 } }, payment: { ...balance.payment, awfulBelow: -1 } };
+    const s = day(1, { over: { ...generous, day: { lengthSec: 600 }, spawn: { ...balance.spawn, intervalSec: { min: 1, max: 1 } } } });
+    const streaks: number[] = [];
+    s.events.on('streak', (e) => streaks.push(e.count));
+    s.openShop();
+    for (let n = 0; n < 3; n++) {
+      for (let k = 0; k < 100 && !s.line.some((c) => c.state === 'inLine'); k++) s.tick(500);
+      const c = s.line.find((x) => x.state === 'inLine')!;
+      const t = s.takeOrder(c.id);
+      s.finishOrdering(c.id);
+      s.selectTicket(t.no);
+      s.serveActiveTicket();
+    }
+    expect(s.streakNow).toBe(3);
+    expect(streaks).toEqual([2, 3]);
+    expect(s.summary().bestStreak).toBe(3);
+  });
+
+  it("a waiting customer's hearts empty as they wait", () => {
+    const s = day(1, { over: { day: { lengthSec: 9999 } } });
+    s.openShop();
+    s.tick(5000);
+    const c = s.line[0]!;
+    s.takeOrder(c.id);
+    s.finishOrdering(c.id);
+    expect(s.patienceHearts(c)).toBe(3);
+    for (let t = 0; t < 3600; t++) s.tick(1000);
+    expect(s.patienceHearts(c)).toBe(0);
+  });
+
+  it('day stars: none for an empty day, up to three for a great one', async () => {
+    const { dayStars, starText } = await import('../../src/systems/journal');
+    expect(dayStars({ served: 0, averageScore: 0 })).toBe(0);
+    expect(dayStars({ served: 2, averageScore: 40 })).toBe(1);
+    expect(dayStars({ served: 2, averageScore: 70 })).toBe(2);
+    expect(dayStars({ served: 4, averageScore: 95 })).toBe(2);
+    expect(dayStars({ served: 6, averageScore: 90 })).toBe(3);
+    expect(starText(2)).toBe('★★☆');
+  });
+});

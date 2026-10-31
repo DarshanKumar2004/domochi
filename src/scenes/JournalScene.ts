@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
-import type { StickerDef } from '../systems/journal';
+import { starText, type StickerDef } from '../systems/journal';
 import { audio, journalData, save } from '../systems/services';
 import { Button } from '../ui/Button';
 import type { Viewport } from '../ui/layout';
@@ -141,7 +141,7 @@ export class JournalScene extends Phaser.Scene {
     const page = pages[Math.min(this.pageIndex, pages.length - 1)]!;
     const left = -w / 2 + 150;
 
-    const heading = [`day ${page.day}`, page.weather, page.event ? `pop-up at ${page.event}` : ''].filter(Boolean).join('  ·  ');
+    const heading = [`day ${page.day}${page.stars !== undefined ? `  ${starText(page.stars)}` : ''}`, page.weather, page.event ? `pop-up at ${page.event}` : ''].filter(Boolean).join('  ·  ');
     this.book.add(this.text(left, top, heading, 54, { fontStyle: 'bold', color: '#b0406a' }).setName('journal-page-title'));
 
     // The doodle: the day's best donut, on a little polaroid.

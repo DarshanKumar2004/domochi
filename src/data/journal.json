@@ -1,26 +1,164 @@
 {
   "_note": "mochi's journal: stickers you earn for little moments, and mochi's note on each day's page. A sticker's check lives in code (src/systems/journal.ts, by id); its name, description, colour and glyph are here. Secret stickers show as '?' until earned. Notes: picked by how the day went ({served}, {best} are filled in).",
   "stickers": [
-    { "id": "first-order", "name": "first order!", "desc": "serve your very first order", "color": "#f4a6c0", "glyph": "1" },
-    { "id": "first-day", "name": "opening day", "desc": "finish a whole day at the trailer", "color": "#ffd27a", "glyph": "✓" },
-    { "id": "golden", "name": "golden brown", "desc": "fry a perfect donut", "color": "#e8b04a", "glyph": "◎" },
-    { "id": "great", "name": "made their day", "desc": "get a \"great\" reaction", "color": "#ff8fab", "glyph": "♥" },
-    { "id": "perfect-order", "name": "chef's kiss", "desc": "an order scoring 95 or more", "color": "#c79bf2", "glyph": "★" },
-    { "id": "gift", "name": "a little extra", "desc": "slip a gift donut in a box", "color": "#9fd8a8", "glyph": "+" },
-    { "id": "dough-perfect", "name": "smooth operator", "desc": "make a perfect batch of dough", "color": "#f6f1e7", "glyph": "~" },
-    { "id": "regular", "name": "the usual!", "desc": "a regular knows you well enough to order \"the usual\"", "color": "#8fd0ee", "glyph": "☺" },
-    { "id": "tidy", "name": "spotless", "desc": "close up with every tray wiped and the oil filtered", "color": "#bfe6f5", "glyph": "✧" },
-    { "id": "zero-waste", "name": "nothing wasted", "desc": "end a day (3+ served) without wasting a single donut", "color": "#7fb069", "glyph": "0" },
-    { "id": "busy", "name": "busy bee", "desc": "serve 10 orders in one day", "color": "#ffcf5c", "glyph": "10" },
-    { "id": "rainy", "name": "rain or shine", "desc": "serve 5 orders on a rainy day", "color": "#9fb4c7", "glyph": "☂" },
-    { "id": "hot", "name": "keep your cool", "desc": "serve 5 orders on a hot day", "color": "#ff9a4d", "glyph": "☼" },
-    { "id": "pop-up", "name": "on the road", "desc": "run a pop-up booth at an event", "color": "#e57373", "glyph": "♪" },
-    { "id": "guides", "name": "by the book", "desc": "own every glaze guide", "color": "#d9b38c", "glyph": "✎" },
-    { "id": "week", "name": "one whole week", "desc": "finish day 7", "color": "#6b5b9e", "glyph": "7" },
-    { "id": "full-house", "name": "full house", "desc": "six donuts frying at once", "color": "#f2d9a0", "glyph": "6", "secret": true },
-    { "id": "speedy", "name": "speedy", "desc": "serve an order within 45 seconds of taking it", "color": "#7ec8c8", "glyph": "»", "secret": true },
-    { "id": "comeback", "name": "the comeback", "desc": "a great order right after a bad one", "color": "#f7a072", "glyph": "↑", "secret": true },
-    { "id": "friends", "name": "with a little help", "desc": "one of Ethan's friends drops off supplies", "color": "#b5d99c", "glyph": "✉", "secret": true }
+    {
+      "id": "first-order",
+      "name": "first order!",
+      "desc": "serve your very first order",
+      "color": "#f4a6c0",
+      "glyph": "1"
+    },
+    {
+      "id": "first-day",
+      "name": "opening day",
+      "desc": "finish a whole day at the trailer",
+      "color": "#ffd27a",
+      "glyph": "✓"
+    },
+    {
+      "id": "golden",
+      "name": "golden brown",
+      "desc": "fry a perfect donut",
+      "color": "#e8b04a",
+      "glyph": "◎"
+    },
+    {
+      "id": "great",
+      "name": "made their day",
+      "desc": "get a \"great\" reaction",
+      "color": "#ff8fab",
+      "glyph": "♥"
+    },
+    {
+      "id": "perfect-order",
+      "name": "chef's kiss",
+      "desc": "an order scoring 95 or more",
+      "color": "#c79bf2",
+      "glyph": "★"
+    },
+    {
+      "id": "gift",
+      "name": "a little extra",
+      "desc": "slip a gift donut in a box",
+      "color": "#9fd8a8",
+      "glyph": "+"
+    },
+    {
+      "id": "dough-perfect",
+      "name": "smooth operator",
+      "desc": "make a perfect batch of dough",
+      "color": "#f6f1e7",
+      "glyph": "~"
+    },
+    {
+      "id": "regular",
+      "name": "the usual!",
+      "desc": "a regular knows you well enough to order \"the usual\"",
+      "color": "#8fd0ee",
+      "glyph": "☺"
+    },
+    {
+      "id": "tidy",
+      "name": "spotless",
+      "desc": "close up with every tray wiped and the oil filtered",
+      "color": "#bfe6f5",
+      "glyph": "✧"
+    },
+    {
+      "id": "zero-waste",
+      "name": "nothing wasted",
+      "desc": "end a day (3+ served) without wasting a single donut",
+      "color": "#7fb069",
+      "glyph": "0"
+    },
+    {
+      "id": "busy",
+      "name": "busy bee",
+      "desc": "serve 10 orders in one day",
+      "color": "#ffcf5c",
+      "glyph": "10"
+    },
+    {
+      "id": "rainy",
+      "name": "rain or shine",
+      "desc": "serve 5 orders on a rainy day",
+      "color": "#9fb4c7",
+      "glyph": "☂"
+    },
+    {
+      "id": "hot",
+      "name": "keep your cool",
+      "desc": "serve 5 orders on a hot day",
+      "color": "#ff9a4d",
+      "glyph": "☼"
+    },
+    {
+      "id": "pop-up",
+      "name": "on the road",
+      "desc": "run a pop-up booth at an event",
+      "color": "#e57373",
+      "glyph": "♪"
+    },
+    {
+      "id": "guides",
+      "name": "by the book",
+      "desc": "own every glaze guide",
+      "color": "#d9b38c",
+      "glyph": "✎"
+    },
+    {
+      "id": "week",
+      "name": "one whole week",
+      "desc": "finish day 7",
+      "color": "#6b5b9e",
+      "glyph": "7"
+    },
+    {
+      "id": "streak",
+      "name": "on a roll",
+      "desc": "5 good or great orders in a row",
+      "color": "#ff7a59",
+      "glyph": "»»"
+    },
+    {
+      "id": "special",
+      "name": "chalkboard hit",
+      "desc": "sell 5 of the day's special in one day",
+      "color": "#a8d5ba",
+      "glyph": "✱"
+    },
+    {
+      "id": "full-house",
+      "name": "full house",
+      "desc": "six donuts frying at once",
+      "color": "#f2d9a0",
+      "glyph": "6",
+      "secret": true
+    },
+    {
+      "id": "speedy",
+      "name": "speedy",
+      "desc": "serve an order within 45 seconds of taking it",
+      "color": "#7ec8c8",
+      "glyph": "»",
+      "secret": true
+    },
+    {
+      "id": "comeback",
+      "name": "the comeback",
+      "desc": "a great order right after a bad one",
+      "color": "#f7a072",
+      "glyph": "↑",
+      "secret": true
+    },
+    {
+      "id": "friends",
+      "name": "with a little help",
+      "desc": "one of Ethan's friends drops off supplies",
+      "color": "#b5d99c",
+      "glyph": "✉",
+      "secret": true
+    }
   ],
   "notes": {
     "great": [

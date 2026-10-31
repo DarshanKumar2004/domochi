@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { Customer } from '../systems/GameSession';
-import { audio, save, session, stickers } from '../systems/services';
+import { audio, balance, menu, save, session, stickers } from '../systems/services';
 import { Booth } from '../ui/Booth';
 import { LobbyScenery } from '../ui/LobbyScenery';
 import { Button } from '../ui/Button';
@@ -12,6 +12,8 @@ import { Truck } from '../ui/Truck';
 import { getViewport, onLayout } from '../ui/viewport';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
+
+const money = (n: number) => `$${n.toFixed(2)}`;
 
 /** Customer sprite height in texture pixels (see MANIFEST). */
 const CUSTOMER_H = 340;
@@ -25,6 +27,7 @@ const LAYOUT = {
     // Truck y puts the wheels on the ground line.
     truck: { x: 540, y: 470, scale: 0.9 },
     sign: { x: 120, feetY: 850, scale: 0.7 },
+    chalk: { x: 215, y: 330 },
     line: { x: [600, 760, 920, 1080], feetY: 1300, scale: 0.85 },
     panel: { x: 780, y: 1060, buttonY: 1330, width: 540 },
     pickups: { x: 780, y: 1500 },
@@ -50,6 +53,7 @@ const LAYOUT = {
     groundY: 380,
     truck: { x: 420, y: 205, scale: 0.65 },
     sign: { x: 820, feetY: 470, scale: 0.6 },
+    chalk: { x: 820, y: 236 },
     // The line starts at the serving window and runs right, along the front of the trailer.
     line: { x: [300, 450, 600, 750], feetY: 720, scale: 0.8 },
     // Checklists and buttons in the open middle of the lot, clear of the line and the patio.
@@ -123,6 +127,24 @@ export class LobbyScene extends Phaser.Scene {
     this.truck = ev ? null : new Truck(this, 0, 0);
     const truck: Phaser.GameObjects.Container = this.truck ?? new Booth(this, 0, 0, ev!.name);
     const sign = this.add.image(0, 0, TextureKeys.SignAFrame).setOrigin(0.5, 1);
+    // Today's special, chalked up by the sign.
+    const special = session().special;
+    const specialName = special ? menu.flavors.find((f) => f.id === special)?.name : undefined;
+    const chalk = this.add
+      .text(0, 0, specialName ? `today's special\n${specialName}\n+${money(balance.special.priceBonus)}` : '', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '26px',
+        fontStyle: 'bold',
+        color: '#f4f1e8',
+        align: 'center',
+        backgroundColor: '#2f4a3a',
+        padding: { x: 14, y: 8 },
+      })
+      .setOrigin(0.5)
+      .setDepth(4)
+      .setAngle(-3)
+      .setVisible(!!specialName)
+      .setName('lobby-special');
     // A little chalkboard naming the patio where customers wait.
     const waitingLabel = this.add
       .text(0, 0, 'waiting patio', { fontFamily: FONT_FAMILY, fontSize: '34px', color: CSS.cream, backgroundColor: '#2b2522', padding: { x: 16, y: 6 } })
@@ -216,6 +238,7 @@ export class LobbyScene extends Phaser.Scene {
 
       truck.setPosition(c.x + L.truck.x, c.y + L.truck.y).setScale(L.truck.scale);
       sign.setPosition(c.x + L.sign.x, c.y + L.sign.feetY).setScale(L.sign.scale);
+      chalk.setPosition(c.x + L.chalk.x, c.y + L.chalk.y);
       waitingLabel.setPosition(c.x + L.waiting.x, c.y + L.waiting.labelY);
       this.doneText.setPosition(c.x + c.width / 2, c.y + (v.orientation === 'landscape' ? 160 : 230));
       this.panelText.setPosition(c.x + L.panel.x, c.y + L.panel.y).setWordWrapWidth(L.panel.width);
@@ -280,6 +303,11 @@ export class LobbyScene extends Phaser.Scene {
   /** The prep / closing checklist and button, the sign, and the pickups list. */
   private syncPanels(): void {
     const s = session();
+    // Patience hearts tick down every second.
+    for (const view of this.views.values()) {
+      const cust = s.customer(view.id);
+      if (cust && !view.leaving) this.setTag(view, cust);
+    }
     this.scenery.setPhase(s.phase);
     this.truck?.setOpen(s.phase === 'open' && !s.timeUp);
     const prep = s.phase === 'prep';
@@ -296,6 +324,7 @@ export class LobbyScene extends Phaser.Scene {
       const lines = [
         s.event ? `pop-up day: ${s.event.name}!` : 'good morning! before opening:',
         ...(s.weather ? [`(${s.weather.note})`] : []),
+        ...(s.special ? [`• special: ${menu.flavors.find((f) => f.id === s.special)?.name} (+${money(balance.special.priceBonus)})`] : []),
         `• ${dough ? `dough: ${dough} donuts ready` : 'make dough (Dough station)'}`,
       ];
       if (s.pickups.length) lines.push(`• ${s.pickups.length} pickup${s.pickups.length === 1 ? '' : 's'} on the rail`);
@@ -442,10 +471,7 @@ export class LobbyScene extends Phaser.Scene {
     }
     // Hidden when empty: an empty Text still draws its background padding.
     // Regulars wear their name; waiting customers their ticket number.
-    const reg = session().regularOf(cust);
-    const no = cust.ticketNo !== undefined && cust.state === 'waiting' ? `#${cust.ticketNo}` : '';
-    const label = reg ? (no ? `${reg.name} ${no}` : reg.name) : no;
-    view.tag.setText(label).setVisible(label !== '');
+    this.setTag(view, cust);
 
     const t = view.target;
     const same = !!t && t.x === target.x && t.y === target.y && t.scale === target.scale;
@@ -501,6 +527,21 @@ export class LobbyScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(6);
     return { id: cust.id, image, tag, target: null, moving: false, leaving: false };
+  }
+
+  /**
+   * A customer's tag: regulars' names, waiting customers' ticket numbers and
+   * how patient they still are (hearts that empty as they wait).
+   */
+  private setTag(view: CustomerView, cust: Customer): void {
+    const s = session();
+    const reg = s.regularOf(cust);
+    const waiting = cust.ticketNo !== undefined && cust.state === 'waiting';
+    const no = waiting ? `#${cust.ticketNo}` : '';
+    const hearts = waiting && !cust.delivery ? s.patienceHearts(cust) : 3;
+    const mood = waiting ? ` ${'♥'.repeat(hearts)}${'♡'.repeat(3 - hearts)}` : '';
+    const label = (reg ? (no ? `${reg.name} ${no}` : reg.name) : no) + mood;
+    view.tag.setText(label).setVisible(label !== '').setBackgroundColor(hearts === 0 ? '#b03a3a' : CSS.ink);
   }
 
   private positionTag(view: CustomerView): void {

@@ -16,7 +16,7 @@ import { Emitter } from './events';
 import type { Menu } from './menu';
 import { flavorsForDay } from './menu';
 import { boxFor, describeOrder, generateOrder, orderPrice, orderSizeRange, type Order } from './orders';
-import { scoreOrder, type OrderScore } from './score';
+import { scoreOrder, waitScore, type OrderScore } from './score';
 import { boxStockId, doughCostPerDonut, paymentFor, unitCost, type Stock } from './supplies';
 import type { WeatherType } from './weather';
 import type { Rng } from './rng';
@@ -133,6 +133,10 @@ export interface DaySummary {
   profit: number;
   /** Walk-ups who went home without being served. */
   wentHome: number;
+  /** Longest run of good-or-great orders. */
+  bestStreak: number;
+  /** Donuts of the day's special sold. */
+  specialsSold: number;
   /** Orders by reaction tier. */
   tiers: Record<'great' | 'good' | 'okay' | 'bad', number>;
   /** Extra donuts given away as gifts. */
@@ -181,6 +185,7 @@ export interface DaySnapshot {
   friendship: Record<string, number> | null;
   regularsToday: string[];
   fryer: { oil: number; temp: number; target: number };
+  streak?: { count: number; best: number; specials: number };
 }
 
 export interface SessionEvents extends Record<string, unknown> {
@@ -202,6 +207,8 @@ export interface SessionEvents extends Record<string, unknown> {
   dropped: { frying: number; slots: number };
   /** A batch of dough went in the tub. */
   doughMade: { quality: number };
+  /** Good or great orders in a row (from the second one on). */
+  streak: { count: number; bonus: number };
   /** A regular who knows you ordered "the usual": straight onto the rail. */
   usual: { customerId: number; name: string; line: string };
 }
@@ -291,6 +298,9 @@ export class GameSession {
   private readonly supplies: Stock | null;
   /** Supplies used today, by id. */
   private readonly used: Stock = {};
+  private streakCount = 0;
+  private bestStreakCount = 0;
+  private specials = 0;
   private friendsToday = 0;
   private nextFriendCheckMs = Infinity;
   private readonly friendship: Record<string, number> | null;
@@ -357,6 +367,7 @@ export class GameSession {
       friendship: this.friendship ? { ...this.friendship } : null,
       regularsToday: [...this.regularsToday],
       fryer: { oil: this.fryer.oil, temp: this.fryer.temp, target: this.fryer.target },
+      streak: { count: this.streakCount, best: this.bestStreakCount, specials: this.specials },
     };
   }
 
@@ -393,7 +404,48 @@ export class GameSession {
     this.fryer.oil = s.fryer.oil;
     this.fryer.temp = s.fryer.temp;
     this.fryer.target = s.fryer.target;
+    this.streakCount = s.streak?.count ?? 0;
+    this.bestStreakCount = s.streak?.best ?? 0;
+    this.specials = s.streak?.specials ?? 0;
     this.events.emit('changed', undefined);
+  }
+
+  /**
+   * Special of the day (full day only): a flavour on today's menu, the same
+   * one every time you play that day. It sells for a little more, and
+   * customers favour it.
+   */
+  get special(): string | undefined {
+    if (!this.deps.dayFlow || this.isTutorial) return undefined;
+    const open = flavorsForDay(this.deps.menu, this.day);
+    if (!open.length) return undefined;
+    let h = Math.imul(this.day ^ 0x5bd1e995, 0x27d4eb2d);
+    h ^= h >>> 15;
+    return open[(h >>> 0) % open.length]!.id;
+  }
+
+  /** Specials sold today. */
+  get specialsSold(): number {
+    return this.specials;
+  }
+
+  /** Good or great orders in a row right now, and the best run today. */
+  get streakNow(): number {
+    return this.streakCount;
+  }
+  get bestStreak(): number {
+    return this.bestStreakCount;
+  }
+
+  /**
+   * How patient a waiting customer still is, 0–3 hearts: 3 while their wait
+   * is still in the grace period, then down as the wait score falls.
+   */
+  patienceHearts(c: Customer): number {
+    const t = c.ticketNo !== undefined ? this.ticket(c.ticketNo) : undefined;
+    if (!t || t.status !== 'open') return 3;
+    const ws = waitScore((this.now - t.takenAtMs) / 1000, this.typeOf(c).patienceSec * (this.deps.weather?.patience ?? 1), this.deps.balance.scoring);
+    return ws >= 100 ? 3 : ws >= 55 ? 2 : ws > 0 ? 1 : 0;
   }
 
   /** Today's weather, if the day has any. */
@@ -914,7 +966,7 @@ export class GameSession {
       ? { flavors: [...scripted.flavors], boxId: scripted.boxId }
       : reg
         ? { flavors: [...reg.usual], boxId: boxFor(menu, reg.usual.length).id }
-        : generateOrder(menu, this.day, size, type.favorites, balance.favoriteWeight, rng);
+        : generateOrder(menu, this.day, size, this.special ? [...type.favorites, this.special] : type.favorites, balance.favoriteWeight, rng);
     const ticket: Ticket = {
       no: this.nextTicketNo++,
       customerId,
@@ -1360,7 +1412,10 @@ export class GameSession {
     // Rainy-day customers are grateful you're open.
     if (this.deps.weather && this.deps.weather.tip !== 1) score.tip = Math.round(score.tip * this.deps.weather.tip * 100) / 100;
     // A poor order pays less (and no tip); an awful one pays nothing and takes some back out of the tip jar.
-    const price = orderPrice(menu, t.order);
+    // The special sells for a little more.
+    const special = this.special;
+    const specialCount = special ? t.order.flavors.filter((f) => f === special).length : 0;
+    const price = Math.round((orderPrice(menu, t.order) + specialCount * balance.special.priceBonus) * 100) / 100;
     const pay = paymentFor(score.total, score.tier, balance.payment);
     const sale = Math.round(price * pay.share * 100) / 100;
     if (!pay.tips) {
@@ -1368,6 +1423,15 @@ export class GameSession {
       score.giftTip = 0;
     }
     if (pay.takesFromJar > 0) score.tip = -Math.min(pay.takesFromJar, Math.max(0, this.tipJar));
+    // A hot streak: good or great orders in a row tip a little more each time.
+    if (score.tier === 'great' || score.tier === 'good') {
+      this.streakCount++;
+      this.bestStreakCount = Math.max(this.bestStreakCount, this.streakCount);
+      const bonus = Math.min(balance.streak.maxBonus, balance.streak.tipPerOrder * (this.streakCount - 1));
+      if (bonus > 0 && score.tip > 0) score.tip = Math.round(score.tip * (1 + bonus) * 100) / 100;
+      if (this.streakCount >= 2) this.events.emit('streak', { count: this.streakCount, bonus });
+    } else this.streakCount = 0;
+    if (sale > 0) this.specials += specialCount;
     t.results.price = price;
     t.results.score = score;
     // A regular gets to know you better (or not).
@@ -1470,6 +1534,8 @@ export class GameSession {
       trashed: this.trashedCount,
       ...this.costs(),
       wentHome: this.allCustomers.filter((c) => c.wentHome).length,
+      bestStreak: this.bestStreakCount,
+      specialsSold: this.specials,
       tiers,
       gifts,
       pickups: served.filter((t) => t.delivery).length,
