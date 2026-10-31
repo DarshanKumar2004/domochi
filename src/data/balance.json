@@ -111,7 +111,8 @@
   "events": {
     "_note": "A served walk-up customer may invite domochi to their event (chance by reaction tier, plus giftBonus if you gave them a gift). Accepting makes tomorrow a pop-up day (see events.json). At most one invite a day.",
     "inviteChance": { "great": 0.08, "good": 0.03, "okay": 0, "bad": 0 },
-    "giftBonus": 0.1
+    "giftBonus": 0.1,
+    "fromDay": 3
   },
   "cleanup": {
     "_note": "Closing time: wipe both trays (mess at or below messDoneAt) and filter the oil. A tidy close earns tidyBonus. Oil dirt +1 per donut fried; the vat looks fully dirty at oilDirtMax.",
@@ -150,7 +151,8 @@
     "priceSwing": 0.25,
     "friendCheckSec": 60,
     "friendChance": 0.2,
-    "friendsPerDay": 1
+    "friendsPerDay": 1,
+    "friendsFromDay": 3
   },
   "weather": {
     "_note": "Each day's weather (the same for a given day; day 1 is always firstDay), picked by weight. spawnFactor: × the gap between walk-ups (bigger = fewer). extraPickups: more morning delivery orders. heatLag: × how fast the oil reaches the dial. patience: × how long customers happily wait. tip: × tips. note: shown on the morning checklist.",

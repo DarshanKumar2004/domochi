@@ -33,7 +33,7 @@ export interface Balance {
   scoring: ScoringBalance;
   dough: DoughBalance;
   deliveries: { byDay: number[]; size: Range };
-  events: { inviteChance: Record<'great' | 'good' | 'okay' | 'bad', number>; giftBonus: number };
+  events: { inviteChance: Record<'great' | 'good' | 'okay' | 'bad', number>; giftBonus: number; fromDay?: number };
   cleanup: { messDoneAt: number; tidyBonus: number; oilDirtMax: number; wipePerUnit: number };
   /** A day at the window lasts this long once you open. */
   day: { lengthSec: number };

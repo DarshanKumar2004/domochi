@@ -551,7 +551,7 @@ export class GameSession {
       else if (this.now >= this.nextFriendCheckMs) {
         const sb = this.deps.balance.supplies;
         this.nextFriendCheckMs += sb.friendCheckSec * 1000;
-        if (this.friendsToday < sb.friendsPerDay && this.deps.rng.next() < sb.friendChance) this.friendVisit();
+        if (this.day >= (sb.friendsFromDay ?? 1) && this.friendsToday < sb.friendsPerDay && this.deps.rng.next() < sb.friendChance) this.friendVisit();
       }
     }
     // If the line is full (or enough people are already here), the next customer
@@ -1232,7 +1232,7 @@ export class GameSession {
       t.results.regular = { name: reg.name, before, after };
     }
     // A happy walk-up customer may invite you to their event (one invite a day).
-    if (this.deps.dayFlow && !c.delivery && !this.deps.event && !this.inviteId && this.deps.events?.length) {
+    if (this.deps.dayFlow && !c.delivery && !this.deps.event && !this.inviteId && this.deps.events?.length && this.day >= (balance.events.fromDay ?? 1)) {
       const chance = balance.events.inviteChance[score.tier] + (score.gifts > 0 ? balance.events.giftBonus : 0);
       if (this.deps.rng.next() < chance) {
         this.inviteId = this.deps.rng.pick(this.deps.events).id;

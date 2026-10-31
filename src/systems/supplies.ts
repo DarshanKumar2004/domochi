@@ -25,6 +25,8 @@ export interface SuppliesBalance {
   friendCheckSec: number;
   friendChance: number;
   friendsPerDay: number;
+  /** No friends drop by before this day (a calm first few days). */
+  friendsFromDay?: number;
 }
 
 export interface PaymentBalance {

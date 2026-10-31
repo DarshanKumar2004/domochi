@@ -224,7 +224,7 @@ describe('event invites and pop-up days', () => {
   it('a great order can bring an invite; accepting books tomorrow', () => {
     // Find a seed where the first (empty-box, 'bad') order doesn't invite, then force a great one by chance:
     // with inviteChance great = 1 the invite is certain.
-    const sure = { ...balance.events, inviteChance: { great: 1, good: 1, okay: 1, bad: 1 } };
+    const sure = { ...balance.events, inviteChance: { great: 1, good: 1, okay: 1, bad: 1 }, fromDay: 1 };
     const s = day(1, { over: { customersPerDay: [2], events: sure } });
     s.openShop();
     s.tick(5000);
@@ -384,7 +384,7 @@ describe('supplies', () => {
   });
 
   it("when you're low, one of Ethan's friends may drop off a pack", () => {
-    const sure = { ...S, friendChance: 1, friendCheckSec: 10, friendsPerDay: 1 };
+    const sure = { ...S, friendChance: 1, friendCheckSec: 10, friendsPerDay: 1, friendsFromDay: 1 };
     const s = day(1, { over: { supplies: sure }, stock: { ...startingStock(S), egg: 0 } });
     const drops: { itemId: string; qty: number; line: string; name: string }[] = [];
     s.events.on('friend', (e) => drops.push(e));
@@ -478,5 +478,25 @@ describe('closing early', () => {
     expect(s.timeUp).toBe(true);
     expect(s.line).toHaveLength(0);
     expect(s.closeEarly()).toBe(false);
+  });
+});
+
+describe('a calm start', () => {
+  it('no friends drop by and nobody invites you before friendsFromDay / events.fromDay', () => {
+    expect(balance.supplies.friendsFromDay).toBeGreaterThan(1);
+    expect(balance.events.fromDay).toBeGreaterThan(1);
+    const sure = { ...balance.supplies, friendChance: 1, friendCheckSec: 10 };
+    const s = day(1, { over: { supplies: sure, events: { ...balance.events, inviteChance: { great: 1, good: 1, okay: 1, bad: 1 } } }, stock: { ...startingStock(balance.supplies), egg: 0 } });
+    let friends = 0;
+    s.events.on('friend', () => friends++);
+    s.openShop();
+    s.tick(5000);
+    const c = s.line[0]!;
+    s.takeOrder(c.id);
+    s.finishOrdering(c.id);
+    s.serveActiveTicket();
+    s.tick(60_000);
+    expect(friends).toBe(0);
+    expect(s.invite).toBeUndefined();
   });
 });
