@@ -32,3 +32,7 @@ android/app/build/
 android/.gradle/
 *.keystore
 *.jks
+
+# Feedback relay local secrets (wrangler)
+relay/.dev.vars
+relay/.wrangler/

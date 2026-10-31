@@ -1,0 +1,9 @@
+# The feedback relay (see feedback-worker.js and README.md).
+# Secrets (RESEND_API_KEY, FEEDBACK_TO) are set with `npx wrangler secret put`, never here.
+name = "domochi-feedback"
+main = "feedback-worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+# Pages allowed to send reports: the live site, and the dev server.
+ALLOWED_ORIGINS = "https://darshankumar2004.github.io,http://localhost:5173"
