@@ -23,6 +23,21 @@ async function start(): Promise<void> {
   document.addEventListener('pointerdown', () => audio().wake(), { capture: true, passive: true });
   // Clicking back into the window (or returning to the tab) brings the music back too.
   window.addEventListener('focus', () => audio().wake());
+  // Leaving the page mid-press (switching apps, a notification) can swallow the finger
+  // lifting: the game would think it's still held down, and pours, the sponge and
+  // buttons get stuck. So on leaving and coming back, let go of every pointer.
+  const letGo = () => {
+    for (const p of game.input.pointers) {
+      if (!p.isDown) continue;
+      p.isDown = false;
+      p.primaryDown = false;
+      p.buttons = 0;
+    }
+  };
+  window.addEventListener('blur', letGo);
+  window.addEventListener('focus', letGo);
+  window.addEventListener('pointercancel', letGo);
+  document.addEventListener('visibilitychange', letGo);
   window.addEventListener('pageshow', () => audio().wake());
 
   // Exposed for Playwright tests.

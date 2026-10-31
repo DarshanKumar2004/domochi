@@ -178,3 +178,27 @@ test('pouring on an empty tray spot splatters the tray (the ring area too: no do
   expect(working).toBe(false);
   await shot(page, 'glaze-6-empty-spot-splat');
 });
+
+test('scrubbing the tray mid-day (donut on it) leaves everything tappable', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message + '\n' + e.stack));
+  await rackThenGlaze(page, 1);
+  await tapNamed(page, SceneKeys.Glaze, 'glaze-tray-0');
+  await page.evaluate(() => (window as unknown as { __session: { addMess(t: string, n: number): void } }).__session.addMess('glaze', 20));
+  const z = await boundsNamed(page, SceneKeys.Glaze, 'glaze-board');
+  for (let k = 0; k < 6; k++) {
+    await drawPath(page, [
+      { x: z.x + z.w * 0.03, y: z.y + z.h * 0.1 },
+      { x: z.x + z.w * 0.97, y: z.y + z.h * 0.05 },
+      { x: z.x + z.w * 0.03, y: z.y + z.h * 0.95 },
+      { x: z.x + z.w * 0.97, y: z.y + z.h * 0.9 },
+    ]);
+  }
+  await page.waitForTimeout(300);
+  await tapNamed(page, SceneKeys.Glaze, 'cup-strawberry');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __game: { scene: { getScene(k: string): { selectedCup: string | null } } } }).__game.scene.getScene('GlazeScene').selectedCup)).toBe('strawberry');
+  await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
+  await waitForScene(page, SceneKeys.Fry);
+  expect(errors).toEqual([]);
+});
