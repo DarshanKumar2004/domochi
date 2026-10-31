@@ -616,6 +616,13 @@ export class GameSession {
     this.checkClosing();
   }
 
+  /** Close the window now, before time's up (out of supplies, or just done for the day). */
+  closeEarly(): boolean {
+    if (this.dayPhase !== 'open' || !this.deps.dayFlow || this.windowClosed) return false;
+    this.closeWindow();
+    return true;
+  }
+
   /** Customers whose orders are taken but not served yet. */
   get unserved(): number {
     let n = 0;

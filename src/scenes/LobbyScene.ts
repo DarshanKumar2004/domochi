@@ -29,6 +29,7 @@ const LAYOUT = {
     panel: { x: 780, y: 1060, buttonY: 1330, width: 540 },
     pickups: { x: 780, y: 1500 },
     journal: { x: 955, y: 820, scale: 0.6 },
+    closeEarly: { x: 250, y: 1585 },
     waiting: {
       x: 250,
       y: 1185,
@@ -54,6 +55,7 @@ const LAYOUT = {
     panel: { x: 1240, y: 330, buttonY: 640, width: 520 },
     pickups: { x: 1730, y: 215 },
     journal: { x: 105, y: 610, scale: 0.55 },
+    closeEarly: { x: 1240, y: 640 },
     // The patio sits on the lot, below the sidewalk (not up in the sky).
     waiting: {
       x: 1730,
@@ -95,6 +97,8 @@ export class LobbyScene extends Phaser.Scene {
   private closeButton!: Button;
   /** After time's up: send whoever's still waiting home (unpaid). */
   private sendHomeButton!: Button;
+  private closeEarlyButton!: Button;
+  private confirmClose = false;
   private pickupsText!: Phaser.GameObjects.Text;
   /** mochi's journal: tap mochi on the lot. */
   private journalButton!: Phaser.GameObjects.Image;
@@ -154,6 +158,8 @@ export class LobbyScene extends Phaser.Scene {
       .setName('lobby-checklist');
     this.openButton = new Button(this, 0, 0, 'Open the window', () => this.openShop(), { width: 520, name: 'btn-open' }).setDepth(21);
     this.closeButton = new Button(this, 0, 0, 'Close up', () => this.closeUp(), { width: 520, name: 'btn-close-up' }).setDepth(21);
+    // Any time while open: close the window early (two taps, so it isn't by accident).
+    this.closeEarlyButton = new Button(this, 0, 0, 'Close early', () => this.closeEarly(), { width: 360, height: 120, fontSize: 42, fill: COLORS.dough, name: 'btn-close-early' }).setDepth(21);
     this.sendHomeButton = new Button(this, 0, 0, 'Send them home', () => this.sendHome(), { width: 520, fill: COLORS.dough, name: 'btn-send-home' }).setDepth(21);
     this.pickupsText = this.add
       .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '32px', color: CSS.ink, backgroundColor: '#fffaf0cc', padding: { x: 18, y: 12 }, align: 'left' })
@@ -213,6 +219,7 @@ export class LobbyScene extends Phaser.Scene {
       this.openButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
       this.closeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
       this.sendHomeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
+      this.closeEarlyButton.setPosition(c.x + L.closeEarly.x, c.y + L.closeEarly.y);
       this.pickupsText.setPosition(c.x + L.pickups.x, c.y + L.pickups.y);
       // Not on the tutorial day: mochi's busy teaching.
       const showJournal = !session().isTutorial;
@@ -278,6 +285,9 @@ export class LobbyScene extends Phaser.Scene {
     this.openButton.setVisible(prep);
     this.closeButton.setVisible(closing);
     this.sendHomeButton.setVisible(lastOrders);
+    const canClose = s.phase === 'open' && !s.timeUp && Number.isFinite(s.timeLeftMs);
+    this.closeEarlyButton.setVisible(canClose);
+    if (!canClose) this.confirmClose = false;
     if (prep) {
       const dough = Number.isFinite(s.dough) ? s.dough : 0;
       const lines = [
@@ -345,6 +355,21 @@ export class LobbyScene extends Phaser.Scene {
     const j = save().data.journal;
     const fresh = j.stickers.length > j.seen;
     this.journalLabel?.setText(fresh ? 'new sticker!' : 'journal').setBackgroundColor(fresh ? '#b0406a' : '#2b2522');
+  }
+
+  private closeEarly(): void {
+    if (!this.confirmClose) {
+      this.confirmClose = true;
+      this.closeEarlyButton.setLabel('Tap to confirm');
+      this.time.delayedCall(3000, () => {
+        this.confirmClose = false;
+        this.closeEarlyButton?.setLabel('Close early');
+      });
+      return;
+    }
+    this.confirmClose = false;
+    this.closeEarlyButton.setLabel('Close early');
+    session().closeEarly();
   }
 
   private sendHome(): void {

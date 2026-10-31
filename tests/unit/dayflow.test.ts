@@ -467,3 +467,16 @@ describe('payment and waste', () => {
     expect(sum.profit).toBeCloseTo(-sum.suppliesCost, 2);
   });
 });
+
+describe('closing early', () => {
+  it('the window can close any time while open (then it is the last orders, as if time were up)', () => {
+    const s = day(1);
+    expect(s.closeEarly()).toBe(false); // not before opening
+    s.openShop();
+    s.tick(5000);
+    expect(s.closeEarly()).toBe(true);
+    expect(s.timeUp).toBe(true);
+    expect(s.line).toHaveLength(0);
+    expect(s.closeEarly()).toBe(false);
+  });
+});
