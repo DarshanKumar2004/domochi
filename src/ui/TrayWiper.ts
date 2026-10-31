@@ -68,7 +68,7 @@ export class TrayWiper {
     this.lastY = p.y;
     if (time >= this.nextSound) {
       this.nextSound = time + 180;
-      audio().play('shake');
+      audio().play('scrub');
     }
     // Wiping goes faster the messier it is, so a big spill doesn't take forever.
     const s = session();

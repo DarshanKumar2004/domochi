@@ -16,7 +16,8 @@ export type Sfx =
   | 'lid'
   | 'cash'
   | 'chime'
-  | 'fanfare';
+  | 'fanfare'
+  | 'scrub';
 
 export interface AudioSettings {
   sound: boolean;
@@ -176,6 +177,10 @@ export class AudioService {
       case 'chime': // a customer walks up
         this.tone(t, 0.18, 880, 'sine', 0.2);
         this.tone(t + 0.12, 0.3, 1174.7, 'sine', 0.2);
+        break;
+      case 'scrub': // a sponge on steel: a soft swish and a little squeak
+        this.hiss(t, 0.12, 0.18, 'bandpass', 1600);
+        this.tone(t + 0.02, 0.06, 1900 + Math.random() * 500, 'sine', 0.06, 2600);
         break;
       case 'fanfare':
         [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(t + i * 0.11, 0.35, f, 'triangle', 0.25));

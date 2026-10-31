@@ -52,7 +52,7 @@ describe('AudioService', () => {
     const { ctx, counts } = fakeContext();
     const a = new AudioService({ sound: true, music: false }, () => ctx);
     a.unlock();
-    const all: Sfx[] = ['tap', 'drop', 'flip', 'ding', 'pour', 'shake', 'trash', 'burn', 'lid', 'cash', 'chime', 'fanfare'];
+    const all: Sfx[] = ['tap', 'drop', 'flip', 'ding', 'pour', 'shake', 'trash', 'burn', 'lid', 'cash', 'chime', 'fanfare', 'scrub'];
     for (const s of all) a.play(s);
     expect(counts.oscillators + counts.noises).toBeGreaterThanOrEqual(all.length);
   });
