@@ -115,6 +115,21 @@ describe('AudioService', () => {
     expect(counts.resumed).toBe(2);
   });
 
+  it('audio the phone closed is made afresh on the next tap', () => {
+    let made = 0;
+    const a = new AudioService({ sound: true, music: false }, () => {
+      made++;
+      return fakeContext().ctx;
+    });
+    a.unlock();
+    expect(made).toBe(1);
+    const ctx = (a as unknown as { ctx: { state: string } }).ctx;
+    ctx.state = 'closed';
+    a.wake();
+    expect(made).toBe(2);
+    expect(a.unlocked).toBe(true);
+  });
+
   it('music that fell behind picks up from now instead of a burst of old notes', () => {
     vi.useFakeTimers();
     const { ctx, counts } = fakeContext();

@@ -29,7 +29,8 @@ const LAYOUT = {
     panel: { x: 780, y: 1060, buttonY: 1330, width: 540 },
     pickups: { x: 780, y: 1500 },
     journal: { x: 955, y: 820, scale: 0.6 },
-    closeEarly: { x: 250, y: 1585 },
+    // On the sidewalk between the patio and the line (short phones have no room at the bottom).
+    closeEarly: { x: 665, y: 905 },
     waiting: {
       x: 250,
       y: 1185,

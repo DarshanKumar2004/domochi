@@ -54,6 +54,8 @@ export class AudioService {
   private step = 0;
   private nextNoteAt = 0;
   private hidden = false;
+  /** resume() didn't bring the audio back: rebuild it on the next tap. */
+  private stuck = false;
 
   constructor(
     private settings: AudioSettings,
@@ -123,14 +125,37 @@ export class AudioService {
   wake(): void {
     const ctx = this.ctx;
     if (!ctx || this.hidden) return;
+    // A phone can close the audio after a long while in the background, or leave it
+    // stuck so resume() never takes: then start over with a fresh one.
+    if (ctx.state === 'closed' || this.stuck) {
+      this.rebuild();
+      return;
+    }
     if (ctx.state !== 'running') {
       // Coming back from a pause: restart the music's schedule from now, once it's running again.
-      void ctx.resume?.()?.then(() => {
-        this.stopMusic();
-        if (this.settings.music) this.startMusic();
-      });
+      const p = ctx.resume?.();
+      if (p) {
+        p.then(() => {
+          if (ctx.state !== 'running') {
+            this.stuck = true;
+            return;
+          }
+          this.stopMusic();
+          if (this.settings.music) this.startMusic();
+        }).catch(() => (this.stuck = true));
+      }
     }
     if (this.settings.music) this.startMusic();
+  }
+
+  /** Throw the audio away and make it again (on a tap, so the browser allows it to play). */
+  private rebuild(): void {
+    this.stopMusic();
+    const old = this.ctx;
+    this.ctx = null;
+    this.stuck = false;
+    void old?.close?.()?.catch(() => undefined);
+    this.unlock();
   }
 
   play(name: Sfx): void {
