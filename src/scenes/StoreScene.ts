@@ -30,6 +30,8 @@ const money = (n: number) => `$${n.toFixed(2)}`;
 export class StoreScene extends Phaser.Scene {
   private tiles: Tile[] = [];
   private cash!: Phaser.GameObjects.Text;
+  /** mochi's shopping tip: what you're short of for a day. */
+  private tip!: Phaser.GameObjects.Text;
 
   constructor() {
     super(SceneKeys.Store);
@@ -45,6 +47,7 @@ export class StoreScene extends Phaser.Scene {
     const title = text(64, CSS.ink, true).setText('supply store');
     const sub = text(32, '#6b5d52').setText(`day ${day} prices · stock up before you open`);
     this.cash = text(44, CSS.ink, true).setName('store-cash');
+    this.tip = text(32, '#b0406a', true).setName('store-tip');
     const suppliesLabel = text(34, '#6b5d52', true).setText('supplies');
     const guidesLabel = text(34, '#6b5d52', true).setText('glaze guides: dashed lines that show you where to pour');
 
@@ -95,7 +98,7 @@ export class StoreScene extends Phaser.Scene {
       const w = cols * tileW + (cols - 1) * GAP + 80;
       const supplyRows = Math.ceil(supplyCount / cols);
       const guideRows = Math.ceil((this.tiles.length - supplyCount) / cols);
-      const head = 230;
+      const head = 285;
       const h = head + 60 + supplyRows * (TILE_H + GAP) + 60 + guideRows * (TILE_H + GAP) + 190;
       const scale = Math.min(1, (v.height - 30) / h, (v.width - 30) / w);
       const cx = v.width / 2;
@@ -109,7 +112,8 @@ export class StoreScene extends Phaser.Scene {
       card.fillRoundedRect(cx - (w * scale) / 2, top, w * scale, h * scale, 48 * scale);
       title.setPosition(cx, at(70)).setScale(scale);
       sub.setPosition(cx, at(130)).setScale(scale);
-      this.cash.setPosition(cx, at(190)).setScale(scale);
+      this.cash.setPosition(cx, at(185)).setScale(scale);
+      this.tip.setPosition(cx, at(240)).setScale(scale).setWordWrapWidth(w - 100);
 
       const place = (from: number, count: number, y0: number) => {
         for (let i = 0; i < count; i++) {
@@ -134,6 +138,25 @@ export class StoreScene extends Phaser.Scene {
       place(supplyCount, this.tiles.length - supplyCount, guidesTop + 60);
       start.setPosition(cx, at(h - 100)).setScale(scale);
     });
+  }
+
+  /**
+   * mochi looks at the stock: dough for two batches of the recipe, a few of each
+   * everyday box, a jug of oil, and anything under one pack. Names what's short.
+   */
+  private shoppingTip(): string {
+    const st = this.stock();
+    const need: Record<string, number> = { oil: 1, 'box-single': 4, 'box-trio': 4, 'box-flight': 2 };
+    for (const [id, n] of Object.entries(balance.dough.recipe)) need[id] = n * 2;
+    // Short of a day's needs, or under one pack (what the tiles call "low"), the day's needs first.
+    const items = balance.supplies.items;
+    const short = [
+      ...items.filter((it) => (st[it.id] ?? 0) < (need[it.id] ?? 0)),
+      ...items.filter((it) => (st[it.id] ?? 0) >= (need[it.id] ?? 0) && (st[it.id] ?? 0) < it.pack),
+    ].map((it) => it.name);
+    if (!short.length) return "mochi says: you're all set for tomorrow!";
+    const list = short.length > 3 ? `${short.slice(0, 3).join(', ')} and more` : short.join(', ');
+    return `mochi says: grab some ${list} to keep going!`;
   }
 
   private stock(): Record<string, number> {
@@ -183,6 +206,7 @@ export class StoreScene extends Phaser.Scene {
 
   private refresh(): void {
     this.cash.setText(`cash ${money(save().data.money)}`);
+    this.tip.setText(this.shoppingTip());
     for (const t of this.tiles) t.refresh();
   }
 
