@@ -419,7 +419,7 @@
         "kind": "glaze",
         "pack": 12,
         "price": 4,
-        "unlockDay": 1
+        "unlockDay": 3
       },
       {
         "id": "glaze-chocolate-hazelnut",
@@ -427,7 +427,7 @@
         "kind": "glaze",
         "pack": 12,
         "price": 4,
-        "unlockDay": 3
+        "unlockDay": 30
       },
       {
         "id": "glaze-cookie-butter",
@@ -435,7 +435,7 @@
         "kind": "glaze",
         "pack": 12,
         "price": 4,
-        "unlockDay": 38
+        "unlockDay": 62
       },
       {
         "id": "glaze-cookies-and-cream",
@@ -443,7 +443,7 @@
         "kind": "glaze",
         "pack": 12,
         "price": 4,
-        "unlockDay": 1
+        "unlockDay": 17
       },
       {
         "id": "glaze-sweet",
@@ -451,7 +451,7 @@
         "kind": "glaze",
         "pack": 12,
         "price": 4,
-        "unlockDay": 17
+        "unlockDay": 45
       },
       {
         "id": "glaze-powdered-sugar",
@@ -459,7 +459,7 @@
         "kind": "glaze",
         "pack": 12,
         "price": 3,
-        "unlockDay": 62
+        "unlockDay": 1
       },
       {
         "id": "glaze-white-icing",
@@ -467,7 +467,7 @@
         "kind": "glaze",
         "pack": 12,
         "price": 3,
-        "unlockDay": 1
+        "unlockDay": 3
       },
       {
         "id": "topping-cookie-butter-cookie",
@@ -475,7 +475,7 @@
         "kind": "topping",
         "pack": 12,
         "price": 3,
-        "unlockDay": 38
+        "unlockDay": 62
       },
       {
         "id": "topping-crushed-cookies",
@@ -483,7 +483,7 @@
         "kind": "topping",
         "pack": 12,
         "price": 3,
-        "unlockDay": 1
+        "unlockDay": 17
       },
       {
         "id": "topping-fruity-cereal",
@@ -491,7 +491,7 @@
         "kind": "topping",
         "pack": 12,
         "price": 3,
-        "unlockDay": 17
+        "unlockDay": 45
       }
     ],
     "start": {
@@ -505,19 +505,25 @@
       "box-flight": 3,
       "box-domochi-box": 1,
       "oil": 2,
-      "glaze-strawberry": 12,
-      "glaze-cookies-and-cream": 12,
-      "glaze-white-icing": 12,
-      "topping-crushed-cookies": 12
+      "glaze-powdered-sugar": 12
     },
     "priceSwing": 0.25,
     "friendCheckSec": 60,
     "friendChance": 0.2,
     "friendsPerDay": 1,
-    "friendsFromDay": 20
+    "friendsFromDay": 20,
+    "errand": {
+      "_note": "When you're out of baking materials (Kumar 2026-11-01): after delaySec, one of Ethan's friends swings by. If you can pay for the supplies plus their fee (feeRate of the cost, at least feeMin), they offer a run to the store for enough dough for 'batches' batches; you can say no. If you can't afford it, they bring enough for rescueBatches, free. At most perDay a day, from day 1 (so you can never get stuck).",
+      "batches": 2,
+      "rescueBatches": 1,
+      "feeRate": 0.25,
+      "feeMin": 3,
+      "delaySec": 4,
+      "perDay": 1
+    }
   },
   "weather": {
-    "_note": "Each day's weather (the same for a given day; day 1 is always firstDay), picked by weight. spawnFactor: × the gap between walk-ups (bigger = fewer). extraPickups: more morning delivery orders. heatLag: × how fast the oil reaches the dial. patience: × how long customers happily wait. tip: × tips. note: shown on the morning checklist.",
+    "_note": "Each day's weather (the same for a given day; day 1 is always firstDay), picked by weight. spawnFactor: × the gap between walk-ups (bigger = fewer). extraPickups: more morning delivery orders. heatLag: × how fast the oil reaches the dial. patience: × how long customers happily wait. tip: × tips. note: shown on the morning checklist. fixedDays: set weather for early days, so every kind shows up in the first week. icon: shown by the day on the ticket rail.",
     "firstDay": "sunny",
     "types": [
       {
@@ -529,7 +535,8 @@
         "heatLag": 1,
         "patience": 1,
         "tip": 1,
-        "note": "sunny: a steady crowd"
+        "note": "sunny: a steady crowd",
+        "icon": "☀️"
       },
       {
         "id": "cloudy",
@@ -540,7 +547,8 @@
         "heatLag": 1,
         "patience": 1.15,
         "tip": 1,
-        "note": "cloudy and mild: folks are patient"
+        "note": "cloudy and mild: folks are patient",
+        "icon": "☁️"
       },
       {
         "id": "hot",
@@ -551,7 +559,8 @@
         "heatLag": 1.6,
         "patience": 0.8,
         "tip": 1.1,
-        "note": "hot! the oil heats fast and nobody wants to wait"
+        "note": "hot! the oil heats fast and nobody wants to wait",
+        "icon": "🔥"
       },
       {
         "id": "rainy",
@@ -562,9 +571,15 @@
         "heatLag": 1,
         "patience": 1.2,
         "tip": 1.2,
-        "note": "rainy: fewer walk-ups, more delivery orders"
+        "note": "rainy: fewer walk-ups, more delivery orders",
+        "icon": "🌧️"
       }
-    ]
+    ],
+    "fixedDays": {
+      "2": "cloudy",
+      "4": "rainy",
+      "6": "hot"
+    }
   },
   "regulars": {
     "_note": "Named regulars (customers.json) come back day after day. chance: share of walk-ups who are a regular (if one is due). Friendship goes up with a good or great order and down with a bad one (0 to maxLevel). From usualAt they just say 'the usual!' and their order goes straight on the rail.",

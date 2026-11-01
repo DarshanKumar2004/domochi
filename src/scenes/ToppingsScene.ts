@@ -189,7 +189,8 @@ export class ToppingsScene extends StationScene {
       const uses = menu.flavors.filter((f) => f.toppings.includes(t.id));
       if (!uses.length) continue;
       const unlock = Math.min(...uses.map((f) => f.unlockDay));
-      this.jars.push(this.makeJar(t, unlock > day ? unlock : null));
+      // The tutorial teaches with any flavour, so everything is out for it.
+      this.jars.push(this.makeJar(t, unlock > day && !session().isTutorial ? unlock : null));
     }
 
     for (let i = 0; i < FALLING; i++) {
@@ -376,7 +377,7 @@ export class ToppingsScene extends StationScene {
     }
     const label = this.add
       .text(0, 0, lockedUntil === null ? t.name : `${t.name}
-day ${lockedUntil}`, {
+soon`, {
         fontFamily: FONT_FAMILY,
         fontSize: '26px',
         color: lockedUntil === null ? CSS.cream : CSS.muted,

@@ -23,9 +23,9 @@ function mix(a: number, b: number, t: number): number {
 /** How the weather changes the sky: blend towards a colour, sun brightness and size, cloud tint. */
 const WEATHER_LOOK: Record<string, { toward: number; amount: number; sun: number; sunScale: number; cloud: number }> = {
   sunny: { toward: 0xffffff, amount: 0, sun: 1, sunScale: 1, cloud: 0xffffff },
-  cloudy: { toward: 0xb8c2cc, amount: 0.45, sun: 0.35, sunScale: 1, cloud: 0xdde3e8 },
+  cloudy: { toward: 0xb0bac4, amount: 0.55, sun: 0.25, sunScale: 1, cloud: 0xdde3e8 },
   rainy: { toward: 0x7d8894, amount: 0.7, sun: 0, sunScale: 1, cloud: 0x9aa3ad },
-  hot: { toward: 0xffc46b, amount: 0.25, sun: 1, sunScale: 1.4, cloud: 0xffffff },
+  hot: { toward: 0xffb35c, amount: 0.4, sun: 1, sunScale: 1.6, cloud: 0xffffff },
 };
 /** Cloud drift, px per second. */
 const CLOUD_SPEED = [14, 9, 20];
@@ -52,6 +52,9 @@ export class LobbyScenery {
   private readonly sunGlow: Phaser.GameObjects.Arc;
   private readonly clouds: Phaser.GameObjects.Image[] = [];
   private readonly trees: Phaser.GameObjects.Image[];
+  /** Landscape fills the wide middle of the lot: two smaller oaks, a hedge, a street lamp and a bench. */
+  private readonly moreTrees: Phaser.GameObjects.Image[];
+  private readonly verge: Phaser.GameObjects.Graphics;
   private readonly lights: Phaser.GameObjects.Graphics;
   private readonly ground: Phaser.GameObjects.Graphics;
   private readonly patio: Phaser.GameObjects.Graphics;
@@ -82,6 +85,8 @@ export class LobbyScenery {
     this.sun = scene.add.circle(0, 0, 55, 0xffffff).setDepth(-19);
     for (let i = 0; i < CLOUDS; i++) this.clouds.push(scene.add.image(0, 0, TextureKeys.Cloud).setDepth(-18).setAlpha(0.9));
     this.trees = [scene.add.image(0, 0, TextureKeys.OakTree).setOrigin(0.5, 1).setDepth(-17), scene.add.image(0, 0, TextureKeys.OakTree).setOrigin(0.5, 1).setDepth(-17).setFlipX(true)];
+    this.moreTrees = [0, 1].map((i) => scene.add.image(0, 0, TextureKeys.OakTree).setOrigin(0.5, 1).setDepth(-17.2).setFlipX(i === 1));
+    this.verge = scene.add.graphics().setDepth(-14.5);
     this.lights = scene.add.graphics().setDepth(-16);
     this.ground = scene.add.graphics().setDepth(-15);
     this.patio = scene.add.graphics().setDepth(-13);
@@ -115,6 +120,10 @@ export class LobbyScenery {
   setDowntown(on: boolean): void {
     this.downtown = on;
     for (const t of this.trees) t.setVisible(!on);
+    const v = this.viewport;
+    const wide = !!v && v.orientation === 'landscape';
+    for (const t of this.moreTrees) t.setVisible(!on && wide);
+    this.verge.setVisible(!on && wide);
     this.storefront.setVisible(on);
     this.storeSign.setVisible(on);
     this.signBoard.setVisible(on);
@@ -283,8 +292,60 @@ export class LobbyScenery {
     this.table.setPosition(p.x, p.y - p.h / 2 + (L ? 150 : 230)).setScale(L ? 0.45 : 0.75);
 
     this.planter.setPosition(l.sign.x + (L ? 95 : 110), l.sign.feetY + 6).setScale(L ? 0.65 : 0.8);
+    this.drawVerge(v, l);
     this.clouds.forEach((c, i) => c.setPosition(((i * 0.37 + 0.1) % 1) * v.width, (v.content.y || 0) + (L ? 40 : 70) + i * (L ? 45 : 70)).setScale(L ? 0.7 : 0.9));
     this.drawSkyAndLights();
+  }
+
+  /** The wide middle of the landscape lot, between the A-frame and the patio: oaks, a hedge, a lamp and a bench. */
+  private drawVerge(v: Viewport, l: SceneryLayout): void {
+    const show = v.orientation === 'landscape' && !this.downtown;
+    for (const t of this.moreTrees) t.setVisible(show);
+    const g = this.verge;
+    g.clear().setVisible(show);
+    if (!show) return;
+    const gy = l.groundY;
+    const left = l.sign.x + 170;
+    const right = l.patio.x - l.patio.w / 2;
+    const span = right - left;
+    if (span < 200) {
+      for (const t of this.moreTrees) t.setVisible(false);
+      return;
+    }
+    this.moreTrees[0]!.setPosition(left + span * 0.22, gy + 2).setScale(0.44);
+    this.moreTrees[1]!.setPosition(left + span * 0.8, gy + 2).setScale(0.5);
+    // A low hedge along the grass.
+    for (let x = left; x < right; x += 46) {
+      const h = 26 + ((x * 7) % 13);
+      g.fillStyle(0x4f8a3c);
+      g.fillEllipse(x, gy - h / 2 + 6, 62, h + 10);
+      g.fillStyle(0x6aa84f);
+      g.fillEllipse(x - 8, gy - h / 2, 30, h * 0.6);
+    }
+    g.lineStyle(3, COLORS.ink, 0.35);
+    for (let x = left; x < right; x += 46) g.strokeEllipse(x, gy - 7, 62, 36);
+    // A street lamp.
+    const lx = left + span * 0.52;
+    g.fillStyle(0x3a3f45);
+    g.fillRect(lx - 5, gy - 230, 10, 240);
+    g.fillRoundedRect(lx - 14, gy - 4, 28, 14, 4);
+    g.fillRect(lx - 3, gy - 232, 44, 8);
+    g.fillStyle(0xfff3c4);
+    g.fillRoundedRect(lx + 28, gy - 228, 26, 22, 6);
+    g.lineStyle(3, COLORS.ink, 0.8);
+    g.strokeRoundedRect(lx + 28, gy - 228, 26, 22, 6);
+    // A park bench on the sidewalk, facing the lot.
+    const bx = left + span * 0.36;
+    const by = gy + 40;
+    g.fillStyle(0x8a5a3b);
+    g.fillRoundedRect(bx - 70, by - 46, 140, 14, 4);
+    g.fillRoundedRect(bx - 70, by - 26, 140, 14, 4);
+    g.fillStyle(0x3a3f45);
+    g.fillRect(bx - 60, by - 14, 8, 26);
+    g.fillRect(bx + 52, by - 14, 8, 26);
+    g.lineStyle(3, COLORS.ink, 0.7);
+    g.strokeRoundedRect(bx - 70, by - 46, 140, 14, 4);
+    g.strokeRoundedRect(bx - 70, by - 26, 140, 14, 4);
   }
 
   /** Morning while prepping, day while open, sunset at closing. */

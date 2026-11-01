@@ -17,7 +17,7 @@ import type { Menu } from './menu';
 import { flavorsForDay } from './menu';
 import { boxFor, describeOrder, generateOrder, orderPrice, orderSizeRange, type Order } from './orders';
 import { scoreOrder, waitScore, type OrderScore } from './score';
-import { boxStockId, doughCostPerDonut, paymentFor, unitCost, type Stock } from './supplies';
+import { boxStockId, doughCostPerDonut, errandFor, paymentFor, priceOn, unitCost, type Errand, type Stock } from './supplies';
 import type { WeatherType } from './weather';
 import type { Rng } from './rng';
 
@@ -129,7 +129,7 @@ export interface DaySummary {
   wasteCost: number;
   /** What the supplies used today cost (dough ingredients, boxes, oil), the waste included. */
   suppliesCost: number;
-  /** Sales + tips + clean-up bonus − supplies used. */
+  /** Sales + tips + clean-up bonus − supplies used − any errand fee. */
   profit: number;
   /** Walk-ups who went home without being served. */
   wentHome: number;
@@ -140,6 +140,8 @@ export interface DaySummary {
   bestStreak: number;
   /** Donuts of the day's special sold. */
   specialsSold: number;
+  /** Paid to a friend for a run to the store (supplies plus their fee). */
+  errandSpent: number;
   /** Orders by reaction tier. */
   tiers: Record<'great' | 'good' | 'okay' | 'bad', number>;
   /** Extra donuts given away as gifts. */
@@ -185,6 +187,7 @@ export interface DaySnapshot {
   used: Stock;
   friendsToday: number;
   nextFriendCheckMs: number | null;
+  errands?: { count: number; spent: number; fees?: number };
   friendship: Record<string, number> | null;
   regularsToday: string[];
   fryer: { oil: number; temp: number; target: number };
@@ -214,6 +217,8 @@ export interface SessionEvents extends Record<string, unknown> {
   goal: { text: string; reward: number };
   /** Good or great orders in a row (from the second one on). */
   streak: { count: number; bonus: number };
+  /** You're out of baking materials and a friend offers a run to the store (say yes or no). */
+  errand: { name: string; line: string; errand: Errand };
   /** A regular who knows you ordered "the usual": straight onto the rail. */
   usual: { customerId: number; name: string; line: string };
 }
@@ -253,6 +258,8 @@ export interface SessionDeps {
   regulars?: Record<string, number>;
   /** Decorations on the lot (balance.decor ids): small perks. */
   decor?: string[];
+  /** Money in the bank before today (what a friend's errand can be paid from, with today's takings). */
+  bank?: () => number;
 }
 
 export class GameSession {
@@ -311,6 +318,12 @@ export class GameSession {
   private goalDone = false;
   private friendsToday = 0;
   private nextFriendCheckMs = Infinity;
+  /** Errand runs today, what they cost, and since when you've been out of materials. */
+  private errandsToday = 0;
+  private errandSpentToday = 0;
+  private errandFeesToday = 0;
+  private outSinceMs: number | null = null;
+  private offer: Errand | null = null;
   private readonly friendship: Record<string, number> | null;
   /** Regulars who've come today (once a day each). */
   private readonly regularsToday = new Set<string>();
@@ -372,6 +385,7 @@ export class GameSession {
       used: { ...this.used },
       friendsToday: this.friendsToday,
       nextFriendCheckMs: finite(this.nextFriendCheckMs),
+      errands: { count: this.errandsToday, spent: this.errandSpentToday, fees: this.errandFeesToday },
       friendship: this.friendship ? { ...this.friendship } : null,
       regularsToday: [...this.regularsToday],
       fryer: { oil: this.fryer.oil, temp: this.fryer.temp, target: this.fryer.target },
@@ -407,6 +421,9 @@ export class GameSession {
     Object.assign(this.used, s.used);
     this.friendsToday = s.friendsToday;
     this.nextFriendCheckMs = s.nextFriendCheckMs ?? Infinity;
+    this.errandsToday = s.errands?.count ?? 0;
+    this.errandSpentToday = s.errands?.spent ?? 0;
+    this.errandFeesToday = s.errands?.fees ?? 0;
     if (this.friendship && s.friendship) Object.assign(this.friendship, s.friendship);
     for (const id of s.regularsToday) this.regularsToday.add(id);
     this.fryer.oil = s.fryer.oil;
@@ -728,6 +745,77 @@ export class GameSession {
     return 'ok';
   }
 
+  /** Cash on hand: the bank plus today's takings, less any errand paid for. */
+  get cash(): number {
+    const s = this.summary();
+    return Math.round(((this.deps.bank?.() ?? 0) + s.sales + s.tips + s.tidyBonus + s.goalBonus - this.errandSpentToday) * 100) / 100;
+  }
+
+  /** A friend's offer to run to the store, waiting for your answer. */
+  get errandOffer(): Errand | null {
+    return this.offer;
+  }
+
+  /**
+   * Out of baking materials (before or during opening hours) for a few
+   * seconds: one of Ethan's friends swings by. With the money, they offer a
+   * run to the store (for a fee); without it, they bring a batch's worth free.
+   */
+  private watchForErrand(): void {
+    const eb = this.deps.balance.supplies.errand;
+    const s = this.supplies;
+    const live = this.dayPhase === 'prep' || (this.dayPhase === 'open' && !this.windowClosed);
+    if (!eb || !s || !this.deps.dayFlow || !live || this.offer || this.errandsToday >= eb.perDay || !this.outOfMaterials) {
+      this.outSinceMs = null;
+      return;
+    }
+    this.outSinceMs ??= this.now;
+    if (this.now - this.outSinceMs < eb.delaySec * 1000) return;
+    this.outSinceMs = null;
+    const sb = this.deps.balance.supplies;
+    const errand = errandFor(sb, eb, this.deps.balance.dough.recipe, s, this.cash, (id) => {
+      const it = sb.items.find((i) => i.id === id);
+      return it ? priceOn(it, this.day, sb.priceSwing) : 0;
+    });
+    if (!errand) return;
+    this.errandsToday++;
+    const friends = this.deps.customers.friends;
+    const name = friends?.names.length ? this.deps.rng.pick(friends.names) : 'a friend';
+    const names = errand.items.map((i) => i.name);
+    const items = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names.join('');
+    if (errand.free) {
+      for (const it of errand.items) s[it.id] = (s[it.id] ?? 0) + it.packs * (sb.items.find((x) => x.id === it.id)?.pack ?? 1);
+      const line = pickLine(friends?.rescueLines?.length ? friends.rescueLines : ['brought you some {items}, on the house!'], this.deps.rng, { items });
+      this.events.emit('friend', { name, line, itemId: errand.items[0]!.id, qty: errand.items[0]!.packs });
+      this.events.emit('changed', undefined);
+      return;
+    }
+    this.offer = errand;
+    const line = pickLine(friends?.errandLines?.length ? friends.errandLines : ["you're out of {items}! want me to run to the store?"], this.deps.rng, { items });
+    this.events.emit('errand', { name, line, errand });
+    this.events.emit('changed', undefined);
+  }
+
+  /** Say yes (they bring the supplies and you pay them) or no to a friend's errand. */
+  answerErrand(yes: boolean): boolean {
+    const e = this.offer;
+    if (!e || !this.supplies) return false;
+    this.offer = null;
+    if (yes) {
+      const total = Math.round((e.cost + e.fee) * 100) / 100;
+      if (this.cash < total) {
+        this.events.emit('changed', undefined);
+        return false;
+      }
+      const sb = this.deps.balance.supplies;
+      for (const it of e.items) this.supplies[it.id] = (this.supplies[it.id] ?? 0) + it.packs * (sb.items.find((x) => x.id === it.id)?.pack ?? 1);
+      this.errandSpentToday = Math.round((this.errandSpentToday + total) * 100) / 100;
+      this.errandFeesToday = Math.round((this.errandFeesToday + e.fee) * 100) / 100;
+    }
+    this.events.emit('changed', undefined);
+    return yes;
+  }
+
   /** One of Ethan's friends drops off a pack of whatever you're lowest on (if anything's low). */
   private friendVisit(): void {
     const s = this.supplies;
@@ -799,6 +887,7 @@ export class GameSession {
       this.finishOrdering(front.id);
       this.events.emit('usual', { customerId: front.id, name: reg.name, line: t.line });
     }
+    this.watchForErrand();
     if (this.dayPhase === 'open' && this.deps.dayFlow && !this.windowClosed) {
       if (this.now >= this.dayEndsAtMs) this.closeWindow();
       else if (this.now >= this.nextFriendCheckMs) {
@@ -1637,6 +1726,7 @@ export class GameSession {
       wentHome: this.allCustomers.filter((c) => c.wentHome).length,
       bestStreak: this.bestStreakCount,
       specialsSold: this.specials,
+      errandSpent: this.errandSpentToday,
       tiers,
       gifts,
       pickups: served.filter((t) => t.delivery).length,
@@ -1663,7 +1753,8 @@ export class GameSession {
       wasted,
       wasteCost: counted ? round(wasted * doughCostPerDonut(sb, this.deps.balance.dough)) : 0,
       suppliesCost: counted ? round(suppliesCost) : 0,
-      profit: round(earned - (counted ? suppliesCost : 0)),
+      // The supplies a friend fetched count as they're used (like the store's); their fee is a cost today.
+      profit: round(earned - (counted ? suppliesCost : 0) - this.errandFeesToday),
     };
   }
 

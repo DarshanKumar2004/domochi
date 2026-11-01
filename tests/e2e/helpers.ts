@@ -212,6 +212,20 @@ export async function seedTutorialDone(page: Page): Promise<void> {
 }
 
 /**
+ * Skip the tutorial and start on `day`, with plenty of every supply: every
+ * glaze cup and topping jar out (day 1 only has the beignet's sugar).
+ */
+export async function seedStockedDay(page: Page, day = 17): Promise<void> {
+  const stock = Object.fromEntries(balanceJson.supplies.items.map((i) => [i.id, 30]));
+  await page.addInitScript(
+    ([d, st]) => {
+      if (!localStorage.getItem('domochi.save')) localStorage.setItem('domochi.save', JSON.stringify({ tutorialDone: true, day: d, stock: st }));
+    },
+    [day, stock] as const,
+  );
+}
+
+/**
  * Drag from one point to another (game coordinates). On touch devices this sends
  * real touch events through the DevTools protocol, so drags are tested the way a
  * finger does them; on desktop it uses the mouse.

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, dragNamedOnto, findNamed, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene, openDay } from './helpers';
+import { advance, boundsNamed, findNamed, pauseClock, seedStockedDay, shot, tapNamed, toPage, isVisibleNamed, waitForScene, openDay } from './helpers';
 
 type Donut = { id: number };
 interface SessionView {
@@ -79,7 +79,7 @@ test('toppings by hand, then pack the box in the ticket order and close the lid'
   page.on('pageerror', (e) => errors.push(e.message));
   const s = session(page);
 
-  await seedTutorialDone(page);
+  await seedStockedDay(page); // every glaze and topping out
   await page.goto('/?seed=7');
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
@@ -94,6 +94,7 @@ test('toppings by hand, then pack the box in the ticket order and close the lid'
 
   // Glaze one donut per ordered flavour, plus a cookies & cream to top by hand.
   const recipes: Record<string, { glaze: string; drizzle?: string }> = {
+    beignet: { glaze: 'powdered-sugar' },
     strawberry: { glaze: 'strawberry', drizzle: 'white-icing' },
     'cookies-and-cream': { glaze: 'cookies-and-cream' },
   };
@@ -108,11 +109,12 @@ test('toppings by hand, then pack the box in the ticket order and close the lid'
     // The plain ones are glazed cookies & cream that don't match a flavour yet.
     const idx = await s((x) => x.shelf.findIndex((d) => x.flavorOf(d) === null));
     expect(idx).toBeGreaterThanOrEqual(0);
-    // Tap it onto the board the first time, drag it there after that.
-    if (n === 0) await tapNamed(page, SceneKeys.Toppings, `toppings-shelf-${idx}`);
-    else await dragNamedOnto(page, SceneKeys.Toppings, `toppings-shelf-${idx}`, 'toppings-board');
+    // Tap it onto the board (with bigger orders the shelf's crowded, and a tap always finds it).
+    await tapNamed(page, SceneKeys.Toppings, `toppings-shelf-${idx}`);
     await expect.poll(() => s((x) => !!x.toppingWork)).toBe(true);
-    await tapNamed(page, SceneKeys.Toppings, 'jar-crushed-cookies');
+    // The jar stays in hand from the last donut (tapping it again would put it down).
+    const held = await page.evaluate(() => (window as unknown as { __game: { scene: { getScene(k: string): { selected: string | null } } } }).__game.scene.getScene('ToppingsScene').selected);
+    if (held !== 'crushed-cookies') await tapNamed(page, SceneKeys.Toppings, 'jar-crushed-cookies');
     await expect.poll(() => isVisibleNamed(page, SceneKeys.Toppings, 'toppings-guide-ring')).toBe(true); // where to shake
     await shakeRing(page);
     const on = await s((x) => x.toppingWork!.countOn('crushed-cookies'));

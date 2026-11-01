@@ -42,6 +42,12 @@ describe('weather', () => {
     expect([...seen].sort()).toEqual(balance.weather.types.map((t) => t.id).sort());
   });
 
+  it('every kind of weather shows up in the first week, and each has an icon', () => {
+    const week = new Set(Array.from({ length: 7 }, (_, i) => weatherFor(i + 1, balance.weather).id));
+    expect([...week].sort()).toEqual(balance.weather.types.map((t) => t.id).sort());
+    for (const t of balance.weather.types) expect(t.icon, t.id).toBeTruthy();
+  });
+
   it('rain brings extra delivery orders and fewer walk-ups; heat makes the oil heat faster', () => {
     const dry = day(3, { weather: 'sunny' });
     const wet = day(3, { weather: 'rainy' });

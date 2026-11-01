@@ -38,7 +38,7 @@ export class DaySummaryScene extends Phaser.Scene {
     const s = session();
     const sum = s.summary();
     const bank = save().data.money;
-    const today = sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus;
+    const today = sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus - sum.errandSpent;
     const counted = s.tracksSupplies;
     // A great day (once Ethan's coupons are on) earns a code to show at the real truck.
     const earns = earnsCoupon(brand.coupons, sum.day, dayStars(sum));
@@ -86,6 +86,7 @@ export class DaySummaryScene extends Phaser.Scene {
       ...(sum.goal ? [['daily goal', sum.goalBonus ? `done! +${money(sum.goalBonus)}` : 'missed', 'goal'] as Row] : []),
       ...(sum.bestStreak >= 2 ? [['best streak', `${sum.bestStreak} in a row`, 'streak'] as Row] : []),
       ...(sum.specialsSold ? [["special sold", `${sum.specialsSold}`, 'specials'] as Row] : []),
+      ...(sum.errandSpent ? [["a friend's store run", `−${money(sum.errandSpent)}`, 'errand'] as Row] : []),
       ...(coupon ? [['your coupon', coupon, 'coupon'] as Row] : []),
       ...(earned.length ? [['new stickers', earned.map((st) => st.glyph).join(' '), 'stickers'] as Row] : []),
       ...(counted && sum.suppliesCost - sum.wasteCost >= 0.005 ? [['other supplies used', `−${money(Math.max(0, sum.suppliesCost - sum.wasteCost))}`, 'supplies'] as Row] : []),
@@ -148,7 +149,7 @@ export class DaySummaryScene extends Phaser.Scene {
       { day: Math.min(...balance.staff.hires.map((h) => h.unlockDay)), text: 'hiring a crew' },
     ];
     const m = nextMilestone(list, day + 1);
-    return m ? `next up on day ${m.day}: ${m.text}` : 'same menu tomorrow';
+    return m ? `coming soon: ${m.text}` : 'same menu tomorrow';
   }
 
   /** Bank today's money and the supplies left, save, then the supply store (or straight to the next day). */
@@ -180,7 +181,7 @@ export class DaySummaryScene extends Phaser.Scene {
     };
     void save().update((d) => {
       d.day = sum.day + 1;
-      d.money = Math.round((d.money + sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus) * 100) / 100;
+      d.money = Math.round((d.money + sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus - sum.errandSpent) * 100) / 100;
       // Book tomorrow's pop-up (or drop a booking that's been and gone).
       if (invite) d.event = { id: invite.id, day: sum.day + 1 };
       else if (d.event && d.event.day <= sum.day) delete d.event;

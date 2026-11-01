@@ -114,6 +114,15 @@
   ],
   "flavors": [
     {
+      "id": "beignet",
+      "name": "beignet",
+      "price": 4,
+      "description": "a louisiana classic, reimagined. our chewy, pull-apart mochi ring finished beignet-style with a snowy dusting of powdered sugar. light, fluffy and made fresh daily.",
+      "glaze": "powdered-sugar",
+      "toppings": [],
+      "unlockDay": 1
+    },
+    {
       "id": "strawberry",
       "name": "strawberry",
       "price": 4,
@@ -121,7 +130,7 @@
       "glaze": "strawberry",
       "drizzle": "white-icing",
       "toppings": [],
-      "unlockDay": 1,
+      "unlockDay": 3,
       "drizzlePattern": [
         {
           "x0": -0.33,
@@ -200,7 +209,7 @@
       "toppings": [
         "crushed-cookies"
       ],
-      "unlockDay": 1
+      "unlockDay": 17
     },
     {
       "id": "chocolate-hazelnut",
@@ -209,7 +218,7 @@
       "description": "rich, nutty chocolate hazelnut glaze on our chewy, pull-apart mochi ring. a chocolate lover's dream, made fresh daily.",
       "glaze": "chocolate-hazelnut",
       "toppings": [],
-      "unlockDay": 3,
+      "unlockDay": 30,
       "drizzle": "white-icing",
       "drizzlePattern": [
         {
@@ -289,7 +298,7 @@
       "toppings": [
         "fruity-cereal"
       ],
-      "unlockDay": 17
+      "unlockDay": 45
     },
     {
       "id": "cookie-butter",
@@ -301,7 +310,7 @@
       "toppings": [
         "cookie-butter-cookie"
       ],
-      "unlockDay": 38,
+      "unlockDay": 62,
       "drizzlePattern": [
         {
           "x0": -0.33,
@@ -370,15 +379,6 @@
           "y1": -0.39
         }
       ]
-    },
-    {
-      "id": "beignet",
-      "name": "beignet",
-      "price": 4,
-      "description": "a louisiana classic, reimagined. our chewy, pull-apart mochi ring finished beignet-style with a snowy dusting of powdered sugar. light, fluffy and made fresh daily.",
-      "glaze": "powdered-sugar",
-      "toppings": [],
-      "unlockDay": 62
     }
   ],
   "boxes": [

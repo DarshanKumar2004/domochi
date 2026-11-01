@@ -17,10 +17,14 @@ export interface WeatherType {
   tip: number;
   /** One line for the morning checklist. */
   note: string;
+  /** Shown by the day on the ticket rail. */
+  icon?: string;
 }
 
 export interface WeatherBalance {
   firstDay: string;
+  /** Set weather for early days (day → type id), so every kind turns up in the first week. */
+  fixedDays?: Record<string, string>;
   types: WeatherType[];
 }
 
@@ -37,6 +41,9 @@ function dayHash(day: number): number {
 export function weatherFor(day: number, b: WeatherBalance): WeatherType {
   const first = b.types.find((t) => t.id === b.firstDay) ?? b.types[0]!;
   if (day <= 1) return first;
+  const fixed = b.fixedDays?.[String(day)];
+  const set = fixed ? b.types.find((t) => t.id === fixed) : undefined;
+  if (set) return set;
   const total = b.types.reduce((s, t) => s + t.weight, 0);
   let r = dayHash(day) * total;
   for (const t of b.types) {

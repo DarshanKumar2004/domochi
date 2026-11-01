@@ -37,6 +37,8 @@ export interface SuppliesBalance {
   friendsPerDay: number;
   /** No friends drop by before this day (a calm first few days). */
   friendsFromDay?: number;
+  /** A friend's run to the store when you're out of baking materials. */
+  errand?: ErrandBalance;
 }
 
 export interface PaymentBalance {
@@ -188,4 +190,56 @@ export function shoppingPlan(b: SuppliesBalance, needs: readonly ShopNeed[], sto
     if (can < packs && n.priority === 1) picks.push({ id: it.id, packs: packs - can, priority: 1, affordable: false });
   }
   return picks;
+}
+
+export interface ErrandBalance {
+  /** Batches of dough a paid errand brings. */
+  batches: number;
+  /** Batches a friend brings for free when you can't afford the run. */
+  rescueBatches: number;
+  /** The friend's fee: this share of the supplies' cost, at least feeMin. */
+  feeRate: number;
+  feeMin: number;
+  /** How long you've been out of materials before a friend turns up, seconds. */
+  delaySec: number;
+  /** At most this many errand runs a day. */
+  perDay: number;
+}
+
+export interface Errand {
+  items: { id: string; name: string; packs: number }[];
+  /** What the supplies cost (0 for a free rescue). */
+  cost: number;
+  /** The friend's fee for the run (0 for a free rescue). */
+  fee: number;
+  /** You couldn't afford it, so it's on the house. */
+  free: boolean;
+}
+
+/** Packs of each dough ingredient needed to bake `batches` batches with what's in stock. */
+export function doughPacksFor(b: SuppliesBalance, recipe: Record<string, number>, stock: Stock, batches: number): Errand['items'] {
+  const out: Errand['items'] = [];
+  for (const [id, per] of Object.entries(recipe)) {
+    const it = b.items.find((i) => i.id === id);
+    const short = per * batches - (stock[id] ?? 0);
+    if (it && short > 0) out.push({ id, name: it.name, packs: Math.ceil(short / it.pack) });
+  }
+  return out;
+}
+
+/**
+ * A friend's run to the store when you're out of baking materials: if you can
+ * pay for the supplies plus their fee, they fetch enough for a few batches;
+ * if you can't, they bring enough for one batch, on the house. Null if
+ * nothing's needed.
+ */
+export function errandFor(b: SuppliesBalance, eb: ErrandBalance, recipe: Record<string, number>, stock: Stock, cash: number, priceOf: (id: string) => number): Errand | null {
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const items = doughPacksFor(b, recipe, stock, eb.batches);
+  if (!items.length) return null;
+  const cost = round(items.reduce((s, i) => s + i.packs * priceOf(i.id), 0));
+  const fee = round(Math.max(eb.feeMin, cost * eb.feeRate));
+  if (cash >= cost + fee) return { items, cost, fee, free: false };
+  const rescue = doughPacksFor(b, recipe, stock, eb.rescueBatches);
+  return rescue.length ? { items: rescue, cost: 0, fee: 0, free: true } : null;
 }

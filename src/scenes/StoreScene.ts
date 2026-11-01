@@ -216,7 +216,7 @@ export class StoreScene extends Phaser.Scene {
     const trend = swing > 0.08 ? '  ▲' : swing < -0.08 ? '  ▼' : '';
     const from = it.unlockDay ?? 1;
     const locked = from > day;
-    const tile = this.makeTile(`store-${it.id}`, it.name, locked ? `day ${from}` : `+${it.pack} · ${money(price)}${trend}`, () => {
+    const tile = this.makeTile(`store-${it.id}`, it.name, locked ? 'coming soon' : `+${it.pack} · ${money(price)}${trend}`, () => {
       if (locked) return { label: 'comes in later', low: false, can: false, owned: false };
       const have = this.stock()[it.id] ?? 0;
       // "low!" = mochi wants more of it for tomorrow (a must or a should).
@@ -244,7 +244,7 @@ export class StoreScene extends Phaser.Scene {
   /** A decoration: bought once, from its day; shows in the lot with a small perk. */
   private decorTile(d: DecorItem, day: number): Tile {
     const locked = d.unlockDay > day;
-    const tile = this.makeTile(`store-decor-${d.id}`, d.name, locked ? `day ${d.unlockDay}` : money(d.price), () => {
+    const tile = this.makeTile(`store-decor-${d.id}`, d.name, locked ? 'coming soon' : money(d.price), () => {
       if (locked) return { label: 'comes in later', low: false, can: false, owned: false };
       const owned = save().data.decor.includes(d.id);
       return { label: owned ? 'on the lot ✓' : d.desc, low: false, can: !owned && save().data.money >= d.price, owned };
@@ -263,7 +263,7 @@ export class StoreScene extends Phaser.Scene {
   private hireTile(h: Hire, day: number): Tile {
     const locked = h.unlockDay > day;
     if (h.player) return this.joinTile(h, locked);
-    const tile = this.makeTile(`store-hire-${h.id}`, `hire ${h.name}`, locked ? `day ${h.unlockDay}` : money(h.price), () => {
+    const tile = this.makeTile(`store-hire-${h.id}`, `hire ${h.name}`, locked ? 'coming soon' : money(h.price), () => {
       if (locked) return { label: 'comes in later', low: false, can: false, owned: false };
       const owned = save().data.staff.includes(h.id);
       return { label: owned ? 'on the crew ✓' : `up to +$${h.capAdd} while away`, low: false, can: !owned && save().data.money >= h.price, owned };
@@ -281,7 +281,7 @@ export class StoreScene extends Phaser.Scene {
 
   /** The last place on the crew is yours: mochi asks your name and invites you on. */
   private joinTile(h: Hire, locked: boolean): Tile {
-    const tile = this.makeTile(`store-hire-${h.id}`, 'join the team!', locked ? `day ${h.unlockDay}` : 'join', () => {
+    const tile = this.makeTile(`store-hire-${h.id}`, 'join the team!', locked ? 'coming soon' : 'join', () => {
       if (locked) return { label: 'mochi has an idea...', low: false, can: false, owned: false };
       const owned = save().data.staff.includes(h.id);
       return { label: owned ? `${save().data.playerName || 'you'}: on the crew ✓` : 'Ethan would love to have you', low: false, can: !owned, owned };

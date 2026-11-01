@@ -29,7 +29,14 @@ export interface CustomersData {
   /** What a customer says when you put extra donuts in their box. */
   giftLines: string[];
   /** Ethan's friends, who drop off supplies you're low on ({item}, {qty}). */
-  friends?: { names: string[]; lines: string[] };
+  friends?: {
+    names: string[];
+    lines: string[];
+    /** Out of materials and broke: a friend brings a batch's worth, free. {items} filled in. */
+    rescueLines?: string[];
+    /** Out of materials, with money: a friend offers a run to the store. {items} filled in. */
+    errandLines?: string[];
+  };
   /** The same people coming back, day after day. */
   regulars?: { list: RegularDef[] };
 }

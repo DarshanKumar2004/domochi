@@ -260,7 +260,7 @@
     "you didn't have to do that! thank you!"
   ],
   "friends": {
-    "_note": "Ethan's friends who drop off supplies you're low on, mid-day. Names are generic. {item} and {qty} are filled in.",
+    "_note": "Ethan's friends who drop off supplies you're low on, mid-day. Names are generic. {item} and {qty} are filled in. rescueLines: out of materials and broke (a free batch). errandLines: out of materials with money (an offered store run, for a fee). {items} is filled in.",
     "names": [
       "Maya",
       "Jordan",
@@ -273,6 +273,16 @@
       "hey! Ethan said you're low on {item}. here's {qty}!",
       "brought you {qty} {item}, Ethan says hi!",
       "special delivery: {qty} {item}. go get em!"
+    ],
+    "rescueLines": [
+      "Ethan said you ran out! here's some {items} for a batch, on the house.",
+      "heard you were out of {items}. this one is on me, pay it forward!",
+      "no {items}? no problem. take these, Ethan has your back."
+    ],
+    "errandLines": [
+      "you're out of {items}! want me to run to the store for you?",
+      "no {items} left? I can grab some from the store, just cover me.",
+      "I'm headed to the store anyway. want me to pick up {items}?"
     ]
   },
   "regulars": {

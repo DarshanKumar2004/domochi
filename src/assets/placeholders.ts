@@ -125,49 +125,148 @@ function paintLogoFallback(g: G): void {
   }
 }
 
+/** A little domochi ring (8 balls), for the cap and the apron pocket. */
+function miniRing(g: G, x: number, y: number, ring: number, fill: number): void {
+  const r = ringBallRadius(ring, 8, 1.25);
+  for (const p of ringBallCenters(x, y, ring)) {
+    g.fillStyle(fill);
+    g.fillCircle(p.x, p.y, r);
+    g.lineStyle(2, COLORS.ink);
+    g.strokeCircle(p.x, p.y, r);
+  }
+}
+
+/**
+ * Ethan, torso up, waving: comic style like the logo (bold ink outlines),
+ * in a black tee and cream apron with the domochi ring on his pink cap
+ * (TODO-BRAND: his real look). A cream halo keeps him readable in the dark
+ * serving window.
+ */
 function paintEthan(g: G): void {
+  const ink = COLORS.ink;
+  const hair = 0x2a1d17;
+  const capDark = 0xd77a9a;
   // Waving arm angles per frame, in radians (negative = raised).
-  const angles = [-0.35, -0.75, -1.15, -1.55];
+  const angles = [-0.45, -0.85, -1.2, -1.5];
   for (let i = 0; i < ETHAN_FRAME.count; i++) {
     const ox = i * ETHAN_FRAME.width;
-    const cx = ox + 100;
+    const cx = ox + 96;
     const a = angles[i] ?? 0;
-    const sx = cx + 50;
-    const sy = 180;
-    const hx = sx + Math.cos(a) * 55;
-    const hy = sy + Math.sin(a) * 55;
-    // Cream outline first (logo-style ink outlines, and it keeps his black
-    // shirt visible on dark backgrounds), then the shirt on top.
+    const sx = cx + 46;
+    const sy = 186;
+    const ex = sx + Math.cos(a) * 30; // elbow (the sleeve ends here)
+    const ey = sy + Math.sin(a) * 34;
+    const hx = sx + Math.cos(a) * 56;
+    const hy = sy + Math.sin(a) * 56;
+
+    // Cream halo behind everything.
     g.fillStyle(COLORS.cream);
-    g.fillRoundedRect(cx - 66, 154, 132, 122, 34);
-    g.fillRoundedRect(cx - 86, 164, 42, 92, 18);
-    g.lineStyle(40, COLORS.cream);
+    g.fillRoundedRect(cx - 70, 158, 140, 120, 38);
+    g.fillRoundedRect(cx - 92, 166, 46, 98, 20);
+    g.fillCircle(cx, 100, 60);
+    g.fillEllipse(cx, 62, 130, 70);
+    g.fillEllipse(cx, 80, 138, 38);
+    g.lineStyle(44, COLORS.cream);
     g.lineBetween(sx, sy, hx, hy);
-    // Body, left arm, apron
+    g.fillCircle(hx, hy, 28);
+
+    // Body: black tee, rounded shoulders.
     g.fillStyle(COLORS.shirt);
-    g.fillRoundedRect(cx - 60, 160, 120, 110, 30);
-    g.fillRoundedRect(cx - 80, 170, 30, 80, 14);
-    g.fillStyle(COLORS.cream);
-    g.fillRoundedRect(cx - 35, 185, 70, 80, 12);
-    // Waving arm
-    g.lineStyle(28, COLORS.shirt);
-    g.lineBetween(sx, sy, hx, hy);
+    g.fillRoundedRect(cx - 62, 164, 124, 120, 34);
+    // Left arm, resting.
+    g.fillRoundedRect(cx - 86, 172, 32, 76, 16);
     g.fillStyle(COLORS.skin);
-    g.fillCircle(hx, hy, 17);
-    // Head
-    g.fillCircle(cx, 105, 55);
-    // Cap (TODO-BRAND)
+    g.fillCircle(cx - 70, 252, 14);
+    g.lineStyle(3, ink);
+    g.strokeCircle(cx - 70, 252, 14);
+    // Apron: cream bib with straps and a pocket with the ring.
+    g.lineStyle(5, COLORS.cream);
+    g.lineBetween(cx - 34, 192, cx - 46, 168);
+    g.lineBetween(cx + 34, 192, cx + 46, 168);
+    g.fillStyle(COLORS.cream);
+    g.fillRoundedRect(cx - 38, 188, 76, 96, 14);
+    g.lineStyle(3, ink);
+    g.strokeRoundedRect(cx - 38, 188, 76, 96, 14);
+    g.fillStyle(0xf3ead9);
+    g.fillRoundedRect(cx - 24, 214, 48, 34, 8);
+    g.strokeRoundedRect(cx - 24, 214, 48, 34, 8);
+    miniRing(g, cx, 231, 9, COLORS.pink);
+
+    // Neck, ears, head.
+    g.fillStyle(COLORS.skin);
+    g.fillRoundedRect(cx - 15, 140, 30, 32, 10);
+    g.fillCircle(cx - 51, 106, 11);
+    g.fillCircle(cx + 51, 106, 11);
+    g.lineStyle(4, ink);
+    g.strokeCircle(cx - 51, 106, 11);
+    g.strokeCircle(cx + 51, 106, 11);
+    g.fillStyle(COLORS.skin);
+    g.fillCircle(cx, 102, 52);
+    g.lineStyle(5, ink);
+    g.strokeCircle(cx, 102, 52);
+    // Hair peeking out under the cap.
+    g.fillStyle(hair);
+    g.fillEllipse(cx - 40, 82, 26, 30);
+    g.fillEllipse(cx + 40, 82, 26, 30);
+    // Cap: pink crown, darker brim to the side, the ring on the front.
     g.fillStyle(COLORS.pink);
-    g.fillEllipse(cx, 60, 124, 46);
-    g.fillRect(cx, 64, 70, 12);
-    // Face
-    g.fillStyle(DARK);
-    g.fillCircle(cx - 20, 105, 7);
-    g.fillCircle(cx + 20, 105, 7);
-    g.lineStyle(6, DARK);
+    g.fillEllipse(cx, 62, 116, 58);
+    g.lineStyle(4, ink);
+    g.strokeEllipse(cx, 62, 116, 58);
+    g.fillStyle(capDark);
+    g.fillEllipse(cx, 80, 124, 24);
+    g.strokeEllipse(cx, 80, 124, 24);
+    miniRing(g, cx - 10, 54, 10, 0xffffff);
+
+    // Face: brows, eyes with a shine, rosy cheeks, a big open smile.
+    g.lineStyle(5, hair);
+    g.lineBetween(cx - 28, 92, cx - 12, 89);
+    g.lineBetween(cx + 12, 89, cx + 28, 92);
+    g.fillStyle(ink);
+    g.fillEllipse(cx - 19, 106, 12, 15);
+    g.fillEllipse(cx + 19, 106, 12, 15);
+    g.fillStyle(0xffffff);
+    g.fillCircle(cx - 17, 102, 3);
+    g.fillCircle(cx + 21, 102, 3);
+    g.fillStyle(0xf28aa6, 0.45);
+    g.fillCircle(cx - 33, 120, 9);
+    g.fillCircle(cx + 33, 120, 9);
+    g.fillStyle(0x5a2320);
+    g.slice(cx, 120, 19, 0, Math.PI, false);
+    g.fillPath();
+    g.fillStyle(0xffffff);
+    g.fillRect(cx - 14, 120, 28, 5);
+    g.fillStyle(0xf28aa6);
+    g.fillEllipse(cx, 134, 16, 7);
+    g.lineStyle(3, ink);
     g.beginPath();
-    g.arc(cx, 115, 22, 0.35, Math.PI - 0.35);
+    g.arc(cx, 120, 19, 0, Math.PI, false);
+    g.closePath();
     g.strokePath();
+
+    // Waving arm: a black sleeve to the elbow, then the forearm and an open hand.
+    g.lineStyle(30, COLORS.shirt);
+    g.lineBetween(sx, sy, ex, ey);
+    g.lineStyle(20, COLORS.skin);
+    g.lineBetween(ex, ey, hx, hy);
+    const fa = a - Math.PI / 2; // fingers fan out along the arm's direction
+    for (let k = -1.5; k <= 1.5; k++) {
+      const ang = a + k * 0.32;
+      const fx = hx + Math.cos(ang) * 17;
+      const fy = hy + Math.sin(ang) * 17;
+      g.fillStyle(COLORS.skin);
+      g.fillCircle(fx, fy, 6);
+      g.lineStyle(2.5, ink);
+      g.strokeCircle(fx, fy, 6);
+    }
+    g.fillStyle(COLORS.skin);
+    g.fillCircle(hx + Math.cos(fa) * 14, hy + Math.sin(fa) * 14, 6);
+    g.lineStyle(2.5, ink);
+    g.strokeCircle(hx + Math.cos(fa) * 14, hy + Math.sin(fa) * 14, 6);
+    g.fillStyle(COLORS.skin);
+    g.fillCircle(hx, hy, 14);
+    g.lineStyle(3, ink);
+    g.strokeCircle(hx, hy, 14);
   }
 }
 

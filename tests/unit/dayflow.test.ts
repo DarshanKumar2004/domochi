@@ -10,7 +10,7 @@ import { GameSession, type PopupEvent } from '../../src/systems/GameSession';
 import type { Menu } from '../../src/systems/menu';
 import { createRng } from '../../src/systems/rng';
 import { tipFor } from '../../src/systems/score';
-import { boxStockId, clockText, doughCostPerDonut, fillStock, paymentFor, priceOn, startingStock } from '../../src/systems/supplies';
+import { boxStockId, clockText, doughCostPerDonut, errandFor, fillStock, paymentFor, priceOn, startingStock } from '../../src/systems/supplies';
 
 const balance = balanceJson as Balance;
 const menu = menuJson as Menu;
@@ -384,7 +384,7 @@ describe('supplies', () => {
   });
 
   it("when you're low, one of Ethan's friends may drop off a pack", () => {
-    const sure = { ...S, friendChance: 1, friendCheckSec: 10, friendsPerDay: 1, friendsFromDay: 1 };
+    const sure = { ...S, friendChance: 1, friendCheckSec: 10, friendsPerDay: 1, friendsFromDay: 1, errand: undefined }; // the random drop-offs only (not a store run)
     const s = day(1, { over: { supplies: sure }, stock: { ...startingStock(S), egg: 0 } });
     const drops: { itemId: string; qty: number; line: string; name: string }[] = [];
     s.events.on('friend', (e) => drops.push(e));
@@ -502,7 +502,7 @@ describe('a calm start', () => {
   it('no friends drop by and nobody invites you before friendsFromDay / events.fromDay', () => {
     expect(balance.supplies.friendsFromDay).toBeGreaterThan(1);
     expect(balance.events.fromDay).toBeGreaterThan(1);
-    const sure = { ...balance.supplies, friendChance: 1, friendCheckSec: 10 };
+    const sure = { ...balance.supplies, friendChance: 1, friendCheckSec: 10, errand: undefined }; // the out-of-materials rescue comes any day
     const s = day(1, { over: { supplies: sure, events: { ...balance.events, inviteChance: { great: 1, good: 1, okay: 1, bad: 1 } } }, stock: { ...startingStock(balance.supplies), egg: 0 } });
     let friends = 0;
     s.events.on('friend', () => friends++);
@@ -573,7 +573,8 @@ describe('glazes and toppings are supplies', () => {
     }
     // Day 1's flavours start stocked; later ones start at 0.
     const st = startingStock(balance.supplies);
-    expect(st['glaze-strawberry']).toBeGreaterThan(0);
+    expect(st['glaze-powdered-sugar']).toBeGreaterThan(0); // the beignet is the starter
+    expect(st['glaze-strawberry']).toBe(0);
     expect(st['glaze-cookie-butter']).toBe(0);
   });
 });
@@ -686,5 +687,73 @@ describe("mochi's shopping plan", () => {
     // Well stocked: nothing to buy.
     const full = Object.fromEntries(S.items.map((i) => [i.id, 999]));
     expect(shoppingPlan(S, needs, full, 1000, price)).toEqual([]);
+  });
+});
+
+describe("a friend's store run when you're out of baking materials", () => {
+  const sb = balance.supplies;
+  const eb = sb.errand!;
+  const price = (id: string) => sb.items.find((i) => i.id === id)!.price;
+  const noFlour = () => ({ ...startingStock(sb), 'rice-flour': 0 });
+  /** The game ticks every frame: step the clock in small bits. */
+  const run = (s: GameSession, ms: number) => {
+    for (let t = 0; t < ms; t += 250) s.tick(250);
+  };
+  const withBank = (bank: number) =>
+    new GameSession({ menu, customers, balance, day: 4, rng: createRng(3), dayFlow: true, events, stock: noFlour(), bank: () => bank });
+
+  it('with the money: supplies for a few batches, plus a fee; broke: one batch, free', () => {
+    const paid = errandFor(sb, eb, D.recipe, noFlour(), 100, price)!;
+    expect(paid.free).toBe(false);
+    const flour = sb.items.find((i) => i.id === 'rice-flour')!;
+    expect(paid.items).toEqual([{ id: 'rice-flour', name: flour.name, packs: Math.ceil((D.recipe['rice-flour']! * eb.batches) / flour.pack) }]);
+    expect(paid.cost).toBeCloseTo(paid.items[0]!.packs * flour.price);
+    expect(paid.fee).toBeCloseTo(Math.max(eb.feeMin, paid.cost * eb.feeRate));
+    const rescue = errandFor(sb, eb, D.recipe, noFlour(), 0, price)!;
+    expect(rescue).toMatchObject({ free: true, cost: 0, fee: 0 });
+    expect(rescue.items[0]!.packs * flour.pack).toBeGreaterThanOrEqual(D.recipe['rice-flour']!);
+    // Nothing missing, no errand.
+    expect(errandFor(sb, eb, D.recipe, startingStock(sb), 100, price)).toBeNull();
+  });
+
+  it('out of flour in the morning: a friend offers a run; yes brings it and costs the supplies plus the fee (once a day)', () => {
+    const s = withBank(50);
+    const offers: string[] = [];
+    s.events.on('errand', (e) => offers.push(e.line));
+    expect(s.outOfMaterials).toBe(true);
+    run(s, (eb.delaySec - 1) * 1000);
+    expect(s.errandOffer).toBeNull(); // not straight away
+    run(s, 2000);
+    const e = s.errandOffer!;
+    expect(offers).toHaveLength(1);
+    expect(offers[0]).toContain('rice flour');
+    expect(s.answerErrand(true)).toBe(true);
+    expect(s.outOfMaterials).toBe(false);
+    expect(s.stockOf('rice-flour')).toBeGreaterThanOrEqual(D.recipe['rice-flour']! * eb.batches);
+    expect(s.cash).toBeCloseTo(50 - e.cost - e.fee);
+    const sum = s.summary();
+    expect(sum.errandSpent).toBeCloseTo(e.cost + e.fee);
+    expect(sum.profit).toBeCloseTo(-e.fee); // the supplies count once they're used
+    // Only one run a day.
+    s.restore({ ...s.snapshot(), supplies: { ...s.snapshot().supplies!, 'rice-flour': 0 } });
+    run(s, (eb.delaySec + 1) * 1000);
+    expect(s.errandOffer).toBeNull();
+  });
+
+  it('saying no leaves you out (and Close early still works once open); broke, a friend just brings a batch', () => {
+    const s = withBank(50);
+    run(s, (eb.delaySec + 1) * 1000);
+    expect(s.answerErrand(false)).toBe(false);
+    expect(s.outOfMaterials).toBe(true);
+    expect(s.summary().errandSpent).toBe(0);
+
+    const broke = withBank(0);
+    const visits: string[] = [];
+    broke.events.on('friend', (f) => visits.push(f.line));
+    run(broke, (eb.delaySec + 1) * 1000);
+    expect(broke.errandOffer).toBeNull();
+    expect(visits).toHaveLength(1);
+    expect(broke.outOfMaterials).toBe(false);
+    expect(broke.summary().errandSpent).toBe(0);
   });
 });

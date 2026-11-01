@@ -77,7 +77,7 @@ export class TicketRail extends Phaser.GameObjects.Container {
         : session.timeUp
           ? 'closed'
           : `${clockText(left)} left`;
-    this.dayText.setText(`Day ${session.day}\n${middle}\n$${this.money().toFixed(2)}`);
+    this.dayText.setText(`Day ${session.day}${session.weather?.icon ? ` ${session.weather.icon}` : ''}\n${middle}\n$${this.money().toFixed(2)}`);
     this.dayText.setLineSpacing(-8).setFontSize(v.orientation === 'landscape' ? 28 : 34);
     // The last 30 seconds glow pink.
     this.dayText.setColor(Number.isFinite(left) && session.phase === 'open' && !session.timeUp && left <= 30_000 ? CSS.pink : CSS.cream);

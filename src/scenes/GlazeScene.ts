@@ -201,7 +201,8 @@ export class GlazeScene extends StationScene {
       const uses = menu.flavors.filter((f) => f.glaze === glaze.id || f.drizzle === glaze.id);
       if (!uses.length) continue;
       const unlock = Math.min(...uses.map((f) => f.unlockDay));
-      this.cups.push(this.makeCup(glaze, unlock > day ? unlock : null));
+      // The tutorial teaches with any flavour, so everything is out for it.
+      this.cups.push(this.makeCup(glaze, unlock > day && !session().isTutorial ? unlock : null));
     }
 
     for (let i = 0; i < DROPS; i++) {
@@ -351,7 +352,7 @@ export class GlazeScene extends StationScene {
     }
     const name = glaze.name.replace(/ glaze$/, '');
     const label = this.add
-      .text(0, 0, lockedUntil === null ? name : `${name}\nday ${lockedUntil}`, {
+      .text(0, 0, lockedUntil === null ? name : `${name}\nsoon`, {
         fontFamily: FONT_FAMILY,
         fontSize: '24px',
         color: lockedUntil === null ? CSS.cream : CSS.muted,

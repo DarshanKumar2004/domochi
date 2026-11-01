@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, dragNamedOnto, drawPath, pauseClock, seedTutorialDone, shot, tapNamed, toPage, isVisibleNamed, waitForScene, openDay } from './helpers';
+import { advance, boundsNamed, dragNamedOnto, drawPath, pauseClock, seedStockedDay, shot, tapNamed, toPage, isVisibleNamed, waitForScene, openDay } from './helpers';
 
 interface SessionView {
   rack: unknown[];
@@ -20,7 +20,7 @@ const S = (page: Page) => ({
 
 /** Fry n good donuts onto the rack, then go to the Glaze station. */
 async function rackThenGlaze(page: Page, n: number): Promise<void> {
-  await seedTutorialDone(page);
+  await seedStockedDay(page); // every glaze out (strawberry, cookies & cream)
   await page.goto('/?seed=7');
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);

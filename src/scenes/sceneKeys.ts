@@ -17,6 +17,7 @@ export const SceneKeys = {
   TicketView: 'TicketViewScene',
   DaySummary: 'DaySummaryScene',
   Invite: 'InviteScene',
+  Errand: 'ErrandScene',
   Store: 'StoreScene',
   Journal: 'JournalScene',
 } as const;

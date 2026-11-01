@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { audio, collectAwayEarnings, isClockPaused, markSeen, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
+import { audio, collectAwayEarnings, isClockPaused, markSeen, menu, saveDayInProgress, session, stickers } from '../systems/services';
 import { Button } from '../ui/Button';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
@@ -39,10 +39,7 @@ export class HudScene extends Phaser.Scene {
       (no) => {
         if (!this.scene.isActive(SceneKeys.TicketView)) this.scene.launch(SceneKeys.TicketView, { ticketNo: no });
       },
-      () => {
-        const today = session().summary();
-        return save().data.money + today.sales + today.tips + today.tidyBonus + today.goalBonus;
-      },
+      () => session().cash,
     );
     const settings = new Button(this, 0, 0, 'Settings', () => this.openSettings(), {
       width: 240,
@@ -67,6 +64,9 @@ export class HudScene extends Phaser.Scene {
         this.showToast(`while you were away, ${who} sold $${away.amount.toFixed(2)}!\n(tap to close)`, true);
       });
     }
+    // Good morning: today's weather and what it means.
+    const wx = session().weather;
+    if (wx && session().phase === 'prep') this.time.delayedCall(1200, () => this.showToast(`${wx.icon ?? ''} today: ${wx.note}`.trim()));
     // The day so far is saved every few seconds, and whenever the page is hidden.
     this.time.addEvent({ delay: 5000, loop: true, callback: () => saveDayInProgress() });
     const onHide = () => {
@@ -99,6 +99,11 @@ export class HudScene extends Phaser.Scene {
       audio().play('chime');
       // In the Lobby they walk up and say it themselves; elsewhere it's a note that stays until tapped.
       if (this.current !== SceneKeys.Lobby) this.showToast(`${e.name} (Ethan's friend) dropped by:\n"${e.line}"\n(tap to close)`, true);
+    });
+    // Out of materials, with money: a friend offers a run to the store.
+    listen(this, session().events, 'errand', (e) => {
+      if (!this.scene.isActive(SceneKeys.Errand)) this.scene.launch(SceneKeys.Errand, { name: e.name, line: e.line });
+      this.scene.bringToTop(SceneKeys.Errand);
     });
     listen(this, session().events, 'streak', (e) => {
       if (e.count === 2 || e.count % 3 === 0) this.showToast(`hot streak ×${e.count}! tips +${Math.round(e.bonus * 100)}%`);

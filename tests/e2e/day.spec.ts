@@ -101,7 +101,7 @@ test('a whole day: serve until the clock runs out, close, see the summary, shop 
     const card = sc.children.list.find((o) => o.name === 'day-summary')!;
     return card.list!.find((o) => o.name === 'summary-unlocks')!.text;
   });
-  expect(unlocks).toContain('next up on day 3: chocolate hazelnut!'); // nothing new tomorrow: what's next
+  expect(unlocks).toContain('coming soon: strawberry!'); // nothing new tomorrow: what's next
 
   // On to the supply store: buy a pack of eggs (with a little cash slipped in to be sure there's enough).
   await page.evaluate(() => ((window as unknown as { __save: { data: { money: number } } }).__save.data.money += 20));

@@ -4,6 +4,7 @@ import { BoxScene } from './scenes/BoxScene';
 import { DaySummaryScene } from './scenes/DaySummaryScene';
 import { DoughScene } from './scenes/DoughScene';
 import { InviteScene } from './scenes/InviteScene';
+import { ErrandScene } from './scenes/ErrandScene';
 import { StoreScene } from './scenes/StoreScene';
 import { JournalScene } from './scenes/JournalScene';
 import { FryScene } from './scenes/FryScene';
@@ -57,6 +58,7 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       TicketViewScene,
       DaySummaryScene,
       InviteScene,
+      ErrandScene,
       StoreScene,
       JournalScene,
     ],

@@ -90,6 +90,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
           weather,
           regulars: { ...(saveService?.data.regulars ?? {}) },
           decor: [...(saveService?.data.decor ?? [])],
+          bank: () => saveService?.data.money ?? 0,
           ...(event ? { event } : {}),
         }),
   });
