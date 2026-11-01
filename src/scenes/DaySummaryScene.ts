@@ -6,6 +6,7 @@ import { createRng } from '../systems/rng';
 import { couponCode, earnsCoupon } from '../systems/coupons';
 import { audio, balance, feedback, journalData, menu, save, session, stickers } from '../systems/services';
 import { drawFinishedDonut } from '../ui/donutArt';
+import { shareDonut } from '../ui/share';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -128,7 +129,22 @@ export class DaySummaryScene extends Phaser.Scene {
       .setName('summary-unlocks');
     if (coupon) newsText.setBackgroundColor('#e3f2df').setPadding(18, 10, 18, 10);
     card.add(newsText);
-    card.add(new Button(this, 0, 530, counted ? 'To the supply store' : `Start day ${sum.day + 1}`, () => this.nextDay(), { width: 620, name: 'btn-next-day' }));
+    // Share the day's best donut (a picture for Instagram and friends), beside the way on.
+    const best = s.bestDonut;
+    if (best) {
+      const flavor = s.flavorOf(best);
+      const name = menu.flavors.find((f) => f.id === flavor)?.name ?? 'mochi';
+      card.add(
+        new Button(this, -255, 530, 'Share', () => void shareDonut(this, { donut: best, title: `my ${name} mochi donut`, subtitle: `day ${sum.day} at the domochi trailer` }), {
+          width: 290,
+          fill: COLORS.dough,
+          name: 'btn-summary-share',
+        }),
+      );
+    }
+    card.add(
+      new Button(this, best ? 165 : 0, 530, counted ? 'To the store' : `Start day ${sum.day + 1}`, () => this.nextDay(), { width: best ? 480 : 620, name: 'btn-next-day' }),
+    );
 
     onLayout(this, (v) => {
       const scale = Math.min(1, (v.height - 40) / CARD_H, (v.width - 40) / CARD_W);

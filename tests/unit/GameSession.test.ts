@@ -349,7 +349,11 @@ function makeFlavor(s: GameSession, flavorId: string) {
     // No glaze (the beignet): straight from the rack to the toppings tray.
     if (f.glaze) s.startToppings(s.shelf.length - 1);
     else s.startToppingsFromRack(s.rack.length - 1);
-    for (const t of f.toppings) topBoard(s, t, menu.toppings.find((x) => x.id === t)!.style === 'piece' ? 1 : 40);
+    for (const t of f.toppings) {
+      const tp = menu.toppings.find((x) => x.id === t)!;
+      // Just the right amount: one piece, or a sprinkle in the middle of its range.
+      topBoard(s, t, tp.style === 'piece' ? 1 : Math.round((tp.amount.min + tp.amount.max) / 2));
+    }
     s.finishToppings();
   }
 }

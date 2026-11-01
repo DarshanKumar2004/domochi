@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { Customer } from '../systems/GameSession';
-import { audio, balance, menu, save, session, stickers } from '../systems/services';
+import { audio, balance, menu, session } from '../systems/services';
 import { Booth } from '../ui/Booth';
 import { LobbyScenery } from '../ui/LobbyScenery';
 import { Button } from '../ui/Button';
@@ -12,6 +12,7 @@ import { Truck } from '../ui/Truck';
 import { getViewport, onLayout } from '../ui/viewport';
 import { listen } from './listen';
 import { Pill } from '../ui/Pill';
+import { roundBg } from '../ui/roundBg';
 import { SceneKeys } from './sceneKeys';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -32,7 +33,9 @@ const LAYOUT = {
     line: { x: [600, 760, 920, 1080], feetY: 1300, scale: 0.85 },
     panel: { x: 780, y: 1112, buttonY: 1375, width: 540 },
     pickups: { x: 780, y: 1515 },
-    journal: { x: 955, y: 820, scale: 0.6 },
+    // Where couriers park for pickup orders (feet of the car; the first is used first).
+    // Portrait has room for one car (right, above the line); the next courier waits for it.
+    parking: [[905, 975]],
     // On the sidewalk between the patio and the line (short phones have no room at the bottom).
     closeEarly: { x: 665, y: 905 },
     waiting: {
@@ -60,25 +63,43 @@ const LAYOUT = {
     // Checklists and buttons in the open middle of the lot, clear of the line and the patio.
     panel: { x: 1240, y: 330, buttonY: 640, width: 520 },
     pickups: { x: 1730, y: 215 },
-    journal: { x: 105, y: 610, scale: 0.55 },
+    parking: [
+      [1330, 772],
+      [1080, 772],
+    ],
     closeEarly: { x: 1240, y: 640 },
     // The patio sits on the lot, below the sidewalk (not up in the sky).
     waiting: {
       x: 1730,
-      y: 590,
+      y: 545,
       w: 360,
-      h: 320,
-      labelY: 765,
+      h: 300,
+      labelY: 710,
       scale: 0.55,
       slots: [
-        [1640, 575],
-        [1820, 575],
-        [1640, 730],
-        [1820, 730],
+        [1640, 535],
+        [1820, 535],
+        [1640, 680],
+        [1820, 680],
       ],
     },
   },
 } as const;
+
+/** A courier come for a pickup order: their car on the lot, and the driver waiting at the patio. */
+interface CourierView {
+  car: Phaser.GameObjects.Image;
+  driver: Phaser.GameObjects.Image;
+  tag: Pill;
+  spot: number;
+  state: 'arriving' | 'waiting' | 'leaving';
+}
+
+/** Courier car colours (the car is drawn white, so a tint colours it). */
+const CAR_TINTS = [0xffb4c8, 0x9fd3e8, 0xffe08a, 0xb9e3a8, 0xd2c1f0];
+/** A courier turns up this long after a pickup is ordered (game ms), the next ones a bit later. */
+const COURIER_DELAY_MS = 12_000;
+const COURIER_STAGGER_MS = 14_000;
 
 interface CustomerView {
   id: number;
@@ -92,6 +113,8 @@ interface CustomerView {
 /** The lot by domochi's trailer: the line, the waiting area, and handing over orders. */
 export class LobbyScene extends Phaser.Scene {
   private views = new Map<number, CustomerView>();
+  /** Couriers on the lot, by pickup customer id. */
+  private couriers = new Map<number, CourierView>();
   private frontTag!: Pill;
   private doneText!: Phaser.GameObjects.Text;
   private bubble: SpeechBubble | null = null;
@@ -106,15 +129,13 @@ export class LobbyScene extends Phaser.Scene {
   private closeEarlyButton!: Button;
   private confirmClose = false;
   private pickupsText!: Phaser.GameObjects.Text;
-  /** mochi's journal: tap mochi on the lot. */
-  private journalButton!: Phaser.GameObjects.Image;
-  private journalLabel!: Pill;
 
   constructor() {
     super(SceneKeys.Lobby);
   }
 
   create(): void {
+    this.couriers = new Map();
     this.views = new Map();
     this.bubble = null;
     this.confirmOpen = false;
@@ -153,7 +174,7 @@ export class LobbyScene extends Phaser.Scene {
     this.frontTag = new Pill(this, 'Tap me!', { fontSize: 40, color: CSS.ink, fill: COLORS.cream, bold: true, padX: 20, padY: 8 }).setDepth(10);
     this.tweens.add({ targets: this.frontTag, scale: 1.1, duration: 500, yoyo: true, repeat: -1 });
 
-    this.doneText = this.add
+    this.doneText = roundBg(this.add
       .text(0, 0, "that's everyone for today!\nthanks for a sweet day", {
         fontFamily: FONT_FAMILY,
         fontSize: '44px',
@@ -163,23 +184,23 @@ export class LobbyScene extends Phaser.Scene {
         padding: { x: 24, y: 16 },
       })
       .setOrigin(0.5)
-      .setDepth(20);
+      .setDepth(20), COLORS.cream);
 
-    this.panelText = this.add
+    this.panelText = roundBg(this.add
       .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '38px', color: CSS.ink, backgroundColor: CSS.cream, padding: { x: 24, y: 16 }, align: 'left', lineSpacing: 6 })
       .setOrigin(0.5)
       .setDepth(20)
-      .setName('lobby-checklist');
+      .setName('lobby-checklist'), COLORS.cream);
     this.openButton = new Button(this, 0, 0, 'Open the window', () => this.openShop(), { width: 520, name: 'btn-open' }).setDepth(21);
     this.closeButton = new Button(this, 0, 0, 'Close up', () => this.closeUp(), { width: 520, name: 'btn-close-up' }).setDepth(21);
     // Any time while open: close the window early (two taps, so it isn't by accident).
     this.closeEarlyButton = new Button(this, 0, 0, 'Close early', () => this.closeEarly(), { width: 360, height: 120, fontSize: 42, fill: COLORS.dough, name: 'btn-close-early' }).setDepth(21);
     this.sendHomeButton = new Button(this, 0, 0, 'Send them home', () => this.sendHome(), { width: 520, fill: COLORS.dough, name: 'btn-send-home' }).setDepth(21);
-    this.pickupsText = this.add
+    this.pickupsText = roundBg(this.add
       .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '32px', color: CSS.ink, backgroundColor: '#fffaf0cc', padding: { x: 18, y: 12 }, align: 'left' })
       .setOrigin(0.5)
       .setDepth(8)
-      .setName('lobby-pickups');
+      .setName('lobby-pickups'), COLORS.cream, 0.85);
     // Pickup countdowns tick every second.
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.syncPanels() });
 
@@ -192,22 +213,6 @@ export class LobbyScene extends Phaser.Scene {
         if (view) this.say(view, `${e.name}: "${e.line}"`);
       });
     });
-
-    // mochi sits on the lot: tap for the journal. A badge says when there are new stickers.
-    this.journalButton = this.add.image(0, 0, TextureKeys.Mascot).setDepth(8).setName('btn-journal').setInteractive({ useHandCursor: true });
-    this.journalButton.on(Phaser.Input.Events.POINTER_UP, () => {
-      audio().play('tap');
-      if (!this.scene.isActive(SceneKeys.Journal)) this.scene.launch(SceneKeys.Journal);
-    });
-    this.journalLabel = new Pill(this, 'journal', { fontSize: 30, color: CSS.cream, fill: 0x2b2522, bold: true, padX: 14, padY: 4 }).setDepth(8);
-    this.tweens.add({ targets: this.journalButton, angle: { from: -4, to: 4 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.events.on(Phaser.Scenes.Events.WAKE, this.refreshJournalBadge, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.WAKE, this.refreshJournalBadge, this));
-    const tracker = stickers();
-    if (tracker) {
-      const off = tracker.events.on('earned', () => this.refreshJournalBadge());
-      this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
-    }
 
     onLayout(this, (v: Viewport) => {
       const L = LAYOUT[v.orientation];
@@ -225,7 +230,8 @@ export class LobbyScene extends Phaser.Scene {
       truck.setPosition(c.x + L.truck.x, c.y + L.truck.y).setScale(L.truck.scale);
       sign.setPosition(c.x + L.sign.x, c.y + L.sign.feetY).setScale(L.sign.scale);
       chalk.setPosition(c.x + L.chalk.x, c.y + L.chalk.y);
-      waitingLabel.setPosition(c.x + L.waiting.x, c.y + L.waiting.labelY);
+      // Never down under the tab bar (short phones).
+      waitingLabel.setPosition(c.x + L.waiting.x, Math.min(c.y + L.waiting.labelY, v.height - v.tabBarHeight - waitingLabel.height / 2 - 8));
       this.doneText.setPosition(c.x + c.width / 2, c.y + (v.orientation === 'landscape' ? 160 : 230));
       this.panelText.setPosition(c.x + L.panel.x, c.y + L.panel.y).setWordWrapWidth(L.panel.width);
       this.openButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
@@ -233,12 +239,8 @@ export class LobbyScene extends Phaser.Scene {
       this.sendHomeButton.setPosition(c.x + L.panel.x, c.y + L.panel.buttonY);
       this.closeEarlyButton.setPosition(c.x + L.closeEarly.x, c.y + L.closeEarly.y);
       this.pickupsText.setPosition(c.x + L.pickups.x, c.y + L.pickups.y);
-      // Not on the tutorial day: mochi's busy teaching.
-      const showJournal = !session().isTutorial;
-      this.journalButton.setPosition(c.x + L.journal.x, c.y + L.journal.y).setScale(L.journal.scale).setVisible(showJournal);
-      this.journalLabel.setPosition(c.x + L.journal.x, c.y + L.journal.y + 105 * L.journal.scale + this.journalLabel.height / 2).setVisible(showJournal);
-      this.refreshJournalBadge();
       this.sync(true);
+      this.snapCouriers();
     });
   }
 
@@ -289,6 +291,7 @@ export class LobbyScene extends Phaser.Scene {
   /** The prep / closing checklist and button, the sign, and the pickups list. */
   private syncPanels(): void {
     const s = session();
+    this.syncCouriers();
     // Patience hearts tick down every second.
     for (const view of this.views.values()) {
       const cust = s.customer(view.id);
@@ -399,12 +402,6 @@ export class LobbyScene extends Phaser.Scene {
 
   private confirmOpen = false;
 
-  /** "journal", or "new sticker!" when there's one you haven't looked at. */
-  private refreshJournalBadge(): void {
-    const j = save().data.journal;
-    const fresh = j.stickers.length > j.seen;
-    this.journalLabel?.setText(fresh ? 'new sticker!' : 'journal').setFill(fresh ? 0xb0406a : 0x2b2522);
-  }
 
   private closeEarly(): void {
     if (!this.confirmClose) {
@@ -474,6 +471,148 @@ export class LobbyScene extends Phaser.Scene {
         friend.on(Phaser.Input.Events.POINTER_UP, done);
       },
     });
+  }
+
+  // ---- Couriers (pickup orders) -------------------------------------------------
+
+  /**
+   * Pickup orders get a courier: once the window's open, their car drives in
+   * and parks on the lot, and the driver waits at the patio. When the order's
+   * handed over, they walk back and drive off.
+   */
+  private syncCouriers(): void {
+    const s = session();
+    const v = getViewport(this);
+    const L = LAYOUT[v.orientation];
+    const pickups = s.pickups;
+    const ids = new Set(pickups.map((p) => p.id));
+    // Collected (or gone): back to the car and away.
+    for (const [id, cv] of this.couriers) if (!ids.has(id) && cv.state !== 'leaving') this.courierLeave(cv, id);
+    if (s.phase === 'prep' || s.isTutorial) return;
+    pickups.forEach((p, j) => {
+      if (this.couriers.has(p.id)) return;
+      const t = p.ticketNo !== undefined ? s.ticket(p.ticketNo) : undefined;
+      if (!t || s.timeMs - t.takenAtMs < COURIER_DELAY_MS + j * COURIER_STAGGER_MS) return;
+      const taken = new Set([...this.couriers.values()].filter((cv) => cv.state !== 'leaving').map((cv) => cv.spot));
+      const spot = L.parking.findIndex((_, i) => !taken.has(i));
+      if (spot < 0) return; // the lot's full: they'll come when a spot frees up
+      this.courierArrive(p, spot);
+    });
+  }
+
+  /** Where a courier waits at the patio (after the walk-ups waiting there). */
+  private courierPatioSpot(id: number): { x: number; y: number; scale: number } {
+    const s = session();
+    const v = getViewport(this);
+    const L = LAYOUT[v.orientation];
+    const c = v.content;
+    const waitingCouriers = [...this.couriers.entries()].filter(([, cv]) => cv.state !== 'leaving').map(([k]) => k);
+    const i = s.waiting.length + Math.max(0, waitingCouriers.indexOf(id));
+    const slot = L.waiting.slots[i % L.waiting.slots.length]!;
+    const wrap = Math.floor(i / L.waiting.slots.length) * 30;
+    return { x: c.x + slot[0] + wrap, y: c.y + slot[1] - wrap, scale: L.waiting.scale };
+  }
+
+  private parkingSpot(spot: number): { x: number; y: number; scale: number } {
+    const v = getViewport(this);
+    const L = LAYOUT[v.orientation];
+    const p = L.parking[spot]!;
+    return { x: v.content.x + p[0], y: v.content.y + p[1], scale: L.line.scale * 0.95 };
+  }
+
+  private courierArrive(p: Customer, spot: number): void {
+    const v = getViewport(this);
+    const at = this.parkingSpot(spot);
+    const car = this.add
+      .image(v.width + 260, at.y, TextureKeys.CourierCar)
+      .setOrigin(0.5, 1)
+      .setScale(at.scale)
+      .setTint(CAR_TINTS[p.id % CAR_TINTS.length]!)
+      .setDepth(4)
+      .setName(`courier-car-${p.ticketNo}`);
+    const driver = this.add.image(at.x, at.y, session().typeOf(p).sprite).setOrigin(0.5, 1).setScale(LAYOUT[v.orientation].waiting.scale).setDepth(5).setAlpha(0).setName(`courier-${p.ticketNo}`);
+    const tag = new Pill(this, `#${p.ticketNo} pickup`, { fontSize: 28, color: CSS.cream, fill: 0xb0406a, bold: true, padX: 12, padY: 3 }).setDepth(6).setVisible(false);
+    const cv: CourierView = { car, driver, tag, spot, state: 'arriving' };
+    this.couriers.set(p.id, cv);
+    // Drive in and park, then the driver hops out and walks to the patio.
+    this.tweens.add({
+      targets: car,
+      x: at.x,
+      duration: 1400,
+      ease: 'Cubic.Out',
+      onComplete: () => {
+        if (cv.state === 'leaving') return;
+        driver.setPosition(at.x - 60 * at.scale, at.y).setAlpha(1);
+        const to = this.courierPatioSpot(p.id);
+        this.tweens.add({
+          targets: driver,
+          x: to.x,
+          y: to.y,
+          duration: Math.max(400, (Phaser.Math.Distance.Between(driver.x, driver.y, to.x, to.y) / WALK_SPEED) * 1000),
+          onUpdate: () => this.placeCourierTag(cv),
+          onComplete: () => {
+            if (cv.state === 'leaving') return;
+            cv.state = 'waiting';
+            this.placeCourierTag(cv);
+            tag.setVisible(true);
+          },
+        });
+      },
+    });
+  }
+
+  private placeCourierTag(cv: CourierView): void {
+    cv.tag.setPosition(cv.driver.x, cv.driver.y - CUSTOMER_H * cv.driver.scale - 22);
+  }
+
+  private courierLeave(cv: CourierView, id: number): void {
+    cv.state = 'leaving';
+    cv.tag.setVisible(false);
+    this.tweens.killTweensOf([cv.car, cv.driver]);
+    const at = this.parkingSpot(cv.spot);
+    cv.car.setX(at.x);
+    const driveOff = () => {
+      cv.driver.destroy();
+      this.tweens.add({
+        targets: cv.car,
+        x: -320,
+        duration: 1600,
+        ease: 'Cubic.In',
+        onComplete: () => {
+          cv.car.destroy();
+          cv.tag.destroy();
+          this.couriers.delete(id);
+        },
+      });
+    };
+    if (cv.driver.alpha === 0) {
+      driveOff();
+      return;
+    }
+    // Back to the car with the box, then away.
+    const tx = at.x - 60 * at.scale;
+    this.tweens.add({
+      targets: cv.driver,
+      x: tx,
+      y: at.y,
+      duration: Math.max(400, (Phaser.Math.Distance.Between(cv.driver.x, cv.driver.y, tx, at.y) / WALK_SPEED) * 1000),
+      onComplete: driveOff,
+    });
+  }
+
+  /** After a layout change (rotation): couriers jump to their spots. */
+  private snapCouriers(): void {
+    for (const [id, cv] of this.couriers) {
+      if (cv.state === 'leaving') continue;
+      this.tweens.killTweensOf([cv.car, cv.driver]);
+      const at = this.parkingSpot(cv.spot);
+      cv.car.setPosition(at.x, at.y).setScale(at.scale);
+      const to = this.courierPatioSpot(id);
+      cv.driver.setPosition(to.x, to.y).setScale(to.scale).setAlpha(1);
+      cv.state = 'waiting';
+      this.placeCourierTag(cv);
+      cv.tag.setVisible(true);
+    }
   }
 
   private closeUp(): void {

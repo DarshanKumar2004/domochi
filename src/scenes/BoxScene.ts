@@ -12,6 +12,7 @@ import { getHud } from './flow';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
+import { roundBg } from '../ui/roundBg';
 import { boxStockId } from '../systems/supplies';
 
 const SHELF_SLOTS = 6;
@@ -108,7 +109,7 @@ export class BoxScene extends StationScene {
       this.add.text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: `${size}px`, fontStyle: bold ? 'bold' : 'normal', color, align: 'center' }).setOrigin(0.5);
     this.hint = text(40, CSS.cream).setName('box-hint');
     this.instruction = text(34, CSS.muted).setName('box-instruction');
-    this.flashText = text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(40).setVisible(false).setName('box-flash');
+    this.flashText = roundBg(text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(40).setVisible(false).setName('box-flash'), COLORS.cream);
     this.serveButton = new Button(this, 0, 0, 'Close lid & serve', () => this.serve(), { width: 640, name: 'btn-serve' });
     // The boxes on the counter: a pile of each size (tap one to use it).
     this.sizeButtons = [...menu.boxes]

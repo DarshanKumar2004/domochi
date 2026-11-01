@@ -49,7 +49,12 @@ export function setSave(s: SaveService): void {
 export function audio(): AudioService {
   if (!audioService) {
     const s = saveService?.data.settings ?? { sound: true, music: true };
-    audioService = new AudioService({ sound: s.sound, music: s.music });
+    audioService = new AudioService({
+      sound: s.sound,
+      music: s.music,
+      ...(s.musicVolume !== undefined ? { musicVolume: s.musicVolume } : {}),
+      ...(s.soundVolume !== undefined ? { soundVolume: s.soundVolume } : {}),
+    });
   }
   return audioService;
 }

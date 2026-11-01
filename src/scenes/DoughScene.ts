@@ -8,6 +8,7 @@ import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
+import { roundBg } from '../ui/roundBg';
 import { StationScene } from './StationScene';
 
 /** The bowl texture's opening, relative to its centre (see MANIFEST: ellipse at (180, 70) of 360×250). */
@@ -70,6 +71,9 @@ export class DoughScene extends StationScene {
   private nextStirSound = 0;
   /** Scrubbing the empty bowl (not stirring a batch). */
   private washing = false;
+  /** The sponge by the bowl (always there; bright when the bowl needs a wash). */
+  private sponge!: Phaser.GameObjects.Image;
+  private spongeLabel!: Phaser.GameObjects.Text;
   /** Lump positions in the bowl (normalised to the opening), fixed per scene. */
   private readonly lumps: { x: number; y: number; r: number }[] = [];
 
@@ -100,6 +104,17 @@ export class DoughScene extends StationScene {
     this.contents = this.add.graphics();
     this.spoon = this.add.graphics().setDepth(10).setVisible(false);
     this.bowlZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('dough-stir');
+    this.sponge = this.add.image(0, 0, TextureKeys.Sponge).setName('dough-sponge').setInteractive({ useHandCursor: true });
+    this.spongeLabel = roundBg(this.add
+      .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold', color: '#fbf6ec', backgroundColor: '#1f1a17cc', padding: { x: 8, y: 3 } })
+      .setOrigin(0.5, 0), 0x1f1a17, 0.8, 10);
+    this.sponge.on(Phaser.Input.Events.POINTER_UP, () => {
+      const s = session();
+      if (!s.bowlNeedsWash) this.flash('the bowl is clean!');
+      else if (s.doughBatch && s.doughBatch.totalScoops > 0) this.flash('finish this batch first, then wash the bowl');
+      else this.flash('scrub round and round in the bowl');
+    });
+    this.tweens.add({ targets: this.sponge, angle: { from: -6, to: 6 }, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     for (const ing of balance.dough.ingredients) {
       const img = this.add.image(0, 0, TextureKeys.IngredientBin).setTint(hexToNumber(ing.color)).setName(`bin-${ing.id}`);
@@ -122,7 +137,7 @@ export class DoughScene extends StationScene {
       .setBackgroundColor('#00000033')
       .setPadding(20, 12, 20, 12)
       .setWordWrapWidth(900);
-    this.flashText = text(46, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(30).setVisible(false).setName('dough-flash');
+    this.flashText = roundBg(text(46, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(30).setVisible(false).setName('dough-flash'), COLORS.cream);
 
     this.redoButton = new Button(this, 0, 0, 'Start over', () => this.startOver(), { width: 340, fill: COLORS.danger, name: 'btn-dough-redo' });
     this.doneButton = new Button(this, 0, 0, 'Into the tub', () => this.done(), { width: 400, name: 'btn-dough-done' });
@@ -139,6 +154,11 @@ export class DoughScene extends StationScene {
     this.bowlPos = { x: c.x + L.bowl.x, y: c.y + L.bowl.y, scale: L.bowl.scale };
     this.bowl.setPosition(this.bowlPos.x, this.bowlPos.y).setScale(L.bowl.scale);
     this.bowlZone.setPosition(this.bowlPos.x, this.bowlPos.y + OPENING.dy * L.bowl.scale).setSize(360 * L.bowl.scale, 230 * L.bowl.scale);
+    // The sponge sits on the bowl's rim, top right.
+    const sx = this.bowlPos.x + 210 * L.bowl.scale;
+    const sy = this.bowlPos.y - 120 * L.bowl.scale;
+    this.sponge.setPosition(sx, sy).setScale(0.8);
+    this.spongeLabel.setPosition(sx, sy + 34);
     this.tubPos = { x: c.x + L.tub.x, y: c.y + L.tub.y };
     this.tubText.setPosition(this.tubPos.x, this.tubPos.y - 28);
     const n = this.bins.length;
@@ -205,6 +225,10 @@ export class DoughScene extends StationScene {
     this.redoButton.setEnabled(!!w && w.totalScoops > 0);
     this.doneButton.setEnabled(!!w && w.stage === 'ready' && w.yield >= 1 && w.yield <= s.tubSpace);
     this.drawContents();
+    // The sponge: bright when the bowl needs a wash, faded when it's clean.
+    const dirty = s.bowlNeedsWash;
+    this.sponge.setAlpha(dirty ? 1 : 0.5);
+    this.spongeLabel.setText(dirty ? (s.bowlMoldy ? 'moldy! scrub it' : 'scrub to wash') : 'sponge').setAlpha(dirty ? 1 : 0.6);
   }
 
   /** The dough in the bowl: the ingredients' mixed colour, lumps that smooth out, and a swirl as you stir. */

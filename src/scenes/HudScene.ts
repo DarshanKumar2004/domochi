@@ -1,12 +1,15 @@
 import Phaser from 'phaser';
-import { audio, collectAwayEarnings, isClockPaused, markSeen, menu, saveDayInProgress, session, stickers } from '../systems/services';
+import { audio, collectAwayEarnings, isClockPaused, markSeen, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
 import { Button } from '../ui/Button';
+import { Pill } from '../ui/Pill';
+import { TextureKeys } from '../assets/keys';
 import { TabBar } from '../ui/TabBar';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
 import { TicketRail } from '../ui/TicketRail';
-import { CSS, FONT_FAMILY } from '../ui/theme';
+import { CSS, FONT_FAMILY, COLORS } from '../ui/theme';
 import { onLayout } from '../ui/viewport';
 import { listen } from './listen';
+import { roundBg } from '../ui/roundBg';
 import { SceneKeys } from './sceneKeys';
 
 /** Longest step the game clock takes per frame, so a hitch doesn't skip time. */
@@ -47,6 +50,26 @@ export class HudScene extends Phaser.Scene {
       fontSize: 42,
       name: 'btn-settings',
     });
+
+    // mochi's journal, up in the top bar by Settings: there from every station. A badge for new stickers.
+    const journal = this.add.image(0, 0, TextureKeys.Mascot).setName('btn-journal').setInteractive({ useHandCursor: true }).setVisible(!session().isTutorial);
+    journal.on(Phaser.Input.Events.POINTER_UP, () => {
+      audio().play('tap');
+      if (!this.scene.isActive(SceneKeys.Journal)) this.scene.launch(SceneKeys.Journal);
+    });
+    const badge = new Pill(this, 'new!', { fontSize: 22, color: CSS.cream, fill: 0xb0406a, bold: true, padX: 8, padY: 2 }).setVisible(false);
+    this.tweens.add({ targets: journal, angle: { from: -5, to: 5 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    const refreshBadge = () => {
+      const j = save().data.journal;
+      badge.setVisible(!session().isTutorial && j.stickers.length > j.seen);
+    };
+    refreshBadge();
+    this.time.addEvent({ delay: 1000, loop: true, callback: refreshBadge });
+    const tracker0 = stickers();
+    if (tracker0) {
+      const off = tracker0.events.on('earned', refreshBadge);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
+    }
 
     let arrived = session().arrivals;
     listen(this, session().events, 'changed', () => {
@@ -89,12 +112,12 @@ export class HudScene extends Phaser.Scene {
     // The day's clock on the rail ticks every second.
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.rail.refreshDay(session()) });
     // Ethan's friends dropping by, and the window closing, get a note at the top.
-    this.toast = this.add
+    this.toast = roundBg(this.add
       .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '38px', fontStyle: 'bold', color: CSS.ink, align: 'center', backgroundColor: CSS.cream, padding: { x: 28, y: 16 } })
       .setOrigin(0.5, 0)
       .setDepth(50)
       .setVisible(false)
-      .setName('hud-toast');
+      .setName('hud-toast'), COLORS.cream);
     this.toast.on(Phaser.Input.Events.POINTER_UP, () => {
       if (!this.toastSticky || !this.toast.visible) return;
       this.toastSticky = false;
@@ -135,7 +158,12 @@ export class HudScene extends Phaser.Scene {
       this.toast.setPosition(v.width / 2, v.railHeight + 20).setWordWrapWidth(Math.min(1000, v.width - 60));
       this.tabBar.layout(v);
       this.rail.layout(v, session());
-      settings.setPosition(v.width - 150, v.railHeight / 2 - 2).setScale(v.orientation === 'landscape' ? 0.9 : 1);
+      const k = v.orientation === 'landscape' ? 0.9 : 1;
+      settings.setPosition(v.width - 150, v.railHeight / 2 - 2).setScale(k);
+      // mochi just left of Settings, sized to the bar.
+      const jx = v.width - 150 - 120 * k - 75;
+      journal.setPosition(jx, v.railHeight / 2).setDisplaySize(v.railHeight * 0.8, v.railHeight * 0.75);
+      badge.setPosition(jx, v.railHeight - 16);
     });
   }
 

@@ -30,6 +30,7 @@ export const TextureKeys = {
   SugarSifter: 'sugar-sifter',
   ToppingJar: 'topping-jar',
   DonutBox: 'donut-box',
+  CourierCar: 'courier-car',
   IconLobby: 'icon-lobby',
   IconDough: 'icon-dough',
   IconFry: 'icon-fry',

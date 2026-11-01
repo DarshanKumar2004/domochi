@@ -52,6 +52,9 @@ export interface SaveData {
     music: boolean;
     /** The Android app's screen: locked landscape (the default), portrait, or turning with the phone. */
     orientation?: 'landscape' | 'portrait' | 'auto';
+    /** Volume sliders, 0–1 (half by default). */
+    musicVolume?: number;
+    soundVolume?: number;
   };
 }
 
@@ -137,6 +140,10 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;
     if (typeof raw.settings.music === 'boolean') data.settings.music = raw.settings.music;
+    for (const k of ['musicVolume', 'soundVolume'] as const) {
+      const v = raw.settings[k];
+      if (typeof v === 'number' && v >= 0 && v <= 1) data.settings[k] = v;
+    }
     const o = raw.settings.orientation;
     if (o === 'landscape' || o === 'portrait' || o === 'auto') data.settings.orientation = o;
   }

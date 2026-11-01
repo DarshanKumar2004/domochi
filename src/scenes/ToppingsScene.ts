@@ -26,6 +26,7 @@ import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
+import { roundBg } from '../ui/roundBg';
 import { TrayWiper } from '../ui/TrayWiper';
 
 /** Each spot's donut art, and the pieces that missed it (left on the tray). */
@@ -41,7 +42,7 @@ const SLOTS = 6;
 /** How far above your finger the jar is held (game px). */
 const JAR_LIFT = 190;
 /** Falling-piece pool size. */
-const FALLING = 48;
+const FALLING = 160;
 /** Size of the falling-piece textures, and the piece radius drawn in them (share of half). */
 const PIECE_TEX = 64;
 const PIECE_TEX_R = 0.7;
@@ -227,7 +228,7 @@ export class ToppingsScene extends StationScene {
       this.add.text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: `${size}px`, fontStyle: bold ? 'bold' : 'normal', color, align: 'center' }).setOrigin(0.5);
     this.instruction = text(42, CSS.cream, true).setName('toppings-instruction');
     this.readout = text(34, CSS.muted).setName('toppings-readout');
-    this.flashText = text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(30).setVisible(false).setName('toppings-flash');
+    this.flashText = roundBg(text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(30).setVisible(false).setName('toppings-flash'), COLORS.cream);
 
     this.redoButton = new Button(this, 0, 0, 'Redo', () => this.redo(), { width: 320, fill: COLORS.danger, name: 'btn-toppings-redo' });
     this.doneButton = new Button(this, 0, 0, 'Done', () => this.done(), { width: 360, name: 'btn-toppings-done' });
@@ -731,7 +732,7 @@ export class ToppingsScene extends StationScene {
         if (time - this.lastEmit > tb.sprinkleEveryMs * 4) this.lastEmit = time - tb.sprinkleEveryMs * 4;
         while (time - this.lastEmit >= tb.sprinkleEveryMs && !work.full) {
           this.lastEmit += tb.sprinkleEveryMs;
-          this.emit(t, time, this.fingerX, this.fingerY, tb.scatter);
+          for (let k = 0; k < (t.stream ?? 1); k++) this.emit(t, time, this.fingerX, this.fingerY, tb.scatter * (t.stream ? 1.4 : 1));
           if (time >= this.nextShakeSound) {
             this.nextShakeSound = time + 120;
             audio().play('shake');
@@ -782,7 +783,7 @@ export class ToppingsScene extends StationScene {
       if (t) {
         const piece = { toppingId: t.id, x: (f.x - x) / (size / 2), y: (f.y - y) / (size / 2), rot: f.rand * Math.PI * 2, on: false, ball: -1 };
         drawOnTray(b.mess.context, (m, sz) => drawToppingPiece(m, sz, piece, t), false);
-        session().addMess('toppings', 1);
+        session().addMess('toppings', 1 / (t.stream ?? 1)); // fine powder: many grains make one bit of mess
         b.messDirty = true;
       }
       return;
@@ -804,7 +805,7 @@ export class ToppingsScene extends StationScene {
       if (piece.on) drawToppingPiece(b.canvas.context, ART_SIZE, piece, t);
       else {
         drawOnTray(b.mess.context, (m, sz) => drawToppingPiece(m, sz, piece, t));
-        session().addMess('toppings', 1);
+        session().addMess('toppings', 1 / (t.stream ?? 1));
         b.messDirty = true;
       }
     }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { applyOrientation, isNative, type OrientationChoice } from '../systems/native';
 import { audio, save, saveDayInProgress } from '../systems/services';
 import { Button } from '../ui/Button';
+import { Slider } from '../ui/Slider';
 import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { onLayout } from '../ui/viewport';
@@ -20,55 +21,49 @@ export class SettingsScene extends Phaser.Scene {
   create(): void {
     this.confirmingReset = false;
     beginOverlay(this);
-    // One container centred on screen; children are laid out relative to the card centre.
-    const card = this.add.container(0, 0, [addCard(this, 860, CARD_H)]);
-
-    card.add(
-      this.add
-        .text(0, -460, 'Settings', { fontFamily: FONT_FAMILY, fontSize: '80px', fontStyle: 'bold', color: CSS.ink })
-        .setOrigin(0.5),
-    );
-    // Sound and music switches (saved, and applied straight away).
-    const a = audio();
-    // In the Android app a third switch: how the screen turns.
+    // In the Android app there's one more row: how the screen turns.
     const app = isNative();
-    const toggle = (x: number, label: string, get: () => boolean, set: (on: boolean) => void, name: string) => {
-      const b = new Button(this, x, -235, `${label}: ${get() ? 'on' : 'off'}`, () => {
-        set(!get());
-        b.setLabel(`${label}: ${get() ? 'on' : 'off'}`);
-        void save().update((d) => {
-          d.settings.sound = a.soundOn;
-          d.settings.music = a.musicOn;
-        });
-      }, { width: app ? 250 : 340, fill: COLORS.dough, name, fontSize: app ? 40 : 48 });
-      card.add(b);
-    };
-    toggle(app ? -270 : -185, 'Sound', () => a.soundOn, (on) => a.setSound(on), 'btn-sound');
-    toggle(app ? 0 : 185, 'Music', () => a.musicOn, (on) => a.setMusic(on), 'btn-music');
+    const cardH = app ? CARD_H + 140 : CARD_H;
+    // One container centred on screen; children are laid out relative to the card centre.
+    const card = this.add.container(0, 0, [addCard(this, 860, cardH)]);
+    let y = -cardH / 2 + 90;
+    card.add(this.add.text(0, y, 'Settings', { fontFamily: FONT_FAMILY, fontSize: '80px', fontStyle: 'bold', color: CSS.ink }).setOrigin(0.5));
+
+    // Music and sound volume (saved when you let go; applied as you slide).
+    const a = audio();
+    const keep = () =>
+      void save().update((d) => {
+        d.settings.music = a.musicOn;
+        d.settings.sound = a.soundOn;
+        d.settings.musicVolume = a.musicVolume;
+        d.settings.soundVolume = a.soundVolume;
+      });
+    y += 150;
+    card.add(new Slider(this, 'Music', a.musicVolume, (v) => a.setMusicVolume(v), keep, 'slider-music').setPosition(60, y));
+    y += 110;
+    card.add(new Slider(this, 'Sound', a.soundVolume, (v) => a.setSoundVolume(v), () => (keep(), a.play('ding')), 'slider-sound').setPosition(60, y));
+    y += 150;
+
     if (app) {
-      const names: Record<OrientationChoice, string> = { landscape: 'Landscape', portrait: 'Portrait', auto: 'Auto-rotate' };
+      const names: Record<OrientationChoice, string> = { landscape: 'Screen: landscape', portrait: 'Screen: portrait', auto: 'Screen: auto-rotate' };
       const order: OrientationChoice[] = ['landscape', 'portrait', 'auto'];
-      const screen = new Button(this, 270, -235, names[save().data.settings.orientation ?? 'landscape'], () => {
+      const screen = new Button(this, 0, y, names[save().data.settings.orientation ?? 'landscape'], () => {
         const now = save().data.settings.orientation ?? 'landscape';
         const next = order[(order.indexOf(now) + 1) % order.length]!;
         screen.setLabel(names[next]);
         void save().update((d) => void (d.settings.orientation = next));
         void applyOrientation(next);
-      }, { width: 250, fill: COLORS.dough, name: 'btn-orientation', fontSize: 40 });
+      }, { width: 640, fill: COLORS.dough, name: 'btn-orientation', fontSize: 44 });
       card.add(screen);
+      y += 150;
     }
 
-    card.add(
-      new Button(this, 0, -70, 'Replay tutorial', () => this.replayTutorial(), {
-        width: 640,
-        name: 'btn-replay-tutorial',
-      }),
-    );
-
+    card.add(new Button(this, 0, y, 'Replay tutorial', () => this.replayTutorial(), { width: 640, name: 'btn-replay-tutorial' }));
+    y += 150;
     const reset = new Button(
       this,
       0,
-      100,
+      y,
       'Reset progress',
       () => {
         // Two taps, so progress isn't wiped by accident.
@@ -84,25 +79,13 @@ export class SettingsScene extends Phaser.Scene {
       { width: 640, fill: COLORS.danger, name: 'btn-reset' },
     );
     card.add(reset);
-
+    y += 150;
     // Back to the home screen (about us, notes for Ethan); the day so far is saved.
-    card.add(
-      new Button(this, 0, 260, 'Home screen', () => this.goHome(), {
-        width: 640,
-        fill: COLORS.dough,
-        name: 'btn-home',
-      }),
-    );
+    card.add(new Button(this, 0, y, 'Home screen', () => this.goHome(), { width: 640, fill: COLORS.dough, name: 'btn-home' }));
+    y += 165;
+    card.add(new Button(this, 0, y, 'Close', () => this.scene.stop(), { width: 400, fill: COLORS.dough, name: 'btn-close-settings' }));
 
-    card.add(
-      new Button(this, 0, 440, 'Close', () => this.scene.stop(), {
-        width: 400,
-        fill: COLORS.dough,
-        name: 'btn-close-settings',
-      }),
-    );
-
-    onLayout(this, (v) => card.setPosition(v.width / 2, v.height / 2).setScale(Math.min(1, (v.height - 40) / CARD_H)));
+    onLayout(this, (v) => card.setPosition(v.width / 2, v.height / 2).setScale(Math.min(1, (v.height - 40) / cardH)));
   }
 
   private replayTutorial(): void {

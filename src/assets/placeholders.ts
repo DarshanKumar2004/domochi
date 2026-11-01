@@ -629,6 +629,40 @@ function paintPatioTable(g: G): void {
 }
 
 /** A wooden planter box with flowers. */
+/**
+ * A courier's little hatchback, side view, facing left. Drawn in white and
+ * light grey so a tint gives each courier their own colour (wheels and
+ * windows stay dark).
+ */
+function paintCourierCar(g: G): void {
+  const ink = COLORS.ink;
+  // Body and cabin.
+  g.fillStyle(0xffffff);
+  g.fillRoundedRect(14, 62, 292, 60, 22);
+  g.fillRoundedRect(70, 18, 170, 70, { tl: 40, tr: 26, bl: 0, br: 0 });
+  g.lineStyle(5, ink);
+  g.strokeRoundedRect(14, 62, 292, 60, 22);
+  g.strokeRoundedRect(70, 18, 170, 70, { tl: 40, tr: 26, bl: 0, br: 0 });
+  // Windows.
+  g.fillStyle(0x35414d);
+  g.fillRoundedRect(84, 30, 66, 40, { tl: 26, tr: 6, bl: 4, br: 4 });
+  g.fillRoundedRect(160, 30, 66, 40, { tl: 6, tr: 16, bl: 4, br: 4 });
+  // Lights and a door line.
+  g.fillStyle(0xfff3b0);
+  g.fillRoundedRect(16, 74, 18, 14, 5);
+  g.fillStyle(0xff8a8a);
+  g.fillRoundedRect(288, 74, 16, 14, 5);
+  g.lineStyle(3, ink, 0.5);
+  g.lineBetween(155, 70, 155, 116);
+  // Wheels.
+  for (const x of [78, 240]) {
+    g.fillStyle(0x222222);
+    g.fillCircle(x, 124, 26);
+    g.fillStyle(0xbfc4c9);
+    g.fillCircle(x, 124, 11);
+  }
+}
+
 function paintPlanter(g: G): void {
   const ink = COLORS.ink;
   g.fillStyle(0x4f8a46);
@@ -832,6 +866,7 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.OakTree]: { width: 460, height: 420, paint: paintOakTree },
   [TextureKeys.PatioTable]: { width: 300, height: 290, paint: paintPatioTable },
   [TextureKeys.Planter]: { width: 150, height: 130, paint: paintPlanter },
+  [TextureKeys.CourierCar]: { width: 320, height: 156, paint: paintCourierCar },
   [TextureKeys.FryDispenser]: { width: 215, height: 175, paint: paintFryDispenser },
   [TextureKeys.DonutFry]: { width: 160, height: 160, paint: paintDonutFry },
   [TextureKeys.GlazeCup]: { width: 150, height: 160, paint: paintGlazeCup },

@@ -71,11 +71,12 @@
       ],
       "style": "sprinkle",
       "shape": "crumb",
-      "size": 0.028,
+      "size": 0.02,
       "amount": {
-        "min": 45,
-        "max": 130
-      }
+        "min": 160,
+        "max": 420
+      },
+      "stream": 5
     },
     {
       "id": "cookie-butter-cookie",

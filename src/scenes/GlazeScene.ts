@@ -30,6 +30,7 @@ import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { TrayWiper } from '../ui/TrayWiper';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
+import { roundBg } from '../ui/roundBg';
 import { StationScene } from './StationScene';
 
 /** Paint canvas resolution (px per side) for a donut on the tray. */
@@ -224,7 +225,7 @@ export class GlazeScene extends StationScene {
       this.add.text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: `${size}px`, fontStyle: bold ? 'bold' : 'normal', color, align: 'center' }).setOrigin(0.5);
     this.instruction = text(42, CSS.cream, true).setName('glaze-instruction');
     this.readout = text(34, CSS.muted);
-    this.flashText = text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(30).setVisible(false).setName('glaze-flash');
+    this.flashText = roundBg(text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(30).setVisible(false).setName('glaze-flash'), COLORS.cream);
 
     this.redoButton = new Button(this, 0, 0, 'Redo', () => this.redo(), { width: 320, fill: COLORS.danger, name: 'btn-glaze-redo' });
     this.doneButton = new Button(this, 0, 0, 'Done', () => this.done(), { width: 360, name: 'btn-glaze-done' });

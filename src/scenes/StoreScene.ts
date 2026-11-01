@@ -9,12 +9,13 @@ import { showJoinTeam } from '../ui/HomePanels';
 import { Button } from '../ui/Button';
 import { beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
+import { hexToNumber } from '../ui/DonutIcon';
 import type { Viewport } from '../ui/layout';
 import { onLayout } from '../ui/viewport';
 import { startMainGame, stopMainGame } from './flow';
 import { SceneKeys } from './sceneKeys';
 
-const TILE_H = 220;
+const TILE_H = 250;
 const GAP = 18;
 /** Header (title, cash, mochi's tip) and footer (Open day) heights, design px. */
 const HEAD = 290;
@@ -25,9 +26,20 @@ const BADGE_TINT = { 1: 0xffffff, 2: 0xffd27a, 3: 0xbdb6ae } as const;
 /** A finger that moves this far is scrolling, not tapping. */
 const DRAG_PX = 14;
 
+/** How a tile looks: its section's colour, and a little picture of the item. */
+interface Look {
+  accent: number;
+  icon?: { key: string; tint?: number };
+  /** Not in the store yet: a mystery tile (no name, no picture). */
+  locked?: boolean;
+}
+
 interface Tile {
   /** Supply id (guides have none). */
   id?: string;
+  look: Look;
+  title: Phaser.GameObjects.Text;
+  icon: Phaser.GameObjects.Image | Phaser.GameObjects.Text;
   /** mochi sitting on the tile when it's one of mochi's picks. */
   badge?: Phaser.GameObjects.Image;
   badgeText?: Phaser.GameObjects.Text;
@@ -38,20 +50,36 @@ interface Tile {
   refresh: () => void;
 }
 
-/** A heading, then its tiles. */
+/** A heading (on a band of its colour), then its tiles. */
 interface Section {
   label: Phaser.GameObjects.Text;
+  band: Phaser.GameObjects.Graphics;
+  accent: number;
   tiles: Tile[];
 }
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
 /** The store's sections, by supply kind. */
-const SECTIONS: { title: string; kinds: SupplyItem['kind'][] }[] = [
-  { title: 'dough & oil', kinds: ['ingredient', 'oil'] },
-  { title: 'boxes', kinds: ['box'] },
-  { title: 'glazes & toppings', kinds: ['glaze', 'topping'] },
+const SECTIONS: { title: string; kinds: SupplyItem['kind'][]; accent: number }[] = [
+  { title: 'dough & oil', kinds: ['ingredient', 'oil'], accent: 0xe9c48f },
+  { title: 'boxes', kinds: ['box'], accent: 0xd8b58a },
+  { title: 'glazes & toppings', kinds: ['glaze', 'topping'], accent: 0xf4a6c0 },
 ];
+const ACCENT = { guides: 0xc9b8ec, decor: 0xa8d8a0, crew: 0xa8c8ec } as const;
+
+/** A little picture of a supply: its bin, cup, jar or box (tinted like the real thing). */
+function supplyIcon(it: SupplyItem): Look['icon'] {
+  const ing = balance.dough.ingredients.find((i) => i.id === it.id);
+  if (ing) return { key: TextureKeys.IngredientBin, tint: hexToNumber(ing.color) };
+  if (it.kind === 'oil') return { key: TextureKeys.IngredientBin, tint: 0xf2c14e };
+  if (it.kind === 'box') return { key: TextureKeys.DonutBox };
+  if (it.kind === 'glaze') {
+    const g = menu.glazes.find((x) => glazeStockId(x.id) === it.id);
+    return { key: TextureKeys.GlazeCup, ...(g ? { tint: hexToNumber(g.color) } : {}) };
+  }
+  return { key: TextureKeys.ToppingJar };
+}
 
 /**
  * The supply store, between days: packs of dough ingredients, boxes, oil,
@@ -92,20 +120,21 @@ export class StoreScene extends Phaser.Scene {
     this.list = this.add.container(0, 0);
     const text = (size: number, color: string = CSS.ink, bold = false) =>
       this.add.text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: `${size}px`, fontStyle: bold ? 'bold' : 'normal', color, align: 'center' }).setOrigin(0.5);
-    const label = (s: string) => {
-      const t = text(34, '#6b5d52', true).setText(s);
-      this.list.add(t);
-      return t;
+    const section = (s: string, accent: number, tiles: Tile[]): Section => {
+      const band = this.add.graphics();
+      const t = text(34, CSS.ink, true).setText(s);
+      this.list.add([band, t]);
+      return { label: t, band, accent, tiles };
     };
 
     const sections: Section[] = [];
     for (const sec of SECTIONS) {
-      const tiles = balance.supplies.items.filter((it) => sec.kinds.includes(it.kind)).map((it) => this.supplyTile(it, day));
-      sections.push({ label: label(sec.title), tiles });
+      const tiles = balance.supplies.items.filter((it) => sec.kinds.includes(it.kind)).map((it) => this.supplyTile(it, day, sec.accent));
+      sections.push(section(sec.title, sec.accent, tiles));
     }
-    sections.push({ label: label('glaze guides: dashed lines that show you where to pour'), tiles: balance.guides.items.map((g) => this.guideTile(g)) });
-    sections.push({ label: label('decorations for the lot (each gives a little perk)'), tiles: balance.decor.items.map((d) => this.decorTile(d, day)) });
-    sections.push({ label: label("your crew: they keep the trailer going while you're away"), tiles: balance.staff.hires.map((h) => this.hireTile(h, day)) });
+    sections.push(section('glaze guides: dashed lines that show you where to pour', ACCENT.guides, balance.guides.items.map((g) => this.guideTile(g))));
+    sections.push(section('decorations for the lot (each gives a little perk)', ACCENT.decor, balance.decor.items.map((d) => this.decorTile(d, day))));
+    sections.push(section("your crew: they keep the trailer going while you're away", ACCENT.crew, balance.staff.hires.map((h) => this.hireTile(h, day))));
 
     // Header and footer sit over the list (and catch taps there), so it scrolls under them.
     const card = this.add.graphics();
@@ -171,19 +200,18 @@ export class StoreScene extends Phaser.Scene {
       // The list, in list coordinates (y from the top of the scrolling area), scaled like the card.
       let y = 30;
       for (const sec of sections) {
-        sec.label.setPosition(0, y).setWordWrapWidth(w - 80);
-        y += 50;
+        sec.label.setPosition(0, y).setWordWrapWidth(w - 120);
+        const lw = sec.label.width + 56;
+        const lh = sec.label.height + 14;
+        sec.band.clear().fillStyle(sec.accent, 0.55).fillRoundedRect(-lw / 2, y - lh / 2, lw, lh, lh / 2);
+        y += 56;
         sec.tiles.forEach((t, i) => {
           const col = i % cols;
           const row = Math.floor(i / cols);
           t.box.setPosition((col - (cols - 1) / 2) * (tileW + GAP), y + row * (TILE_H + GAP) + TILE_H / 2);
-          t.bg.clear();
-          t.bg.fillStyle(0xffffff, 0.7);
-          t.bg.fillRoundedRect(-tileW / 2, -TILE_H / 2, tileW, TILE_H, 24);
-          t.bg.lineStyle(3, COLORS.ink, 0.15);
-          t.bg.strokeRoundedRect(-tileW / 2, -TILE_H / 2, tileW, TILE_H, 24);
-          t.badge?.setPosition(-tileW / 2 + 34, -TILE_H / 2 + 30);
-          t.badgeText?.setPosition(-tileW / 2 + 34, -TILE_H / 2 + 72);
+          this.drawTile(t, tileW);
+          t.badge?.setPosition(tileW / 2 - 36, -TILE_H / 2 + 40);
+          t.badgeText?.setPosition(tileW / 2 - 36, -TILE_H / 2 + 82);
         });
         y += Math.ceil(sec.tiles.length / cols) * (TILE_H + GAP) + 20;
       }
@@ -210,7 +238,7 @@ export class StoreScene extends Phaser.Scene {
   }
 
   /** A pack of a supply: greyed out until the day it comes in. */
-  private supplyTile(it: SupplyItem, day: number): Tile {
+  private supplyTile(it: SupplyItem, day: number, accent: number): Tile {
     const price = priceOn(it, day, balance.supplies.priceSwing);
     const swing = price / it.price - 1;
     const trend = swing > 0.08 ? '  ▲' : swing < -0.08 ? '  ▼' : '';
@@ -229,8 +257,7 @@ export class StoreScene extends Phaser.Scene {
         d.stock = stock;
         d.money = Math.round((d.money - price) * 100) / 100;
       });
-    });
-    if (locked) tile.box.setAlpha(0.5);
+    }, { accent, icon: supplyIcon(it), locked });
     tile.id = it.id;
     tile.badge = this.add.image(0, 0, TextureKeys.Mascot).setScale(0.32).setVisible(false).setName(`store-pick-${it.id}`);
     tile.badgeText = this.add
@@ -254,8 +281,7 @@ export class StoreScene extends Phaser.Scene {
         s.decor.push(d.id);
         s.money = Math.round((s.money - d.price) * 100) / 100;
       });
-    });
-    if (locked) tile.box.setAlpha(0.5);
+    }, { accent: ACCENT.decor, icon: { key: TextureKeys.Planter }, locked });
     return tile;
   }
 
@@ -274,8 +300,7 @@ export class StoreScene extends Phaser.Scene {
         s.money = Math.round((s.money - h.price) * 100) / 100;
         s.lastSeen = Date.now(); // they start from now
       });
-    });
-    if (locked) tile.box.setAlpha(0.5);
+    }, { accent: ACCENT.crew, icon: { key: TextureKeys.CustomerRegular }, locked });
     return tile;
   }
 
@@ -303,8 +328,7 @@ export class StoreScene extends Phaser.Scene {
         this.refresh();
         return true;
       });
-    });
-    if (locked) tile.box.setAlpha(0.5);
+    }, { accent: ACCENT.crew, icon: { key: TextureKeys.Mascot }, locked });
     return tile;
   }
 
@@ -321,7 +345,7 @@ export class StoreScene extends Phaser.Scene {
         d.money = Math.round((d.money - g.price) * 100) / 100;
       });
       stickers()?.checkGuides();
-    });
+    }, { accent: ACCENT.guides, icon: { key: TextureKeys.IconGlaze, tint: 0x8a6fc9 } });
   }
 
   /** mochi's tip from the plan: what to get first, and what's short if money's tight. */
@@ -348,17 +372,22 @@ export class StoreScene extends Phaser.Scene {
     buyLabel: string,
     state: () => { label: string; low: boolean; can: boolean; owned: boolean },
     buy: () => void,
+    look: Look,
   ): Tile {
     const bg = this.add.graphics();
-    const title = this.add.text(0, -80, label, { fontFamily: FONT_FAMILY, fontSize: '32px', fontStyle: 'bold', color: CSS.ink, align: 'center' }).setOrigin(0.5);
-    // One line, shrunk to fit the narrowest tile.
-    for (let size = 32; title.width > 300 && size > 20; size -= 2) title.setFontSize(size);
-    const have = this.add.text(0, -42, '', { fontFamily: FONT_FAMILY, fontSize: '28px', color: '#6b5d52' }).setOrigin(0.5).setName(`${name}-have`);
+    // Not here yet: no name or picture, just a "?" (no spoilers).
+    const title = this.add
+      .text(0, -72, look.locked ? 'coming soon' : label, { fontFamily: FONT_FAMILY, fontSize: '32px', fontStyle: 'bold', color: look.locked ? '#8a7b70' : CSS.ink })
+      .setOrigin(0, 0.5);
+    const icon = look.locked
+      ? this.add.text(0, -52, '?', { fontFamily: FONT_FAMILY, fontSize: '64px', fontStyle: 'bold', color: '#8a7b70' }).setOrigin(0.5)
+      : this.add.image(0, -52, look.icon?.key ?? TextureKeys.Mascot).setTint(look.icon?.tint ?? 0xffffff);
+    const have = this.add.text(0, -36, '', { fontFamily: FONT_FAMILY, fontSize: '28px', color: '#6b5d52' }).setOrigin(0, 0.5).setName(`${name}-have`);
     const btn = new Button(
       this,
       0,
-      42,
-      buyLabel,
+      56,
+      look.locked ? 'locked' : buyLabel,
       () => {
         // A finger that was scrolling the list isn't buying.
         if (this.dragged) return;
@@ -368,14 +397,22 @@ export class StoreScene extends Phaser.Scene {
       },
       { width: 290, height: 120, fontSize: 34, name },
     );
-    const box = this.add.container(0, 0, [bg, title, have, btn]);
+    const box = this.add.container(0, 0, [bg, icon, title, have, btn]);
     this.list.add(box);
     const tile: Tile = {
+      look,
+      title,
+      icon,
       box,
       bg,
       have,
       buy: btn,
       refresh: () => {
+        if (look.locked) {
+          have.setText('');
+          btn.setEnabled(false);
+          return;
+        }
         const s = state();
         have.setText(s.low ? `${s.label} · low!` : s.label).setColor(s.low ? '#b0406a' : '#6b5d52');
         btn.setEnabled(s.can);
@@ -384,6 +421,37 @@ export class StoreScene extends Phaser.Scene {
     };
     this.tiles.push(tile);
     return tile;
+  }
+
+  /** A tile: white card with its section's band along the top, the picture, the name and count, and the buy button. */
+  private drawTile(t: Tile, tileW: number): void {
+    const g = t.bg;
+    const half = TILE_H / 2;
+    g.clear();
+    g.fillStyle(0x000000, 0.08);
+    g.fillRoundedRect(-tileW / 2 + 4, -half + 6, tileW, TILE_H, 26);
+    g.fillStyle(t.look.locked ? 0xf3ede4 : 0xffffff);
+    g.fillRoundedRect(-tileW / 2, -half, tileW, TILE_H, 26);
+    g.fillStyle(t.look.accent, t.look.locked ? 0.35 : 0.9);
+    g.fillRoundedRect(-tileW / 2, -half, tileW, 18, { tl: 26, tr: 26, bl: 0, br: 0 });
+    g.lineStyle(3, COLORS.ink, 0.15);
+    g.strokeRoundedRect(-tileW / 2, -half, tileW, TILE_H, 26);
+    if (t.look.locked) {
+      // A dashed circle round the "?".
+      g.lineStyle(3, 0x8a7b70, 0.6);
+      for (let k = 0; k < 16; k += 2) g.beginPath().arc(-tileW / 2 + 58, -52, 36, (k / 16) * Math.PI * 2, ((k + 1) / 16) * Math.PI * 2).strokePath();
+    }
+    // The picture on the left, the name and count beside it.
+    const ix = -tileW / 2 + 58;
+    t.icon.setPosition(ix, -52);
+    if (t.icon instanceof Phaser.GameObjects.Image) {
+      const fit = 78 / Math.max(t.icon.width, t.icon.height);
+      t.icon.setScale(fit);
+    }
+    const tx = -tileW / 2 + 108;
+    t.title.setPosition(tx, -72);
+    for (let size = 32; t.title.width > tileW - 124 && size > 18; size -= 2) t.title.setFontSize(size);
+    t.have.setPosition(tx, -34);
   }
 
   private refresh(): void {

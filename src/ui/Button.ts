@@ -24,9 +24,13 @@ export class Button extends Phaser.GameObjects.Container {
     const h = Math.max(opts.height ?? 140, MIN_HIT_SIZE);
 
     const bg = scene.make.graphics({}, false);
-    bg.fillStyle(0x000000, 0.25);
+    // A soft shadow, then a darker lip under the face: it looks like it presses in.
+    const fill = opts.fill ?? COLORS.pink;
+    bg.fillStyle(0x000000, 0.22);
+    bg.fillRoundedRect(-w / 2, -h / 2 + 13, w, h, 36);
+    bg.fillStyle(Phaser.Display.Color.IntegerToColor(fill).darken(16).color);
     bg.fillRoundedRect(-w / 2, -h / 2 + 8, w, h, 36);
-    bg.fillStyle(opts.fill ?? COLORS.pink);
+    bg.fillStyle(fill);
     bg.fillRoundedRect(-w / 2, -h / 2, w, h, 36);
 
     this.label = scene.make

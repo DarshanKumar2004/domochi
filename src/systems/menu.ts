@@ -28,6 +28,8 @@ export interface Topping {
   size: number;
   /** Pieces on the donut for full marks. */
   amount: { min: number; max: number };
+  /** Pieces released per shake (default 1): a fine powder pours in a thick stream. */
+  stream?: number;
 }
 
 export interface Flavor {

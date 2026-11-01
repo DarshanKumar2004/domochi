@@ -22,6 +22,9 @@ export type Sfx =
 export interface AudioSettings {
   sound: boolean;
   music: boolean;
+  /** Volume sliders (0–1, half by default; 0 is off). */
+  musicVolume?: number;
+  soundVolume?: number;
 }
 
 /** Music: a gentle loop of chords (root notes in Hz) and a pentatonic melody. */
@@ -39,9 +42,10 @@ const MELODY = [
   [3, -1, 2, -1, 1, 2, -1, 0],
   [1, -1, 2, 3, -1, 2, 1, -1],
 ];
-// Loud enough for a phone speaker at half volume (Kumar, 2026-11-01); a limiter keeps the mix from crackling.
-const MUSIC_VOLUME = 0.2;
-const SFX_VOLUME = 0.85;
+// Full volume on the sliders. Halfway (the default) is loud enough for a phone speaker at
+// half volume (Kumar, 2026-11-01); a limiter keeps the mix from crackling.
+const MUSIC_MAX = 0.8;
+const SFX_MAX = 1.7;
 
 type Ctx = AudioContext;
 
@@ -94,10 +98,10 @@ export class AudioService {
       limiter.release.value = 0.2;
       limiter.connect(ctx.destination);
       this.sfxGain = ctx.createGain();
-      this.sfxGain.gain.value = SFX_VOLUME;
+      this.sfxGain.gain.value = SFX_MAX * this.soundVolume;
       this.sfxGain.connect(limiter);
       this.musicGain = ctx.createGain();
-      this.musicGain.gain.value = MUSIC_VOLUME;
+      this.musicGain.gain.value = MUSIC_MAX * this.musicVolume;
       this.musicGain.connect(limiter);
       // One second of white noise, reused for every noisy sound.
       this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -106,6 +110,29 @@ export class AudioService {
     }
     void this.ctx.resume?.();
     if (this.settings.music) this.startMusic();
+  }
+
+  /** Music volume, 0–1 (0 = off). */
+  get musicVolume(): number {
+    return this.settings.musicVolume ?? 0.5;
+  }
+
+  /** Sound-effects volume, 0–1 (0 = off). */
+  get soundVolume(): number {
+    return this.settings.soundVolume ?? 0.5;
+  }
+
+  setMusicVolume(v: number): void {
+    this.settings.musicVolume = Math.max(0, Math.min(1, v));
+    if (this.musicGain) this.musicGain.gain.value = MUSIC_MAX * this.settings.musicVolume;
+    const on = this.settings.musicVolume > 0;
+    if (on !== this.settings.music) this.setMusic(on);
+  }
+
+  setSoundVolume(v: number): void {
+    this.settings.soundVolume = Math.max(0, Math.min(1, v));
+    if (this.sfxGain) this.sfxGain.gain.value = SFX_MAX * this.settings.soundVolume;
+    this.settings.sound = this.settings.soundVolume > 0;
   }
 
   setSound(on: boolean): void {

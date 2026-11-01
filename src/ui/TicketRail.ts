@@ -12,7 +12,7 @@ const DOUBLE_TAP_MS = 500;
 const GAP = 14;
 const LEFT_PAD = 24;
 /** Room kept on the right for the Settings button (HudScene places it). */
-export const RAIL_RIGHT_RESERVE = 280;
+export const RAIL_RIGHT_RESERVE = 400; // Settings, and mochi's journal beside it
 
 /**
  * Papa's-style ticket rail across the top: Day on the left, then a mini
@@ -141,11 +141,16 @@ export class TicketRail extends Phaser.GameObjects.Container {
           .setOrigin(1, 0.5),
       );
     }
-    // Up to 6 mini donuts, 3 per row.
-    const size = Math.min(42, (h - 50) / 2);
-    t.order.flavors.slice(0, 6).forEach((f, i) => {
-      const ix = 28 + (i % 3) * 47;
-      const iy = 50 + size / 2 + Math.floor(i / 3) * (size + 2);
+    // Up to 6 mini donuts, 3 per row, sized to fit inside the ticket (a short landscape rail too).
+    const shown = t.order.flavors.slice(0, 6);
+    const rows = shown.length > 3 ? 2 : 1;
+    const top = 46;
+    const gap = 3;
+    const size = Math.max(16, Math.min(42, (h - top - 8 - (rows - 1) * gap) / rows));
+    const left = (TICKET_W - (3 * size + 2 * gap)) / 2 + size / 2;
+    shown.forEach((f, i) => {
+      const ix = left + (i % 3) * (size + gap);
+      const iy = top + size / 2 + Math.floor(i / 3) * (size + gap);
       c.add(addDonutIcon(this.scene, ix, iy, size, f, this.menu));
     });
 

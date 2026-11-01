@@ -132,7 +132,7 @@ test('a whole day: serve until the clock runs out, close, see the summary, shop 
   // mochi's journal: day 1's page is written, with the "opening day" sticker.
   expect(saved.journal.pages.map((p: { day: number }) => p.day)).toEqual([1]);
   expect(saved.journal.stickers).toContain('first-day');
-  await tapNamed(page, SceneKeys.Lobby, 'btn-journal');
+  await tapNamed(page, SceneKeys.Hud, 'btn-journal');
   await waitForScene(page, SceneKeys.Journal);
   await findNamed(page, SceneKeys.Journal, 'journal-sticker-count'); // new stickers: it opens on the sticker book
   await shot(page, 'day-4-journal-stickers');

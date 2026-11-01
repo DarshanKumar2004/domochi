@@ -8,6 +8,7 @@ import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
+import { roundBg } from '../ui/roundBg';
 import { StationScene } from './StationScene';
 
 /** Doneness shown on the per-donut meters goes 0 → METER_MAX (golden = 1). */
@@ -212,14 +213,14 @@ export class FryScene extends StationScene {
     this.tempText = text(60).setOrigin(0, 0.5).setName('fry-temp');
     this.targetText = text(36, CSS.muted, false).setOrigin(0, 0.5);
     this.hintText = text(38, CSS.cream, false).setOrigin(0.5).setAlign('center');
-    this.resultText = text(56, CSS.ink)
+    this.resultText = roundBg(text(56, CSS.ink)
       .setOrigin(0.5)
       .setAlign('center')
       .setBackgroundColor(CSS.cream)
       .setPadding(28, 18, 28, 18)
       .setDepth(20)
       .setVisible(false)
-      .setName('fry-result');
+      .setName('fry-result'), COLORS.cream);
 
     this.rackLabel = text(36, CSS.cream, true).setOrigin(0, 0.5).setText('rack').setName('fry-rack');
     for (let i = 0; i < RACK_SHOWN; i++) this.rackMinis.push(this.makeRackMini(i));

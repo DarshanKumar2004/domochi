@@ -583,3 +583,21 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - **Box choice as piles of boxes** (`ui/BoxPile.ts`): a single bag, then the trio, flight and domochi boxes, wider for bigger boxes and stacked up to three high to show stock, with the name and count under each. Tap a pile to use it; the chosen pile is ringed in pink.
   - **Same-size trays:** the Toppings tray now uses the Glaze tray's exact size and spacing.
   - **Choppiness on the emulator:** measured through the web view's debugger, every station holds about 60 fps idle and about 55 fps while pouring, with a few slow frames. The game keeps up, so the choppy feel is most likely the emulator's input and display path. Check again on a real phone.
+- **Kumar's next round from the emulator (2026-11-01):**
+  - **Powdered sugar pours thickly again.** Toppings can set `stream` (pieces per shake). Sugar has 5 finer grains per shake and a bigger ideal amount (160–420), and off-donut grains count as 1/5 of a mess each.
+  - **Dough station sponge** sits on the bowl's rim: bright with "scrub to wash" when it's dirty, faded otherwise.
+  - **Volume sliders** for music and sound in Settings (0–100%, half by default; 0 is off). Halfway is double the old music level (`MUSIC_MAX 0.8`, `SFX_MAX 1.7`, through the limiter). Saved as `settings.musicVolume` / `soundVolume`.
+  - **Supply store restyled:**
+    - Each section has a colour, shown as a band on its tiles and a pill behind its title.
+    - Each tile has a picture: the tinted bin, the glaze cup in its colour, the jar, the box and so on, with the name and count beside it.
+    - Items not in yet are mystery tiles: "coming soon", a "?", and a "locked" button. No names (no spoilers).
+  - **Buttons everywhere** have a darker lip and a soft shadow, so they look pressable.
+  - **Ticket donuts** size themselves to fit the ticket (the 4th one was hanging off the bottom in landscape).
+  - **mochi's journal moved to the top bar**, beside Settings, with a "new!" badge, so it's there from every station. It's no longer on the lot.
+  - **Share is on the day summary too** (the day's best donut), as well as on each order's card.
+  - **The landscape patio sits a bit higher,** and its label never goes under the tab bar.
+  - **Rounded pop-ups:** the HUD notes, the morning and closing checklist, the pickups list, "that's everyone", the station flash messages and the sponge labels all get a rounded plate (`ui/roundBg.ts`, which follows the text each frame).
+  - **Couriers for pickup orders:**
+    - A little while after a pickup is ordered and the window's open, the courier's car drives in and parks: two spots in landscape, one in portrait (the next courier waits for it).
+    - The driver walks to the patio and waits with a "#N pickup" tag. Once the order's handed over, they walk back and drive off.
+    - The car is drawn in code (`courier-car`), tinted per courier.
