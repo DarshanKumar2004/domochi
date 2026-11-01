@@ -8,5 +8,5 @@ workers_dev = true
 preview_urls = false
 
 [vars]
-# Pages allowed to send reports: the live site, and the dev server.
-ALLOWED_ORIGINS = "https://darshankumar2004.github.io,http://localhost:5173"
+# Pages allowed to send reports: the live site, the Android app (Capacitor serves it from https://localhost), and the dev server.
+ALLOWED_ORIGINS = "https://darshankumar2004.github.io,https://localhost,http://localhost:5173"

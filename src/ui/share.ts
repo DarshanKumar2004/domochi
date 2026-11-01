@@ -3,6 +3,7 @@ import { TextureKeys } from '../assets/keys';
 import brand from '../data/brand.json';
 import type { FinishedDonut } from '../stations/toppings';
 import { drawFinishedDonut } from './donutArt';
+import { isNative, shareImageNative } from '../systems/native';
 import { CSS, FONT_FAMILY } from './theme';
 
 /** Share card size: 4:5, the shape Instagram posts like. */
@@ -72,6 +73,8 @@ export async function renderShareCard(scene: Phaser.Scene, card: ShareCard): Pro
  */
 export async function shareDonut(scene: Phaser.Scene, card: ShareCard): Promise<'shared' | 'downloaded' | 'cancelled'> {
   const blob = await renderShareCard(scene, card);
+  // In the Android app the share sheet needs a file.
+  if (isNative()) return shareImageNative(blob, 'my-domochi-donut.png', card.title, `${card.title}! ${brand.instagram}`).catch(() => 'cancelled' as const);
   const file = new File([blob], 'my-domochi-donut.png', { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
   if (nav.share && nav.canShare?.({ files: [file] })) {

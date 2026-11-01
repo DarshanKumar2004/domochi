@@ -48,6 +48,8 @@ export interface SaveData {
   settings: {
     sound: boolean;
     music: boolean;
+    /** The Android app's screen: locked landscape (the default), portrait, or turning with the phone. */
+    orientation?: 'landscape' | 'portrait' | 'auto';
   };
 }
 
@@ -124,6 +126,8 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;
     if (typeof raw.settings.music === 'boolean') data.settings.music = raw.settings.music;
+    const o = raw.settings.orientation;
+    if (o === 'landscape' || o === 'portrait' || o === 'auto') data.settings.orientation = o;
   }
   return data;
 }

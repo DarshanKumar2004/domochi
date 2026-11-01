@@ -3,11 +3,14 @@ import { createGameConfig } from './config';
 import { SaveService } from './systems/SaveService';
 import { audio, feedback, hasSession, save, session, setClockPaused, setSave, setSeed } from './systems/services';
 import { createDefaultStorage } from './systems/storage';
+import { initNative, isNative, PreferencesStorage } from './systems/native';
+import { handleBack } from './scenes/back';
 import { measureGameSize, watchContainerSize } from './ui/viewport';
 
 async function start(): Promise<void> {
   // Load the save before Phaser starts, so every scene can read it synchronously.
-  setSave(await SaveService.load(createDefaultStorage()));
+  // In the Android app the save lives in the phone's own storage.
+  setSave(await SaveService.load(isNative() ? new PreferencesStorage() : createDefaultStorage()));
 
   // ?seed=123 makes customers and orders reproducible (handy for testing and bug reports).
   const seed = Number(new URLSearchParams(window.location.search).get('seed'));
@@ -17,6 +20,12 @@ async function start(): Promise<void> {
   const size = measureGameSize(container);
   const game = new Phaser.Game(createGameConfig(size.width, size.height));
   watchContainerSize(game, container);
+  // The Android app: full screen, the chosen orientation, the back button, quiet in the background.
+  void initNative({
+    orientation: save().data.settings.orientation ?? 'landscape',
+    onBack: () => handleBack(game),
+    onPause: (paused) => audio().setSuspended(paused),
+  });
   // Hush when the tab or app goes to the background.
   document.addEventListener('visibilitychange', () => audio().setSuspended(document.hidden));
   // ...and pick the sound back up on the next tap if the phone paused it.

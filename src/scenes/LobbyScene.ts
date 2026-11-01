@@ -142,8 +142,8 @@ export class LobbyScene extends Phaser.Scene {
         padding: { x: 14, y: 8 },
       })
       .setOrigin(0.5)
+      // Not tilted: a rotated text with a background renders with holes in it (Phaser 4).
       .setDepth(4)
-      .setAngle(-3)
       .setVisible(!!specialName)
       .setName('lobby-special');
     // A little chalkboard naming the patio where customers wait.
@@ -393,7 +393,9 @@ export class LobbyScene extends Phaser.Scene {
     if (v.orientation !== 'portrait') return;
     const btn = [this.openButton, this.closeButton, this.sendHomeButton].find((b) => b.visible);
     const top = btn ? btn.y + 85 : v.content.y + L.pickups.y - this.pickupsText.height / 2;
-    this.pickupsText.setOrigin(0.5, 0).setY(top);
+    // ...but never down under the tab bar.
+    const floor = v.height - v.tabBarHeight - 12 - this.pickupsText.height;
+    this.pickupsText.setOrigin(0.5, 0).setY(Math.min(top, floor));
   }
 
   private openShop(): void {

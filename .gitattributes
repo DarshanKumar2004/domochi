@@ -1,0 +1,2 @@
+# The Gradle wrapper script must keep Unix line endings (it runs on Mac/Linux too).
+android/gradlew text eol=lf

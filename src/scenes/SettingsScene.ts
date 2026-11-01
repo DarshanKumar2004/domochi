@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { applyOrientation, isNative, type OrientationChoice } from '../systems/native';
 import { audio, save, saveDayInProgress } from '../systems/services';
 import { Button } from '../ui/Button';
 import { addCard, beginOverlay } from '../ui/overlay';
@@ -29,6 +30,8 @@ export class SettingsScene extends Phaser.Scene {
     );
     // Sound and music switches (saved, and applied straight away).
     const a = audio();
+    // In the Android app a third switch: how the screen turns.
+    const app = isNative();
     const toggle = (x: number, label: string, get: () => boolean, set: (on: boolean) => void, name: string) => {
       const b = new Button(this, x, -235, `${label}: ${get() ? 'on' : 'off'}`, () => {
         set(!get());
@@ -37,11 +40,23 @@ export class SettingsScene extends Phaser.Scene {
           d.settings.sound = a.soundOn;
           d.settings.music = a.musicOn;
         });
-      }, { width: 340, fill: COLORS.dough, name, fontSize: 48 });
+      }, { width: app ? 250 : 340, fill: COLORS.dough, name, fontSize: app ? 40 : 48 });
       card.add(b);
     };
-    toggle(-185, 'Sound', () => a.soundOn, (on) => a.setSound(on), 'btn-sound');
-    toggle(185, 'Music', () => a.musicOn, (on) => a.setMusic(on), 'btn-music');
+    toggle(app ? -270 : -185, 'Sound', () => a.soundOn, (on) => a.setSound(on), 'btn-sound');
+    toggle(app ? 0 : 185, 'Music', () => a.musicOn, (on) => a.setMusic(on), 'btn-music');
+    if (app) {
+      const names: Record<OrientationChoice, string> = { landscape: 'Landscape', portrait: 'Portrait', auto: 'Auto-rotate' };
+      const order: OrientationChoice[] = ['landscape', 'portrait', 'auto'];
+      const screen = new Button(this, 270, -235, names[save().data.settings.orientation ?? 'landscape'], () => {
+        const now = save().data.settings.orientation ?? 'landscape';
+        const next = order[(order.indexOf(now) + 1) % order.length]!;
+        screen.setLabel(names[next]);
+        void save().update((d) => void (d.settings.orientation = next));
+        void applyOrientation(next);
+      }, { width: 250, fill: COLORS.dough, name: 'btn-orientation', fontSize: 40 });
+      card.add(screen);
+    }
 
     card.add(
       new Button(this, 0, -70, 'Replay tutorial', () => this.replayTutorial(), {

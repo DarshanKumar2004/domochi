@@ -546,3 +546,13 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - **Ethan redrawn** in the logo's comic style: ink outlines, hair and ears, brows, eyes with a shine, rosy cheeks, an open smile, the ring on his pink cap and on his apron pocket, and a waving hand with fingers. His real look is still TODO-BRAND.
   - **Landscape lot:** the wide middle, between the A-frame and the patio, now has two smaller oaks, a hedge, a street lamp and a bench along the verge. It's hidden in portrait and on downtown pop-up days.
   - **The tutorial keeps every cup and jar out,** since it teaches with a cookies & cream order and that flavour is now locked on day 1. Locked cups and jars elsewhere say "soon" instead of an unlock day.
+- **Phase 8, the Android app** (2026-11-01). Ethan OK'd launching the app, and Kumar is publishing it on his personal Google Play account.
+  - **Libraries** (Kumar approved "whatever you need"): Capacitor 8 core, CLI and Android, plus the plugins app (back button), status-bar (full screen), screen-orientation, share and filesystem (the share sheet needs a file), and preferences (saves). `@capacitor/assets` is a dev tool that makes the icons; its npm audit warnings are dev-only.
+  - **App id:** `com.domochitreats.game`. It's permanent on Play.
+  - **Saves:** in the app they go to Capacitor Preferences. The first launch moves over any save found in the web view's localStorage (`PreferencesStorage`).
+  - **Screen:** the app starts in landscape (manifest `sensorLandscape`). Settings in the app gets a third switch, Landscape → Portrait → Auto-rotate (`settings.orientation`).
+  - **Back button:** closes an HTML card, then Settings, a ticket or the journal, then goes from a station back to the Lobby. Otherwise the app goes to the background (`scenes/back.ts`).
+  - **Feedback relay:** now lists `https://localhost` (the app's origin) in `relay/wrangler.toml`. Kumar redeploys it with `npx wrangler deploy`, since a production deploy from here was blocked.
+  - **For the store:** `public/privacy.html` (contact is domochi's Instagram and site, not a personal email); `store/` has the listing text, the feature graphic, the 512 icon and screenshots (`npm run store-art`); `ANDROID.md` has Kumar's steps (Android Studio, the upload key, building the AAB, Play Console, the 12-tester / 14-day closed test, data safety answers).
+  - **Signing:** release builds use `android/keystore.properties` (git-ignored), with the `.jks` kept outside the repo.
+  - **Fixed along the way:** the "today's special" chalkboard drew with holes in it (Phaser 4 draws a tilted text with a background wrongly), so it's no longer tilted. In portrait, the pickups list could slide under the tab bar; it now stops above it.
