@@ -28,6 +28,8 @@ test('store screenshots', async ({ page }) => {
   await out(page, '1-home');
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
+  // Let the start-of-day notes (daily gift, weather) come up first; each shot then clears them.
+  await page.waitForTimeout(3000);
   await pauseClock(page);
   await openDay(page);
   await advance(page, 75_000); // a line forms
