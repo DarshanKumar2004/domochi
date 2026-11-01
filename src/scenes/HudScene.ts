@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { audio, collectAwayEarnings, isClockPaused, markSeen, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
+import { dailyGift } from '../systems/daily';
+import { audio, awardSticker, balance, collectAwayEarnings, isClockPaused, markSeen, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
 import { Button } from '../ui/Button';
 import { Pill } from '../ui/Pill';
 import { TextureKeys } from '../assets/keys';
@@ -86,6 +87,25 @@ export class HudScene extends Phaser.Scene {
         audio().play('cash');
         this.showToast(`while you were away, ${who} sold $${away.amount.toFixed(2)}!\n(tap to close)`, true);
       });
+    }
+    // mochi's daily gift: the first visit each day, a bit more for each day in a row.
+    if (!session().isTutorial) {
+      const gift = dailyGift(balance.daily, save().data.daily, new Date());
+      if (gift && gift.cash > 0) {
+        void save().update((d) => {
+          d.daily = gift.state;
+          d.money = Math.round((d.money + gift.cash) * 100) / 100;
+        });
+        const week = gift.streak % balance.daily.gifts.length === 0;
+        if (week) awardSticker('daily-week');
+        const line = week
+          ? `🎁 a whole week in a row! mochi saved you $${gift.cash.toFixed(2)}!`
+          : `🎁 mochi's daily gift: $${gift.cash.toFixed(2)}!${gift.streak > 1 ? ` (${gift.streak} days in a row)` : ''}\ncome back tomorrow for more`;
+        this.time.delayedCall(600, () => {
+          audio().play('cash');
+          this.showToast(line);
+        });
+      }
     }
     // Good morning: today's weather and what it means.
     const wx = session().weather;

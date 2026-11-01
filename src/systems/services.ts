@@ -16,6 +16,7 @@ import { awayEarnings } from './staff';
 import journalJson from '../data/journal.json';
 import { StickerTracker, type JournalData } from './journal';
 import { weatherFor } from './weather';
+import { checkTrailerWord } from './trailerCode';
 import brandJson from '../data/brand.json';
 import { FeedbackService } from './FeedbackService';
 
@@ -158,6 +159,34 @@ export function feedback(): FeedbackService {
     feedbackService = new FeedbackService(store, endpoint);
   }
   return feedbackService;
+}
+
+/** Put a sticker in mochi's journal (if it isn't there yet). True if it's new. */
+export function awardSticker(id: string): boolean {
+  const s = saveService;
+  if (!s || s.data.journal.stickers.includes(id)) return false;
+  void s.update((d) => void d.journal.stickers.push(id));
+  return true;
+}
+
+/**
+ * The trailer's secret word, typed in the game: once a week it pays cash (and
+ * stickers for the first visit and for a regular).
+ */
+export function claimTrailerWord(input: string, now = new Date()): { result: 'new' | 'used' | 'wrong'; cash: number; stickers: string[] } {
+  const s = saveService;
+  const week = checkTrailerWord(input, now);
+  if (!s || week === null) return { result: 'wrong', cash: 0, stickers: [] };
+  if (s.data.trailerWeeks?.includes(week)) return { result: 'used', cash: 0, stickers: [] };
+  const cash = balance.trailerCode.cash;
+  void s.update((d) => {
+    d.trailerWeeks = [...(d.trailerWeeks ?? []), week].slice(-60);
+    d.money = Math.round((d.money + cash) * 100) / 100;
+  });
+  const stickers: string[] = [];
+  if (awardSticker('trailer-visit')) stickers.push('trailer-visit');
+  if ((s.data.trailerWeeks?.length ?? 0) >= balance.trailerCode.regularVisits && awardSticker('trailer-regular')) stickers.push('trailer-regular');
+  return { result: 'new', cash, stickers };
 }
 
 /**

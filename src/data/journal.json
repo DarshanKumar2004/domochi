@@ -158,6 +158,27 @@
       "color": "#b5d99c",
       "glyph": "✉",
       "secret": true
+    },
+    {
+      "id": "trailer-visit",
+      "name": "been to the trailer",
+      "desc": "find the secret word at the real domochi trailer",
+      "color": "#b0406a",
+      "glyph": "★"
+    },
+    {
+      "id": "trailer-regular",
+      "name": "trailer regular",
+      "desc": "find the secret word on 4 different weeks",
+      "color": "#7a4fb0",
+      "glyph": "♛"
+    },
+    {
+      "id": "daily-week",
+      "name": "a whole week",
+      "desc": "visit mochi 7 days in a row",
+      "color": "#5fa86a",
+      "glyph": "7"
     }
   ],
   "notes": {

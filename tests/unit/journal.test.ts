@@ -155,6 +155,8 @@ describe("mochi's journal", () => {
     const awardable = [
       'first-order', 'first-day', 'golden', 'great', 'perfect-order', 'gift', 'dough-perfect', 'regular', 'tidy', 'zero-waste',
       'busy', 'rainy', 'hot', 'pop-up', 'guides', 'week', 'streak', 'special', 'full-house', 'speedy', 'comeback', 'friends',
+      // Awarded outside the day (services: the trailer's secret word, the daily gift).
+      'trailer-visit', 'trailer-regular', 'daily-week',
     ];
     expect(journal.stickers.map((s) => s.id).sort()).toEqual(awardable.sort());
     expect(new Set(journal.stickers.map((s) => s.id)).size).toBe(journal.stickers.length);

@@ -127,3 +127,45 @@ export function showFeedback(kind: FeedbackKind, send: (text: string, name: stri
   });
   setTimeout(() => text.focus(), 50);
 }
+
+/**
+ * The trailer's secret word: the real domochi trailer shows a word each week;
+ * type it here for a treat. `check` says how it went (and what it gave).
+ */
+export function showTrailerWord(check: (word: string) => { result: 'new' | 'used' | 'wrong'; cash: number; stickers: string[] }, onClose?: () => void): void {
+  const { card, close } = openCard(
+    `<h2>the trailer's secret word</h2>
+     <p>every week the domochi trailer has a secret word. ask at the window or look on the menu board, then type it here for a treat!</p>
+     <input maxlength="24" placeholder="secret word" autocapitalize="none" autocomplete="off">
+     <p class="dm-muted" data-x="msg">find the trailer on Instagram at <b>${brand.instagram}</b>.</p>
+     <div class="dm-row"><button class="dm-btn" data-x="close">Close</button><button class="dm-btn dm-go" data-x="check">Check</button></div>`,
+    onClose,
+  );
+  const word = card.querySelector('input')!;
+  const msg = card.querySelector<HTMLElement>('[data-x="msg"]')!;
+  card.querySelector('[data-x="close"]')!.addEventListener('click', close);
+  const submit = () => {
+    if (!word.value.trim()) {
+      word.focus();
+      return;
+    }
+    const r = check(word.value);
+    if (r.result === 'wrong') {
+      msg.textContent = "hmm, that's not this week's word. ask at the trailer window!";
+      msg.style.color = '#b03a3a';
+      word.select();
+      return;
+    }
+    if (r.result === 'used') {
+      msg.textContent = "you've already found this week's word. come back next week for a new one!";
+      msg.style.color = '#6b5d52';
+      return;
+    }
+    const extra = r.stickers.length ? ' and a new sticker for your journal' : '';
+    card.innerHTML = `<h2>you found it!</h2><p>thanks for visiting the trailer! mochi put <b>$${r.cash.toFixed(2)}</b> in your tip jar${extra}.</p><p class="dm-muted">a new word comes every monday.</p><div class="dm-row"><button class="dm-btn dm-go" data-x="close">yay!</button></div>`;
+    card.querySelector('[data-x="close"]')!.addEventListener('click', close);
+  };
+  card.querySelector('[data-x="check"]')!.addEventListener('click', submit);
+  word.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  setTimeout(() => word.focus(), 50);
+}

@@ -36,3 +36,6 @@ android/.gradle/
 # Feedback relay local secrets (wrangler)
 relay/.dev.vars
 relay/.wrangler/
+
+# Ethan's calendar of trailer secret words (npm run trailer-words): not for the public repo
+trailer-words.html

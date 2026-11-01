@@ -602,3 +602,10 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
     - The driver walks to the patio and waits with a "#N pickup" tag. Once the order's handed over, they walk back and drive off.
     - The car is drawn in code (`courier-car`), tinted per courier.
   - **Fixes (Kumar):** shaking across onto the second toppings donut without lifting now makes it the active one, so its count, guide ring and Done follow. An unglazed donut on the glazing tray (out of glaze, say) can always come off: **Done** puts it back on the rack (`returnToRack`).
+- **Retention and in-store features (2026-11-01, Kumar asked for research and "what keeps people playing and coming to the real stand").** The launch plan report is at https://claude.ai/artifact/E65ccJbme4rqMoUXqASrbn.
+  - **mochi's daily gift** (`systems/daily.ts`, `balance.daily`, `save.daily`): on the first open each day, cash of $2, 3, 4, 5, 6, 8 then $15 for days in a row (a 7-day cycle). Missing a day just restarts the count. A full week earns the "a whole week" sticker. Research: daily streak and engagement bonuses are the top reason US mobile players return.
+  - **The trailer's secret word** (`systems/trailerCode.ts`, `balance.trailerCode`, `save.trailerWeeks`):
+    - Each week (Monday to Sunday) has a word picked from the date (a fixed donut-themed list, a hash of the week number, never the same two weeks running). Last week's word works too.
+    - Typing it on the home screen ("Secret word") pays $10 once a week. Stickers: "been to the trailer" for the first visit, "trailer regular" after 4 weeks.
+    - Ethan's calendar: `npm run trailer-words` writes `trailer-words.html` (git-ignored). The words can be worked out from the public code, so the rewards stay in-game.
+  - **Release bundle checked:** `bundleRelease` builds (6.3 MB). Only the signing key is missing.

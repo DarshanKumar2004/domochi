@@ -702,5 +702,22 @@
         "player": true
       }
     ]
+  },
+  "daily": {
+    "_note": "mochi's daily gift (research, 2026-11-01: daily streak bonuses are the top reason mobile players come back). The first time you open the game each day: cash for day 1, 2, ... in a row, a 7-day cycle; missing a day just starts again.",
+    "gifts": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      15
+    ]
+  },
+  "trailerCode": {
+    "_note": "The trailer's secret word (systems/trailerCode.ts): a word a week, shown at the real trailer; typing it in the game pays cash once a week. A sticker for the first visit, and another after regularVisits different weeks. Calendar for Ethan: npm run trailer-words.",
+    "cash": 10,
+    "regularVisits": 4
   }
 }

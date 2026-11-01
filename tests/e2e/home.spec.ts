@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
 import { findNamed, seedTutorialDone, shot, tapNamed, waitForScene } from './helpers';
+import { trailerWeek, trailerWord } from '../../src/systems/trailerCode';
 
 test('home screen: about us, a flavour idea for Ethan, then play; Settings goes back home', async ({ page }) => {
   test.setTimeout(90_000);
@@ -44,4 +45,29 @@ test('home screen: about us, a flavour idea for Ethan, then play; Settings goes 
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
   expect(errors).toEqual([]);
+});
+
+test("the trailer's secret word: this week's word pays once; a wrong one doesn't", async ({ page }) => {
+  test.setTimeout(60_000);
+  await seedTutorialDone(page);
+  await page.goto('/?seed=7');
+  await findNamed(page, SceneKeys.Preload, 'prompt-start');
+  await tapNamed(page, SceneKeys.Preload, 'btn-secret-word');
+  const input = page.locator('.dm-card input');
+  await input.fill('definitely not it');
+  await page.locator('[data-x="check"]').click();
+  await expect(page.locator('[data-x="msg"]')).toContainText("not this week's word");
+  await shot(page, 'home-secret-word');
+  await input.fill(trailerWord(trailerWeek(new Date())).toUpperCase());
+  await page.locator('[data-x="check"]').click();
+  await expect(page.locator('.dm-card h2')).toContainText('you found it');
+  const saved = JSON.parse((await page.evaluate(() => localStorage.getItem('domochi.save'))) ?? '{}');
+  expect(saved.money).toBeGreaterThanOrEqual(10);
+  expect(saved.journal.stickers).toContain('trailer-visit');
+  await page.locator('[data-x="close"]').click();
+  // The same week again: already found.
+  await tapNamed(page, SceneKeys.Preload, 'btn-secret-word');
+  await page.locator('.dm-card input').fill(trailerWord(trailerWeek(new Date())));
+  await page.locator('[data-x="check"]').click();
+  await expect(page.locator('[data-x="msg"]')).toContainText('already found');
 });

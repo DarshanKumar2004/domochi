@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import type { FeedbackKind } from '../systems/FeedbackService';
 import { Button } from '../ui/Button';
-import { panelOpen, showAbout, showFeedback } from '../ui/HomePanels';
+import { panelOpen, showAbout, showFeedback, showTrailerWord } from '../ui/HomePanels';
 import { ASSET_FILES, queueAssetFile } from '../assets/files';
 import brand from '../data/brand.json';
 import { TextureKeys } from '../assets/keys';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
-import { audio, feedback, menu, save } from '../systems/services';
+import { audio, feedback, menu, save, claimTrailerWord } from '../systems/services';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { Truck } from '../ui/Truck';
@@ -101,7 +101,8 @@ export class PreloadScene extends Phaser.Scene {
       this.logo.setPosition(lx, s.y + 450).setDisplaySize(620, 620);
       this.subtitle.setPosition(lx, s.y + 820);
       this.truck.setPosition(rx, s.y + 430).setScale(0.85);
-      this.homeButtons.forEach((b, i) => b.setPosition(rx + (i - 1) * 335, s.y + 830).setScale(0.95));
+      // Three under the trailer; the secret word under the logo.
+      this.homeButtons.forEach((b, i) => (i < 3 ? b.setPosition(rx + (i - 1) * 335, s.y + 830).setScale(0.95) : b.setPosition(lx, s.y + 985).setScale(0.95)));
       this.barBg.setPosition(rx, s.y + 830);
       this.barFill.setPosition(rx - BAR_WIDTH / 2, s.y + 830);
       this.prompt.setPosition(rx, s.y + 940);
@@ -112,7 +113,8 @@ export class PreloadScene extends Phaser.Scene {
       this.logo.setPosition(cx, s.y + 400).setDisplaySize(560, 560);
       this.subtitle.setPosition(cx, s.y + 730);
       this.truck.setPosition(cx, s.y + 1150).setScale(1);
-      this.homeButtons.forEach((b, i) => b.setPosition(cx + (i - 1) * 345, s.y + 1560));
+      // Four across (a little smaller).
+      this.homeButtons.forEach((b, i) => b.setPosition(cx + (i - 1.5) * 262, s.y + 1560).setScale(0.78));
       this.barBg.setPosition(cx, s.y + 1560);
       this.barFill.setPosition(cx - BAR_WIDTH / 2, s.y + 1560);
       this.prompt.setPosition(cx, s.y + 1700);
@@ -201,6 +203,8 @@ export class PreloadScene extends Phaser.Scene {
       new Button(this, 0, 0, 'About us', () => showAbout(), opts('btn-about')),
       new Button(this, 0, 0, 'Suggest a flavor', () => showFeedback('flavor', thanks('flavor')), { ...opts('btn-suggest'), fontSize: 30 }),
       new Button(this, 0, 0, 'Let Ethan know', () => showFeedback('note', thanks('note')), { ...opts('btn-tell-ethan'), fontSize: 30 }),
+      // The real trailer's weekly secret word: a treat for visiting.
+      new Button(this, 0, 0, 'Secret word', () => showTrailerWord((w) => claimTrailerWord(w)), { ...opts('btn-secret-word'), fill: COLORS.pink, fontSize: 30 }),
     ];
     for (const b of this.homeButtons) b.setDepth(3).setVisible(false);
   }

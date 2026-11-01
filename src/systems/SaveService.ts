@@ -37,6 +37,10 @@ export interface SaveData {
   lastSeen?: number;
   /** What the player told mochi to call them (when they joined the team). */
   playerName: string;
+  /** mochi's daily gift: the last day it was given, and days in a row. */
+  daily?: { last: string; streak: number };
+  /** Trailer weeks whose secret word has been claimed (the newest few). */
+  trailerWeeks?: number[];
   /** A random id for this save (coupon codes are tied to it); made when first needed. */
   playerId: string;
   /** How well each regular knows you (customers.json regulars ids). */
@@ -137,6 +141,10 @@ export function sanitizeSave(raw: unknown): SaveData {
       mold: { glaze: Math.floor(n(raw.trays.mold.glaze)), toppings: Math.floor(n(raw.trays.mold.toppings)), bowl: Math.floor(n(raw.trays.mold.bowl)) },
     };
   }
+  if (isRecord(raw.daily) && typeof raw.daily.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.daily.last) && typeof raw.daily.streak === 'number') {
+    data.daily = { last: raw.daily.last, streak: Math.max(1, Math.floor(raw.daily.streak)) };
+  }
+  if (Array.isArray(raw.trailerWeeks)) data.trailerWeeks = raw.trailerWeeks.filter((w): w is number => Number.isInteger(w)).slice(-60);
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;
     if (typeof raw.settings.music === 'boolean') data.settings.music = raw.settings.music;

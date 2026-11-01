@@ -19,7 +19,8 @@
     "android:open": "cap open android",
     "android:bundle": "npm run android:sync && cd android && gradlew bundleRelease",
     "android:apk": "npm run android:sync && cd android && gradlew assembleDebug",
-    "store-art": "playwright test -c playwright.store.config.ts"
+    "store-art": "playwright test -c playwright.store.config.ts",
+    "trailer-words": "node scripts/trailer-words.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
