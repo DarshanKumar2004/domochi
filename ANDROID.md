@@ -27,7 +27,7 @@ Google Play signs the app for players. You sign each upload with your own **uplo
 1. Make a folder **outside the project**, for example `C:\Users\kumar\domochi-keys`.
 2. In a terminal, run (one line):
    ```
-   "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe" -genkeypair -v -keystore C:\Users\kumar\domochi-keys\domochi-upload.jks -alias domochi -keyalg RSA -keysize 2048 -validity 10000
+   "C:\Users\kumar\.jdks\jbr-21.0.11\bin\keytool.exe" -genkeypair -v -keystore C:\Users\kumar\domochi-keys\domochi-upload.jks -alias domochi -keyalg RSA -keysize 2048 -validity 10000
    ```
    It asks for a password (make a strong one), then your name and city. Those can be anything; they aren't shown to players.
 3. Create the file `android/keystore.properties`. It's git-ignored, so it never goes to GitHub:
@@ -47,7 +47,7 @@ npm run android:bundle
 
 The file is `android/app/build/outputs/bundle/release/app-release.aab`.
 
-- If it says JAVA_HOME isn't set, run this first in the same terminal: `set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr`.
+- If it says JAVA_HOME isn't set, run this first in the same terminal: `set JAVA_HOME=C:\Users\kumar\.jdks\jbr-21.0.11` (the Java 21 that Android Studio downloaded).
 - You can also build it in Android Studio: **Build → Generate Signed App Bundle**.
 
 **Every later update:** raise `versionCode` (1 → 2 → 3…) and `versionName` in `android/app/build.gradle`, then build again.
