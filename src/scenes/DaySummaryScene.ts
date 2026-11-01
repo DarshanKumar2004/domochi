@@ -4,7 +4,7 @@ import { flavorsForDay } from '../systems/menu';
 import { addPage, dayNote, dayStars, nextMilestone, type JournalPage, type Milestone } from '../systems/journal';
 import { createRng } from '../systems/rng';
 import { couponCode, earnsCoupon } from '../systems/coupons';
-import { audio, balance, feedback, journalData, menu, save, session, stickers } from '../systems/services';
+import { audio, balance, feedback, journalData, menu, save, session, stickers, currentWeekly } from '../systems/services';
 import { drawFinishedDonut } from '../ui/donutArt';
 import { shareDonut } from '../ui/share';
 import { Button } from '../ui/Button';
@@ -12,6 +12,7 @@ import { addCard, beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { onLayout } from '../ui/viewport';
 import { startMainGame, stopMainGame } from './flow';
+import { addWeeklyDay, weeklyText, type WeeklyState } from '../systems/weekly';
 import { SceneKeys } from './sceneKeys';
 
 const CARD_W = 860;
@@ -29,6 +30,8 @@ const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(n).toFixed(2)}`;
  */
 export class DaySummaryScene extends Phaser.Scene {
   private coupon: string | undefined;
+  /** The weekly challenge after today (saved on the way to tomorrow). */
+  private weekly: { state: WeeklyState; justDone: boolean } | undefined;
   constructor() {
     super(SceneKeys.DaySummary);
   }
@@ -48,6 +51,12 @@ export class DaySummaryScene extends Phaser.Scene {
       void save().update((d) => void (d.playerId = id));
     }
     const coupon = earns ? couponCode(sum.day, save().data.playerId) : undefined;
+    // The weekly challenge: today counts towards it.
+    this.weekly = counted
+      ? addWeeklyDay(currentWeekly(sum.day), { flavors: s.servedFlavors(), great: sum.tiers.great, tidy: !!sum.tidy, stars: dayStars(sum) })
+      : undefined;
+    const wk = this.weekly;
+    const flavorName = (id: string) => menu.flavors.find((f) => f.id === id)?.name ?? id;
     this.coupon = coupon;
     // The day's stickers (finishing the day, a tidy close, no waste...).
     const tracker = stickers();
@@ -89,6 +98,13 @@ export class DaySummaryScene extends Phaser.Scene {
       ...(sum.specialsSold ? [["special sold", `${sum.specialsSold}`, 'specials'] as Row] : []),
       ...(sum.errandSpent ? [["a friend's store run", `−${money(sum.errandSpent)}`, 'errand'] as Row] : []),
       ...(coupon ? [['your coupon', coupon, 'coupon'] as Row] : []),
+      ...(wk
+        ? [
+            (wk.justDone
+              ? ['weekly challenge', `done! +${money(balance.weekly.reward)}`, 'weekly']
+              : ['this week', `${weeklyText(wk.state, flavorName)} · ${wk.state.progress}/${wk.state.target}${wk.state.done ? ' ✓' : ''}`, 'weekly']) as Row,
+          ]
+        : []),
       ...(earned.length ? [['new stickers', earned.map((st) => st.glyph).join(' '), 'stickers'] as Row] : []),
       ...(counted && sum.suppliesCost - sum.wasteCost >= 0.005 ? [['other supplies used', `−${money(Math.max(0, sum.suppliesCost - sum.wasteCost))}`, 'supplies'] as Row] : []),
     ];
@@ -198,6 +214,10 @@ export class DaySummaryScene extends Phaser.Scene {
     void save().update((d) => {
       d.day = sum.day + 1;
       d.money = Math.round((d.money + sum.sales + sum.tips + sum.tidyBonus + sum.goalBonus - sum.errandSpent) * 100) / 100;
+      if (this.weekly) {
+        d.weekly = this.weekly.state;
+        if (this.weekly.justDone) d.money = Math.round((d.money + balance.weekly.reward) * 100) / 100;
+      }
       // Book tomorrow's pop-up (or drop a booking that's been and gone).
       if (invite) d.event = { id: invite.id, day: sum.day + 1 };
       else if (d.event && d.event.day <= sum.day) delete d.event;

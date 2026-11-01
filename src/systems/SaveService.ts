@@ -1,4 +1,5 @@
 import type { DaySnapshot } from './GameSession';
+import type { WeeklyState } from './weekly';
 import type { JournalPage } from './journal';
 /**
  * Async key-value storage. Async so it can be backed by Capacitor Preferences
@@ -41,6 +42,8 @@ export interface SaveData {
   daily?: { last: string; streak: number };
   /** Trailer weeks whose secret word has been claimed (the newest few). */
   trailerWeeks?: number[];
+  /** This week's challenge and how far along it is. */
+  weekly?: WeeklyState;
   /** A random id for this save (coupon codes are tied to it); made when first needed. */
   playerId: string;
   /** How well each regular knows you (customers.json regulars ids). */
@@ -143,6 +146,17 @@ export function sanitizeSave(raw: unknown): SaveData {
   }
   if (isRecord(raw.daily) && typeof raw.daily.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.daily.last) && typeof raw.daily.streak === 'number') {
     data.daily = { last: raw.daily.last, streak: Math.max(1, Math.floor(raw.daily.streak)) };
+  }
+  if (isRecord(raw.weekly) && Number.isInteger(raw.weekly.week) && ['flavor', 'great', 'stars', 'tidy'].includes(raw.weekly.kind as string)) {
+    const w = raw.weekly;
+    data.weekly = {
+      week: w.week as number,
+      kind: w.kind as WeeklyState['kind'],
+      ...(typeof w.flavor === 'string' ? { flavor: w.flavor } : {}),
+      target: typeof w.target === 'number' && w.target > 0 ? w.target : 1,
+      progress: typeof w.progress === 'number' && w.progress >= 0 ? w.progress : 0,
+      done: w.done === true,
+    };
   }
   if (Array.isArray(raw.trailerWeeks)) data.trailerWeeks = raw.trailerWeeks.filter((w): w is number => Number.isInteger(w)).slice(-60);
   if (isRecord(raw.settings)) {

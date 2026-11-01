@@ -1796,6 +1796,16 @@ export class GameSession {
   }
 
   /** The day's best donut: from the best-scoring order, the donut that matched its flavour best. */
+  /** Donuts served today, by flavour (for the weekly challenge). */
+  servedFlavors(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const t of this.allTickets) {
+      if (t.status !== 'served' || !t.results.score) continue;
+      for (const f of t.order.flavors) out[f] = (out[f] ?? 0) + 1;
+    }
+    return out;
+  }
+
   get bestDonut(): FinishedDonut | undefined {
     let best: Ticket | undefined;
     for (const t of this.allTickets) {

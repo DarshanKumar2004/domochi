@@ -16,7 +16,9 @@ import { awayEarnings } from './staff';
 import journalJson from '../data/journal.json';
 import { StickerTracker, type JournalData } from './journal';
 import { weatherFor } from './weather';
-import { checkTrailerWord } from './trailerCode';
+import { checkTrailerWord, trailerWeek } from './trailerCode';
+import { weeklyFor, type WeeklyState } from './weekly';
+import { flavorsForDay } from './menu';
 import brandJson from '../data/brand.json';
 import { FeedbackService } from './FeedbackService';
 
@@ -159,6 +161,11 @@ export function feedback(): FeedbackService {
     feedbackService = new FeedbackService(store, endpoint);
   }
   return feedbackService;
+}
+
+/** This week's challenge (the one going, or a new one for a new week), for the flavours you have on `day`. */
+export function currentWeekly(day: number, now = new Date()): WeeklyState {
+  return weeklyFor(balance.weekly, trailerWeek(now), saveService?.data.weekly, flavorsForDay(menu, day).map((f) => f.id));
 }
 
 /** Put a sticker in mochi's journal (if it isn't there yet). True if it's new. */

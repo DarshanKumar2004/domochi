@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import type { Customer } from '../systems/GameSession';
-import { audio, balance, menu, session } from '../systems/services';
+import { audio, balance, currentWeekly, menu, session } from '../systems/services';
+import { weeklyText } from '../systems/weekly';
 import { Booth } from '../ui/Booth';
 import { LobbyScenery } from '../ui/LobbyScenery';
 import { Button } from '../ui/Button';
@@ -315,6 +316,7 @@ export class LobbyScene extends Phaser.Scene {
         s.event ? `pop-up day: ${s.event.name}!` : 'good morning! before opening:',
         ...(s.weather ? [`(${s.weather.note})`] : []),
         ...(s.goal ? [`• goal: ${s.goal.text} (+$${balance.goals.reward})`] : []),
+        ...this.weeklyLine(),
         ...(s.special ? [`• special: ${menu.flavors.find((f) => f.id === s.special)?.name} (+${money(balance.special.priceBonus)})`] : []),
         `• ${dough ? `dough: ${dough} donuts ready` : 'make dough (Dough station)'}`,
       ];
@@ -613,6 +615,15 @@ export class LobbyScene extends Phaser.Scene {
       this.placeCourierTag(cv);
       cv.tag.setVisible(true);
     }
+  }
+
+  /** The weekly challenge on the morning checklist (not on the tutorial day). */
+  private weeklyLine(): string[] {
+    const s = session();
+    if (s.isTutorial || !s.tracksSupplies) return [];
+    const w = currentWeekly(s.day);
+    const name = (id: string) => menu.flavors.find((f) => f.id === id)?.name ?? id;
+    return [w.done ? '• this week: challenge done! ✓' : `• this week: ${weeklyText(w, name)} (${w.progress}/${w.target})`];
   }
 
   private closeUp(): void {

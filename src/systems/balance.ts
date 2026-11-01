@@ -8,6 +8,7 @@ import { validateScoring, type ScoringBalance } from './score';
 import type { GuideItem, PaymentBalance, SuppliesBalance } from './supplies';
 import type { WeatherBalance } from './weather';
 import type { DailyBalance } from './daily';
+import type { WeeklyBalance } from './weekly';
 import type { StaffBalance } from './staff';
 
 /** A decoration for the lot (bought once at the store), with a small perk. */
@@ -62,6 +63,8 @@ export interface Balance {
   daily: DailyBalance;
   /** The trailer's secret word reward. */
   trailerCode: { cash: number; regularVisits: number };
+  /** The weekly challenge. */
+  weekly: WeeklyBalance;
   goals: { reward: number; fromDay: number; list: { id: string; text: string; base: number; perDay: number; max: number }[] };
   streak: { tipPerOrder: number; maxBonus: number };
 }

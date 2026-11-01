@@ -719,5 +719,15 @@
     "_note": "The trailer's secret word (systems/trailerCode.ts): a word a week, shown at the real trailer; typing it in the game pays cash once a week. A sticker for the first visit, and another after regularVisits different weeks. Calendar for Ethan: npm run trailer-words.",
     "cash": 10,
     "regularVisits": 4
+  },
+  "weekly": {
+    "_note": "The weekly challenge (systems/weekly.ts): one goal per real calendar week (Monday to Sunday), built up over the days played that week; reward when it's done. A reason to come back across the week.",
+    "reward": 25,
+    "targets": {
+      "flavor": 10,
+      "great": 12,
+      "stars": 8,
+      "tidy": 3
+    }
   }
 }
