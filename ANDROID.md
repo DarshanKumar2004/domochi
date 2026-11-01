@@ -91,3 +91,13 @@ The app sends notes from `https://localhost`, which is how Capacitor serves it. 
 cd relay
 npx wrangler deploy
 ```
+
+## 7. Keeping the game fresh (no app update needed)
+
+- **News banner and featured flavour:** edit `public/news.json` and push.
+  - `message` shows on the home screen (for example where the trailer is this week).
+  - `featured` names a menu flavour (such as `strawberry`) that becomes the in-game special of the day.
+  - `until` (YYYY-MM-DD) hides both after that day.
+  - The app and the website read the file every time they open.
+- **The trailer's secret word:** run `npm run trailer-words` to make `trailer-words.html`, a calendar of the next 26 weeks of words for Ethan. Show the week's word at the trailer; players type it on the home screen for a weekly reward. Don't commit that file.
+- **Code changes** (new flavours, features) do need a new build: raise `versionCode` in `android/app/build.gradle`, run `npm run android:bundle`, and upload in Play Console.
