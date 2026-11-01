@@ -533,3 +533,5 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - **Tested live:** a real note reached Kumar's inbox, another site's request got a 403, and the preflight from the GitHub Pages site is allowed.
   - **Only the built game sends** (`import.meta.env.PROD`). The dev server and the Playwright runs keep notes queued, so tests never email anyone.
   - **Switching to Ethan:** `npx wrangler secret put FEEDBACK_TO`. Resend first needs domochitreats.com verified before it will deliver to anyone other than the account owner.
+- **Notes are emailed the moment the player taps Send** (Kumar, 2026-11-01), not at the end of the day. If a send fails (offline, say), the note stays queued and is retried at the end of the day and at start-up. Sends run one at a time, and only the notes that went out are cleared, so two quick notes are never lost or sent twice.
+  - **Later idea (Kumar):** once lots of people play, switch to one end-of-day email with everyone's notes. That digest would have to be collected on the relay's side, for example in Cloudflare KV with a daily cron trigger.

@@ -191,7 +191,12 @@ export class PreloadScene extends Phaser.Scene {
   /** About us, suggest a flavour, a note for Ethan: shown once loading's done. */
   private makeHomeButtons(): void {
     const opts = (name: string) => ({ width: 320, height: 120, fontSize: 34, fill: COLORS.dough, name });
-    const thanks = (kind: FeedbackKind) => (text: string, name: string) => feedback().add(kind, text, name);
+    // A note goes out as soon as it's sent (if that fails, it waits for the end of the day or the next visit).
+    const thanks = (kind: FeedbackKind) => (text: string, name: string) => {
+      const kept = feedback().add(kind, text, name);
+      if (kept) void feedback().sendReport(save().data.day);
+      return kept;
+    };
     this.homeButtons = [
       new Button(this, 0, 0, 'About us', () => showAbout(), opts('btn-about')),
       new Button(this, 0, 0, 'Suggest a flavor', () => showFeedback('flavor', thanks('flavor')), { ...opts('btn-suggest'), fontSize: 30 }),

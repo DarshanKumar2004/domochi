@@ -1,6 +1,6 @@
 // Players' notes for Ethan: flavour ideas and anything they want to tell him.
-// Kept on the device and sent as one daily report (at the end of each day, and
-// at start-up if an older report is waiting). Sending needs an endpoint that
+// Kept on the device and sent as soon as the player sends one; anything that
+// could not go out then is retried at the end of the day and at start-up. Sending needs an endpoint that
 // takes a JSON POST and emails it on (a form service such as Formspree, or a
 // small serverless function): brand.json `feedbackEndpoint`. Until one is set,
 // notes simply wait in the queue. No Phaser imports.
@@ -35,6 +35,9 @@ export class FeedbackService {
     },
   ) {}
 
+  /** Sends run one after another, so two quick notes never go out twice. */
+  private chain: Promise<unknown> = Promise.resolve();
+
   /** Notes waiting to go out. */
   get queued(): Feedback[] {
     try {
@@ -60,7 +63,13 @@ export class FeedbackService {
    * Send everything waiting as one report. On success the queue empties; if
    * there's no endpoint yet, or it fails, the notes wait for the next time.
    */
-  async sendReport(day: number): Promise<'sent' | 'nothing' | 'waiting'> {
+  sendReport(day: number): Promise<'sent' | 'nothing' | 'waiting'> {
+    const run = this.chain.then(() => this.sendNow(day));
+    this.chain = run;
+    return run;
+  }
+
+  private async sendNow(day: number): Promise<'sent' | 'nothing' | 'waiting'> {
     const notes = this.queued;
     if (!notes.length) return 'nothing';
     if (!this.endpoint) return 'waiting';
@@ -83,7 +92,8 @@ export class FeedbackService {
     } catch {
       return 'waiting';
     }
-    this.store.set(FEEDBACK_KEY, JSON.stringify([]));
+    // Drop just what went out: a note added meanwhile waits for the next send.
+    this.store.set(FEEDBACK_KEY, JSON.stringify(this.queued.slice(notes.length)));
     return 'sent';
   }
 }

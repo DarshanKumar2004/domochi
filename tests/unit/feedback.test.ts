@@ -47,4 +47,24 @@ describe('notes for Ethan', () => {
     store.set(FEEDBACK_KEY, '{not json');
     expect(f.queued).toEqual([]);
   });
+
+  it('two notes sent in quick succession each go out once, and neither is lost', async () => {
+    const sent: string[][] = [];
+    let release!: () => void;
+    const f = new FeedbackService(memStore(), 'https://example.test/report', async (_url, body) => {
+      sent.push((JSON.parse(body) as { notes: { text: string }[] }).notes.map((n) => n.text));
+      if (sent.length === 1) await new Promise<void>((r) => (release = r)); // the first send is slow
+      return true;
+    });
+    f.add('note', 'first');
+    const a = f.sendReport(2);
+    while (!sent.length) await Promise.resolve(); // the first send is under way
+    f.add('flavor', 'second'); // written while the first is still on its way
+    const b = f.sendReport(2);
+    release();
+    expect(await a).toBe('sent');
+    expect(await b).toBe('sent');
+    expect(sent).toEqual([['first'], ['second']]);
+    expect(f.queued).toHaveLength(0);
+  });
 });

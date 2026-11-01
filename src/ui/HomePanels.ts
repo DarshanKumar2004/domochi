@@ -96,8 +96,8 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * A little form: a flavour idea, or a note for Ethan. `send` keeps it for
- * the day's report (it says whether the note was kept).
+ * A little form: a flavour idea, or a note for Ethan. `send` keeps it and
+ * sends it on (it says whether the note was kept).
  */
 export function showFeedback(kind: FeedbackKind, send: (text: string, name: string) => boolean, onClose?: () => void): void {
   const title = kind === 'flavor' ? 'suggest a new flavor' : 'let Ethan know';
@@ -107,7 +107,7 @@ export function showFeedback(kind: FeedbackKind, send: (text: string, name: stri
      <p>${prompt}</p>
      <textarea maxlength="500" placeholder="${kind === 'flavor' ? 'ube with coconut flakes!' : 'type here'}"></textarea>
      <input maxlength="60" placeholder="your first name (optional)">
-     <p class="dm-muted">Sent to domochi in a daily report. Please don't include private info.</p>
+     <p class="dm-muted">Sent straight to domochi. Please don't include private info.</p>
      <div class="dm-row"><button class="dm-btn" data-x="close">Cancel</button><button class="dm-btn dm-go" data-x="send">Send</button></div>`,
     onClose,
   );
