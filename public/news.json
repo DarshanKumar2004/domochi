@@ -1,5 +1,6 @@
 {
-  "_note": "News from the real trailer, shown on the game's home screen (web and app). Edit, commit and push: players see it next time they open the game, no app update needed. message: up to 140 characters (empty = no banner). until: last day to show it (YYYY-MM-DD), or empty for no end.",
+  "_note": "News from the real trailer, shown on the game's home screen (web and app). Edit, commit and push: players see it next time they open the game, no app update needed. message: up to 140 characters (empty = no banner). until: last day to show it (YYYY-MM-DD), or empty for no end. featured: a menu flavour id the real shop is pushing this week (e.g. strawberry); it becomes the in-game special of the day for players who have it.",
   "message": "",
-  "until": ""
+  "until": "",
+  "featured": ""
 }

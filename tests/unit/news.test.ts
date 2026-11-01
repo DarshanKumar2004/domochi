@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeNews } from '../../src/systems/news';
+import { activeFeatured, activeNews } from '../../src/systems/news';
 
 describe('news from the trailer', () => {
   const now = new Date(2026, 10, 7, 12);
@@ -19,5 +19,15 @@ describe('news from the trailer', () => {
 
   it('long messages are cut short', () => {
     expect(activeNews({ message: 'x'.repeat(500) }, now)!.length).toBe(140);
+  });
+});
+
+describe('the featured flavour', () => {
+  const now = new Date(2026, 10, 7, 12);
+  it('comes from news.json while it is in date', () => {
+    expect(activeFeatured({ featured: ' strawberry ' }, now)).toBe('strawberry');
+    expect(activeFeatured({ featured: 'strawberry', until: '2026-11-06' }, now)).toBeNull();
+    expect(activeFeatured({ featured: '' }, now)).toBeNull();
+    expect(activeFeatured(null, now)).toBeNull();
   });
 });

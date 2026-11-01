@@ -816,3 +816,12 @@ describe('the dough bowl needs washing', () => {
     expect(next.scoop('rice-flour')).toBe(true);
   });
 });
+
+describe("the real shop's featured flavour", () => {
+  it("becomes the special of the day when you have it (and is ignored when you don't)", () => {
+    const day12 = (featured?: string) =>
+      new GameSession({ menu, customers, balance, day: 12, rng: createRng(3), dayFlow: true, events, ...(featured ? { featured } : {}) });
+    expect(day12('strawberry').special).toBe('strawberry');
+    expect(day12('cookie-butter').special).toBe(day12().special); // not unlocked on day 12
+  });
+});

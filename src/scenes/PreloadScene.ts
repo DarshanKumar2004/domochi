@@ -6,7 +6,7 @@ import { ASSET_FILES, queueAssetFile } from '../assets/files';
 import brand from '../data/brand.json';
 import { TextureKeys } from '../assets/keys';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
-import { audio, feedback, menu, save, claimTrailerWord } from '../systems/services';
+import { audio, feedback, menu, save, claimTrailerWord, setNews } from '../systems/services';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { Truck } from '../ui/Truck';
@@ -213,6 +213,7 @@ export class PreloadScene extends Phaser.Scene {
     fetch(url, { cache: 'no-store', signal: ctl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((json: unknown) => {
+        setNews(json);
         const msg = activeNews(json, new Date());
         if (msg && this.news?.active) this.news.setText(`📍 ${msg}`).setVisible(true);
       })

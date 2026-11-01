@@ -273,6 +273,8 @@ export interface SessionDeps {
   decor?: string[];
   /** The trays as yesterday left them: mess not cleaned up, and how many days each has sat dirty (mold!). */
   mess?: TrayState;
+  /** A flavour the real shop is featuring this week (news.json): today's special, if it's on the menu. */
+  featured?: string;
   /** Money in the bank before today (what a friend's errand can be paid from, with today's takings). */
   bank?: () => number;
 }
@@ -481,6 +483,8 @@ export class GameSession {
     if (!this.deps.dayFlow || this.isTutorial || this.day < (this.deps.balance.special.fromDay ?? 1)) return undefined;
     const open = flavorsForDay(this.deps.menu, this.day);
     if (!open.length) return undefined;
+    // The real shop's featured flavour, when you have it.
+    if (this.deps.featured && open.some((f) => f.id === this.deps.featured)) return this.deps.featured;
     let h = Math.imul(this.day ^ 0x5bd1e995, 0x27d4eb2d);
     h ^= h >>> 15;
     return open[(h >>> 0) % open.length]!.id;

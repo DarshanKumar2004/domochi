@@ -18,6 +18,7 @@ import { StickerTracker, type JournalData } from './journal';
 import { weatherFor } from './weather';
 import { checkTrailerWord, trailerWeek } from './trailerCode';
 import { weeklyFor, type WeeklyState } from './weekly';
+import { activeFeatured } from './news';
 import { flavorsForDay } from './menu';
 import brandJson from '../data/brand.json';
 import { FeedbackService } from './FeedbackService';
@@ -99,6 +100,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
           regulars: { ...(saveService?.data.regulars ?? {}) },
           decor: [...(saveService?.data.decor ?? [])],
           bank: () => saveService?.data.money ?? 0,
+          ...(featuredNow() ? { featured: featuredNow()! } : {}),
           ...(saveService?.data.trays ? { mess: saveService.data.trays } : {}),
           ...(event ? { event } : {}),
         }),
@@ -161,6 +163,15 @@ export function feedback(): FeedbackService {
     feedbackService = new FeedbackService(store, endpoint);
   }
   return feedbackService;
+}
+
+/** News from the trailer (news.json), once the home screen has read it. */
+let newsCache: unknown = null;
+export function setNews(json: unknown): void {
+  newsCache = json;
+}
+function featuredNow(): string | null {
+  return activeFeatured(newsCache, new Date());
 }
 
 /** This week's challenge (the one going, or a new one for a new week), for the flavours you have on `day`. */
