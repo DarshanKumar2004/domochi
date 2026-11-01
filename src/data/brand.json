@@ -15,5 +15,7 @@
     "offer": "your reward",
     "_note": "Real-shop coupons: from fromDay, a three-star day earns a code (DMC-<day>-<4 letters>, steady per day and phone). Players screenshot it and show it at the trailer. Enabled by Kumar 2026-11-01. TODO-BRAND: Ethan decides what the reward is and how many a day; codes can't be checked against a server, so staff go by the screenshot.",
     "redeem": "take a screenshot and come to the domochi trailer to redeem your reward!"
-  }
+  },
+  "newsUrl": "https://darshankumar2004.github.io/domochi/news.json",
+  "_newsNote": "Where the home screen reads news from the trailer (public/news.json on the game site; edit and push to change it)."
 }

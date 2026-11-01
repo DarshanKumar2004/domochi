@@ -609,3 +609,4 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
     - Typing it on the home screen ("Secret word") pays $10 once a week. Stickers: "been to the trailer" for the first visit, "trailer regular" after 4 weeks.
     - Ethan's calendar: `npm run trailer-words` writes `trailer-words.html` (git-ignored). The words can be worked out from the public code, so the rewards stay in-game.
   - **Release bundle checked:** `bundleRelease` builds (6.3 MB). Only the signing key is missing.
+  - **News from the trailer** (`public/news.json`, `systems/news.ts`, `brand.newsUrl`): the home screen reads `news.json` from the game's website at start-up (4 s timeout; offline means no banner) and shows a pink "📍 …" banner, for example where the trailer is this week. Edit the file and push; the app and the web game pick it up next time they open, with no store update. `until` hides it after a date.

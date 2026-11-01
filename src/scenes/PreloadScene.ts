@@ -13,6 +13,8 @@ import { Truck } from '../ui/Truck';
 import { addDonutIcon } from '../ui/DonutIcon';
 import { getViewport, onLayout } from '../ui/viewport';
 import { startMainGame } from './flow';
+import { activeNews } from '../systems/news';
+import { roundBg } from '../ui/roundBg';
 import { SceneKeys } from './sceneKeys';
 
 /**
@@ -26,6 +28,8 @@ const BAR_HEIGHT = 44;
 export class PreloadScene extends Phaser.Scene {
   private logo!: Phaser.GameObjects.Image;
   private subtitle!: Phaser.GameObjects.Text;
+  /** News from the real trailer (public/news.json), when there is some. */
+  private news!: Phaser.GameObjects.Text;
   private truck!: Truck;
   private barBg!: Phaser.GameObjects.Rectangle;
   private barFill!: Phaser.GameObjects.Rectangle;
@@ -67,6 +71,16 @@ export class PreloadScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(2)
       .setVisible(false);
+    this.news = roundBg(
+      this.add
+        .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '34px', fontStyle: 'bold', color: '#fffaf0', align: 'center', wordWrap: { width: 760 }, padding: { x: 22, y: 12 } })
+        .setOrigin(0.5)
+        .setDepth(4)
+        .setVisible(false)
+        .setName('home-news'),
+      0xb0406a,
+    );
+    this.loadNews();
     this.truck = new Truck(this, 0, 0);
     this.barBg = this.add.rectangle(0, 0, BAR_WIDTH + 16, BAR_HEIGHT + 16, 0xe6e1d6);
     this.barFill = this.add.rectangle(0, 0, BAR_WIDTH, BAR_HEIGHT, COLORS.pink).setOrigin(0, 0.5).setScale(0, 1);
@@ -100,6 +114,7 @@ export class PreloadScene extends Phaser.Scene {
       const rx = s.x + 1360;
       this.logo.setPosition(lx, s.y + 450).setDisplaySize(620, 620);
       this.subtitle.setPosition(lx, s.y + 820);
+      this.news.setPosition(rx, s.y + 95);
       this.truck.setPosition(rx, s.y + 430).setScale(0.85);
       // Three under the trailer; the secret word under the logo.
       this.homeButtons.forEach((b, i) => (i < 3 ? b.setPosition(rx + (i - 1) * 335, s.y + 830).setScale(0.95) : b.setPosition(lx, s.y + 985).setScale(0.95)));
@@ -112,6 +127,7 @@ export class PreloadScene extends Phaser.Scene {
       const cx = v.width / 2;
       this.logo.setPosition(cx, s.y + 400).setDisplaySize(560, 560);
       this.subtitle.setPosition(cx, s.y + 730);
+      this.news.setPosition(cx, s.y + 815);
       this.truck.setPosition(cx, s.y + 1150).setScale(1);
       // Four across (a little smaller).
       this.homeButtons.forEach((b, i) => b.setPosition(cx + (i - 1.5) * 262, s.y + 1560).setScale(0.78));
@@ -186,6 +202,22 @@ export class PreloadScene extends Phaser.Scene {
       audio().unlock(); // browsers allow sound only after a tap
       startMainGame(this, { tutorial: !save().data.tutorialDone });
     });
+  }
+
+  /** News from the trailer, read fresh from the game's website (no app update needed to change it). */
+  private loadNews(): void {
+    const url = (brand as { newsUrl?: string }).newsUrl;
+    if (!url || typeof fetch !== 'function') return;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 4000);
+    fetch(url, { cache: 'no-store', signal: ctl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: unknown) => {
+        const msg = activeNews(json, new Date());
+        if (msg && this.news?.active) this.news.setText(`📍 ${msg}`).setVisible(true);
+      })
+      .catch(() => undefined) // offline: no news, no fuss
+      .finally(() => clearTimeout(timer));
   }
 
   private homeButtons: Button[] = [];

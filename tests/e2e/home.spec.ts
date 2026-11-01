@@ -71,3 +71,13 @@ test("the trailer's secret word: this week's word pays once; a wrong one doesn't
   await page.locator('[data-x="check"]').click();
   await expect(page.locator('[data-x="msg"]')).toContainText('already found');
 });
+
+test('news from the trailer shows on the home screen (and nothing when there is none)', async ({ page }) => {
+  await page.route('**/news.json', (route) => route.fulfill({ json: { message: 'find us at the Saturday market downtown!', until: '' } }));
+  await seedTutorialDone(page);
+  await page.goto('/?seed=7');
+  await findNamed(page, SceneKeys.Preload, 'prompt-start');
+  await findNamed(page, SceneKeys.Preload, 'home-news');
+  await page.waitForTimeout(300);
+  await shot(page, 'home-news');
+});
