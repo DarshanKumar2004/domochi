@@ -525,3 +525,7 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - **When you come back:** "while you were away, Mai sold $X" (tap to close), and the money is banked.
 - **Coupons for the real truck** (`brand.json` `coupons`, `systems/coupons.ts`): from day 50, a three-star day earns a code (DMC-<day>-<4 letters>, steady per day and phone). It shows on the summary and the journal page.
   - **Built but OFF** until Ethan agrees on the offer, the daily cap, and how staff check a code (TODO-BRAND).
+- **Crew renamed, and the player joins** (Kumar, 2026-11-01): Geo (day 75), then Bruce (day 90), and the last place is the player's (day 110, free).
+  - mochi asks "hey, what's your name? would you like to join the team? Ethan would love to have you!" in an HTML card over the game. The name is saved as `playerName`, and the "while you were away" note names everyone ("Geo, Bruce and Kim sold $X").
+- **Coupons switched ON** (Kumar, 2026-11-01). On a three-star day from day 50, the summary shows the code and a green banner: "screenshot this and bring it to the domochi trailer to redeem your reward!" The journal page keeps the code too.
+  - **Still TODO-BRAND:** Ethan decides the reward and any daily cap. There's no server check, so staff go by the screenshot (the code has the day in it).

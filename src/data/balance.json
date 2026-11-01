@@ -658,30 +658,31 @@
     ]
   },
   "staff": {
-    "_note": "Hire a crew (from each hire's unlockDay): they run the trailer while you're away. Money made away = cap × (1 − ½^(hours away / halfLifeHours)), where cap is the hires' capAdd added up: it levels off, so a long time away isn't worth much more than an evening. Nothing for under minHours away.",
+    "_note": "Hire a crew (from each hire's unlockDay): they run the trailer while you're away. Money made away = cap × (1 − ½^(hours away / halfLifeHours)), where cap is the hires' capAdd added up: it levels off, so a long time away isn't worth much more than an evening. Nothing for under minHours away. The last to join is the player: mochi asks their name and invites them onto the team (free).",
     "halfLifeHours": 6,
     "minHours": 0.5,
     "hires": [
       {
-        "id": "mai",
-        "name": "Mai",
+        "id": "geo",
+        "name": "Geo",
         "price": 150,
         "unlockDay": 75,
         "capAdd": 20
       },
       {
-        "id": "theo",
-        "name": "Theo",
+        "id": "bruce",
+        "name": "Bruce",
         "price": 260,
         "unlockDay": 90,
         "capAdd": 25
       },
       {
-        "id": "rosa",
-        "name": "Rosa",
-        "price": 400,
+        "id": "you",
+        "name": "you",
+        "price": 0,
         "unlockDay": 110,
-        "capAdd": 35
+        "capAdd": 35,
+        "player": true
       }
     ]
   }

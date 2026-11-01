@@ -9,6 +9,8 @@ export interface Hire {
   unlockDay: number;
   /** How much this hire adds to the most the crew can make while you're away. */
   capAdd: number;
+  /** The player themselves (they join the team: mochi asks their name). */
+  player?: boolean;
 }
 
 export interface StaffBalance {

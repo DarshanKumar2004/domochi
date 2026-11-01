@@ -161,7 +161,7 @@ export function collectAwayEarnings(now = Date.now()): { amount: number; hours: 
   const last = s.data.lastSeen;
   const hours = last ? Math.max(0, (now - last) / 3_600_000) : 0;
   const amount = awayEarnings(balance.staff, s.data.staff, hours);
-  const crew = balance.staff.hires.filter((h) => s.data.staff.includes(h.id)).map((h) => h.name);
+  const crew = balance.staff.hires.filter((h) => s.data.staff.includes(h.id)).map((h) => (h.player ? s.data.playerName || 'you' : h.name));
   void s.update((d) => {
     d.lastSeen = now;
     if (amount > 0) d.money = Math.round((d.money + amount) * 100) / 100;

@@ -60,7 +60,8 @@ export class HudScene extends Phaser.Scene {
     // Back from being away: the crew's takings.
     const away = collectAwayEarnings();
     if (away.amount > 0) {
-      const who = away.crew.length > 1 ? 'your crew' : away.crew[0];
+      const names = away.crew;
+      const who = names.length > 2 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names.join(' and ');
       this.time.delayedCall(800, () => {
         audio().play('cash');
         this.showToast(`while you were away, ${who} sold $${away.amount.toFixed(2)}!\n(tap to close)`, true);

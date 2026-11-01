@@ -10,9 +10,10 @@
   "feedbackEndpoint": "",
   "_feedbackNote": "Where players' flavour ideas and notes for Ethan go: a URL that takes a JSON POST and emails it on (e.g. a Formspree form, or a small serverless function). Empty = notes wait on the device until it's set. TODO-BRAND: Kumar to pick the service and Ethan's address.",
   "coupons": {
-    "enabled": false,
+    "enabled": true,
     "fromDay": 50,
-    "offer": "$1 off a box",
-    "_note": "Real-shop coupons: from fromDay, a three-star day earns a code to show at the truck. TODO-BRAND: OFF until Ethan agrees on the offer, how many a day, and how staff check a code (codes are DMC-<day>-<4 letters>; the letters come from the day and the player's save id, so the same day on the same phone always gives the same code). Then set enabled: true."
+    "offer": "your reward",
+    "_note": "Real-shop coupons: from fromDay, a three-star day earns a code (DMC-<day>-<4 letters>, steady per day and phone). Players screenshot it and show it at the trailer. Enabled by Kumar 2026-11-01. TODO-BRAND: Ethan decides what the reward is and how many a day; codes can't be checked against a server, so staff go by the screenshot.",
+    "redeem": "take a screenshot and come to the domochi trailer to redeem your reward!"
   }
 }

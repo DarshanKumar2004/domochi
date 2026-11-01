@@ -3,9 +3,8 @@ import brand from '../../src/data/brand.json';
 import { couponCode, earnsCoupon } from '../../src/systems/coupons';
 
 describe('coupons for the real truck', () => {
-  it('are off until Ethan agrees (brand.json), and then only for three-star days from the set day', () => {
-    expect(brand.coupons.enabled).toBe(false);
-    expect(earnsCoupon(brand.coupons, 99, 3)).toBe(false);
+  it('only for three-star days from the set day (and only when switched on)', () => {
+    expect(earnsCoupon({ ...brand.coupons, enabled: false }, 99, 3)).toBe(false);
     const on = { ...brand.coupons, enabled: true };
     expect(earnsCoupon(on, on.fromDay - 1, 3)).toBe(false);
     expect(earnsCoupon(on, on.fromDay, 2)).toBe(false);

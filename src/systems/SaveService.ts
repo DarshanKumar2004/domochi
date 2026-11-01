@@ -35,6 +35,8 @@ export interface SaveData {
   /** Your crew (balance.staff hire ids), and when you were last here (ms since 1970), for what they made meanwhile. */
   staff: string[];
   lastSeen?: number;
+  /** What the player told mochi to call them (when they joined the team). */
+  playerName: string;
   /** A random id for this save (coupon codes are tied to it); made when first needed. */
   playerId: string;
   /** How well each regular knows you (customers.json regulars ids). */
@@ -61,6 +63,7 @@ export function defaultSave(): SaveData {
     decor: [],
     staff: [],
     playerId: '',
+    playerName: '',
     regulars: {},
     journal: { stickers: [], pages: [], seen: 0 },
     settings: { sound: true, music: true },
@@ -96,6 +99,7 @@ export function sanitizeSave(raw: unknown): SaveData {
   }
   if (Array.isArray(raw.guides)) data.guides = [...new Set(raw.guides.filter((g): g is string => typeof g === 'string'))];
   if (Array.isArray(raw.staff)) data.staff = [...new Set(raw.staff.filter((g): g is string => typeof g === 'string'))];
+  if (typeof raw.playerName === 'string') data.playerName = raw.playerName.trim().slice(0, 24);
   if (typeof raw.playerId === 'string' && raw.playerId) data.playerId = raw.playerId.slice(0, 32);
   if (typeof raw.lastSeen === 'number' && Number.isFinite(raw.lastSeen)) data.lastSeen = raw.lastSeen;
   if (Array.isArray(raw.decor)) data.decor = [...new Set(raw.decor.filter((g): g is string => typeof g === 'string'))];

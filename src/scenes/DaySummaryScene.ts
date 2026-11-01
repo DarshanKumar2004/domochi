@@ -86,7 +86,7 @@ export class DaySummaryScene extends Phaser.Scene {
       ...(sum.goal ? [['daily goal', sum.goalBonus ? `done! +${money(sum.goalBonus)}` : 'missed', 'goal'] as Row] : []),
       ...(sum.bestStreak >= 2 ? [['best streak', `${sum.bestStreak} in a row`, 'streak'] as Row] : []),
       ...(sum.specialsSold ? [["special sold", `${sum.specialsSold}`, 'specials'] as Row] : []),
-      ...(coupon ? [['coupon for the truck!', coupon, 'coupon'] as Row] : []),
+      ...(coupon ? [['your coupon', coupon, 'coupon'] as Row] : []),
       ...(earned.length ? [['new stickers', earned.map((st) => st.glyph).join(' '), 'stickers'] as Row] : []),
       ...(counted && sum.suppliesCost - sum.wasteCost >= 0.005 ? [['other supplies used', `−${money(Math.max(0, sum.suppliesCost - sum.wasteCost))}`, 'supplies'] as Row] : []),
     ];
@@ -107,17 +107,26 @@ export class DaySummaryScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setName('summary-total'),
     );
-    card.add(
-      text(0, 378, [sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '', fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!
-(its glaze and toppings are at the supply store)` : sum.nextEvent ? '' : this.comingUp(sum.day)].filter(Boolean).join('\n'), 38, {
-        color: fresh.length || sum.nextEvent ? '#b0406a' : '#6b5d52',
-        fontStyle: fresh.length || sum.nextEvent ? 'bold' : 'normal',
-        align: 'center',
-        wordWrap: { width: CARD_W - 100 },
-      })
-        .setOrigin(0.5)
-        .setName('summary-unlocks'),
-    );
+    // What's new tomorrow: or, on a coupon day, the coupon's the news.
+    const news = coupon
+      ? 'screenshot this and bring it to the domochi trailer to redeem your reward!'
+      : [
+          sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '',
+          fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!\n(its glaze and toppings are at the supply store)` : sum.nextEvent ? '' : this.comingUp(sum.day),
+        ]
+          .filter(Boolean)
+          .join('\n');
+    const big = !!coupon || fresh.length > 0 || !!sum.nextEvent;
+    const newsText = text(0, 378, news, coupon ? 32 : 38, {
+      color: coupon ? '#2f6b3a' : big ? '#b0406a' : '#6b5d52',
+      fontStyle: big ? 'bold' : 'normal',
+      align: 'center',
+      wordWrap: { width: CARD_W - 120 },
+    })
+      .setOrigin(0.5)
+      .setName('summary-unlocks');
+    if (coupon) newsText.setBackgroundColor('#e3f2df').setPadding(18, 10, 18, 10);
+    card.add(newsText);
     card.add(new Button(this, 0, 530, counted ? 'To the supply store' : `Start day ${sum.day + 1}`, () => this.nextDay(), { width: 620, name: 'btn-next-day' }));
 
     onLayout(this, (v) => {

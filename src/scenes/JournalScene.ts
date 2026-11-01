@@ -185,7 +185,7 @@ export class JournalScene extends Phaser.Scene {
     ty += 10;
     line(`"${page.note}"`, 44, { fontStyle: 'italic', color: '#4a3f38' }).setName('journal-note');
     line('— mochi', 32, { color: '#b0406a' });
-    if (page.coupon) line(`coupon: ${page.coupon} · ${brand.coupons.offer}, show it at the truck!`, 32, { fontStyle: 'bold', color: '#2f6b3a' }).setName('journal-coupon');
+    if (page.coupon) line(`coupon ${page.coupon}: ${brand.coupons.redeem}`, 32, { fontStyle: 'bold', color: '#2f6b3a' }).setName('journal-coupon');
     ty += 10;
     const earned = page.stickers.map((id) => journalData.stickers.find((s) => s.id === id)).filter((s): s is StickerDef => !!s);
     if (earned.length) {

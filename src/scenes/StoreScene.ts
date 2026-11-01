@@ -5,6 +5,7 @@ import { fillStock, glazeStockId, priceOn, shopNeeds, shoppingPlan, toppingStock
 import { TextureKeys } from '../assets/keys';
 import type { DecorItem } from '../systems/balance';
 import type { Hire } from '../systems/staff';
+import { showJoinTeam } from '../ui/HomePanels';
 import { Button } from '../ui/Button';
 import { beginOverlay } from '../ui/overlay';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -261,6 +262,7 @@ export class StoreScene extends Phaser.Scene {
   /** Hire someone (once, from their day): more made while you're away. */
   private hireTile(h: Hire, day: number): Tile {
     const locked = h.unlockDay > day;
+    if (h.player) return this.joinTile(h, locked);
     const tile = this.makeTile(`store-hire-${h.id}`, `hire ${h.name}`, locked ? `day ${h.unlockDay}` : money(h.price), () => {
       if (locked) return { label: 'comes in later', low: false, can: false, owned: false };
       const owned = save().data.staff.includes(h.id);
@@ -271,6 +273,35 @@ export class StoreScene extends Phaser.Scene {
         s.staff.push(h.id);
         s.money = Math.round((s.money - h.price) * 100) / 100;
         s.lastSeen = Date.now(); // they start from now
+      });
+    });
+    if (locked) tile.box.setAlpha(0.5);
+    return tile;
+  }
+
+  /** The last place on the crew is yours: mochi asks your name and invites you on. */
+  private joinTile(h: Hire, locked: boolean): Tile {
+    const tile = this.makeTile(`store-hire-${h.id}`, 'join the team!', locked ? `day ${h.unlockDay}` : 'join', () => {
+      if (locked) return { label: 'mochi has an idea...', low: false, can: false, owned: false };
+      const owned = save().data.staff.includes(h.id);
+      return { label: owned ? `${save().data.playerName || 'you'}: on the crew ✓` : 'Ethan would love to have you', low: false, can: !owned, owned };
+    }, () => {
+      const tex = this.textures.get(TextureKeys.Mascot).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+      const c = document.createElement('canvas');
+      c.width = tex.width;
+      c.height = tex.height;
+      c.getContext('2d')!.drawImage(tex, 0, 0);
+      showJoinTeam(c.toDataURL('image/png'), (name) => {
+        const n = name.trim().slice(0, 24);
+        if (!n) return false;
+        void save().update((s) => {
+          s.playerName = n;
+          if (!s.staff.includes(h.id)) s.staff.push(h.id);
+          s.lastSeen = Date.now();
+        });
+        audio().play('fanfare');
+        this.refresh();
+        return true;
       });
     });
     if (locked) tile.box.setAlpha(0.5);

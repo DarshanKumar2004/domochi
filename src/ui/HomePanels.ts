@@ -66,6 +66,36 @@ export function showAbout(onClose?: () => void): void {
 }
 
 /**
+ * mochi's invitation to join the team: asks your name. `join` gets the name
+ * (it says whether it was accepted).
+ */
+export function showJoinTeam(mochiImage: string, join: (name: string) => boolean, onClose?: () => void): void {
+  const { card, close } = openCard(
+    `<div style="display:flex;gap:14px;align-items:center"><img src="${mochiImage}" alt="mochi" style="width:84px;height:80px;flex:none"><h2 style="margin:0">hey, what's your name?</h2></div>
+     <p>would you like to join the team? Ethan would love to have you!</p>
+     <input maxlength="24" placeholder="your name">
+     <p class="dm-muted">you'll keep the trailer going with the crew while you're away.</p>
+     <div class="dm-row"><button class="dm-btn" data-x="close">Not yet</button><button class="dm-btn dm-go" data-x="join">Join the team!</button></div>`,
+    onClose,
+  );
+  const name = card.querySelector('input')!;
+  card.querySelector('[data-x="close"]')!.addEventListener('click', close);
+  card.querySelector('[data-x="join"]')!.addEventListener('click', () => {
+    if (!join(name.value)) {
+      name.focus();
+      return;
+    }
+    card.innerHTML = `<h2>welcome to the team, ${escapeHtml(name.value.trim())}!</h2><p>mochi made you a name tag. see you at the trailer!</p><div class="dm-row"><button class="dm-btn dm-go" data-x="close">yay!</button></div>`;
+    card.querySelector('[data-x="close"]')!.addEventListener('click', close);
+  });
+  setTimeout(() => name.focus(), 50);
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+}
+
+/**
  * A little form: a flavour idea, or a note for Ethan. `send` keeps it for
  * the day's report (it says whether the note was kept).
  */
