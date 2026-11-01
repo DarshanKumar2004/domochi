@@ -190,7 +190,7 @@ export class FryScene extends StationScene {
     // A small movement threshold, so a tap flips instead of starting a drag.
     this.input.dragDistanceThreshold = 16;
 
-    this.vat = this.add.image(0, 0, TextureKeys.Fryer);
+    this.vat = this.add.image(0, 0, TextureKeys.Fryer).setName('fry-vat');
     // Dirty oil darkens (filter it at closing).
     this.dirtOverlay = this.add.rectangle(0, 0, 1, 1, 0x4a2f14).setAlpha(0).setDepth(1);
     this.shownDirt = -1;

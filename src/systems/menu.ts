@@ -35,8 +35,8 @@ export interface Flavor {
   name: string;
   price: number;
   description: string;
-  /** Base coat: id of a 'dip' or 'dust' glaze. */
-  glaze: string;
+  /** Base coat: id of a 'dip' or 'dust' glaze. None: it skips the Glaze station (the beignet's sugar is a topping). */
+  glaze?: string;
   /** Optional stripes over the base coat: id of a 'drizzle' glaze. */
   drizzle?: string;
   toppings: string[];
@@ -116,8 +116,11 @@ export function validateMenu(menu: Menu): string[] {
     }
   }
   for (const f of menu.flavors) {
-    const base = glazeById.get(f.glaze);
-    if (!base) errors.push(`flavor "${f.id}" uses unknown glaze "${f.glaze}"`);
+    const base = f.glaze === undefined ? undefined : glazeById.get(f.glaze);
+    if (f.glaze === undefined) {
+      if (f.drizzle !== undefined) errors.push(`flavor "${f.id}" has a drizzle but no base glaze`);
+      if (f.toppings.length === 0) errors.push(`flavor "${f.id}" needs a glaze or a topping`);
+    } else if (!base) errors.push(`flavor "${f.id}" uses unknown glaze "${f.glaze}"`);
     else if (base.style === 'drizzle') {
       errors.push(`flavor "${f.id}" base glaze "${f.glaze}" must be a dip or dust, not a drizzle`);
     }

@@ -91,6 +91,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
           regulars: { ...(saveService?.data.regulars ?? {}) },
           decor: [...(saveService?.data.decor ?? [])],
           bank: () => saveService?.data.money ?? 0,
+          ...(saveService?.data.trays ? { mess: saveService.data.trays } : {}),
           ...(event ? { event } : {}),
         }),
   });

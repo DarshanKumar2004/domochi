@@ -68,6 +68,8 @@ export class DoughScene extends StationScene {
   private stirPointer: Phaser.Input.Pointer | null = null;
   private lastAngle = 0;
   private nextStirSound = 0;
+  /** Scrubbing the empty bowl (not stirring a batch). */
+  private washing = false;
   /** Lump positions in the bowl (normalised to the opening), fixed per scene. */
   private readonly lumps: { x: number; y: number; r: number }[] = [];
 
@@ -184,10 +186,14 @@ export class DoughScene extends StationScene {
     }
 
     this.setSubtitle(s.phase === 'prep' ? 'morning prep: make the day’s dough' : `tub ${left}/${D.tubCapacity}`);
-    if (!w || w.totalScoops === 0) this.instruction.setText(s.tubFull ? 'the tub is full!' : 'tap the ingredients to scoop them in');
+    const empty = !w || w.totalScoops === 0;
+    if (empty && s.bowlMoldy) this.instruction.setText('the bowl grew mold! scrub round it to wash it');
+    else if (empty && s.bowlNeedsWash && s.phase === 'closing') this.instruction.setText('closing: scrub round the bowl to wash it');
+    else if (empty) this.instruction.setText(s.tubFull ? 'the tub is full!' : 'tap the ingredients to scoop them in');
     else if (w.stage !== 'ready') this.instruction.setText('stir: drag round and round in the bowl');
     else this.instruction.setText('smooth! tip it into the tub');
-    if (!w || w.totalScoops === 0) this.readout.setText('follow the recipe below (double it for twice the donuts)');
+    if (empty && s.bowlNeedsWash) this.readout.setText(`bowl washed ${Math.round(s.bowlWashProgress * 100)}% · scrub round the empty bowl`);
+    else if (empty) this.readout.setText('follow the recipe below (double it for twice the donuts)');
     else {
       // How much it makes depends on the ingredient you have least of.
       const names = new Map(D.ingredients.map((i) => [i.id, i.name]));
@@ -205,13 +211,30 @@ export class DoughScene extends StationScene {
   private drawContents(): void {
     const g = this.contents;
     g.clear();
-    const w = session().doughBatch;
-    if (!w || w.totalScoops === 0) return;
+    const s = session();
+    const w = s.doughBatch;
     const { x, y, scale } = this.bowlPos;
     const cx = x;
     const cy = y + OPENING.dy * scale;
     const rx = OPENING.rx * scale;
     const ry = OPENING.ry * scale;
+    if (!w || w.totalScoops === 0) {
+      // An empty bowl that needs washing: dried dough smears (fading as you scrub), and mold if it sat overnight.
+      if (!s.bowlNeedsWash) return;
+      const left = 1 - s.bowlWashProgress;
+      g.fillStyle(0xe8d9b8, 0.85 * left);
+      for (const l of this.lumps) g.fillEllipse(cx + l.x * rx * 0.85, cy + l.y * ry * 0.85, l.r * rx * 2.2, l.r * ry * 1.6);
+      if (s.bowlMoldy) {
+        this.lumps.forEach((l, i) => {
+          if (i % 2) return;
+          g.fillStyle(0x9fb38a, 0.4 * left);
+          g.fillCircle(cx - l.y * rx * 0.7, cy + l.x * ry * 0.7, l.r * rx * 1.3);
+          g.fillStyle(0x5f7a4f, 0.85 * left);
+          g.fillCircle(cx - l.y * rx * 0.7, cy + l.x * ry * 0.7, l.r * rx * 0.7);
+        });
+      }
+      return;
+    }
     // Fill level grows with the scoops (up to the recipe's amount).
     const total = Object.values(balance.dough.recipe).reduce((a, b) => a + b, 0);
     const fill = Math.min(1, 0.35 + (0.65 * w.totalScoops) / total);
@@ -261,6 +284,10 @@ export class DoughScene extends StationScene {
       this.flash('the tub is full: fry some first');
       return;
     }
+    if (s.bowlMoldy && !s.doughBatch) {
+      this.flash('the bowl grew mold! scrub it clean first');
+      return;
+    }
     if (!s.scoop(id)) {
       const ing = balance.dough.ingredients.find((i) => i.id === id);
       this.flash(`out of ${ing?.name ?? id}! buy more at the store`);
@@ -291,7 +318,8 @@ export class DoughScene extends StationScene {
 
   private startStir(p: Phaser.Input.Pointer): void {
     const w = session().doughBatch;
-    if (!w || w.totalScoops === 0) {
+    this.washing = (!w || w.totalScoops === 0) && session().bowlNeedsWash;
+    if (!this.washing && (!w || w.totalScoops === 0)) {
       this.flash('scoop the ingredients in first');
       return;
     }
@@ -312,16 +340,20 @@ export class DoughScene extends StationScene {
       this.stopStir();
       return;
     }
-    const w = session().doughBatch;
-    if (!w) {
-      this.stopStir();
-      return;
-    }
     const a = this.angleAt(p);
     let d = a - this.lastAngle;
     if (d > Math.PI) d -= Math.PI * 2;
     if (d < -Math.PI) d += Math.PI * 2;
     this.lastAngle = a;
+    if (this.washing) {
+      this.scrubBowl(p, d, time);
+      return;
+    }
+    const w = session().doughBatch;
+    if (!w) {
+      this.stopStir();
+      return;
+    }
     // A function, so TypeScript doesn't assume the stage can't change when stir() runs.
     const ready = () => w.stage === 'ready';
     const wasReady = ready();
@@ -343,6 +375,33 @@ export class DoughScene extends StationScene {
     this.spoon.lineBetween(p.x, p.y, p.x + 70, p.y - 150);
     this.spoon.fillStyle(0x9c6b3e);
     this.spoon.fillEllipse(p.x, p.y, 46, 30);
+  }
+
+  /** Scrubbing the empty bowl round and round with a sponge. */
+  private scrubBowl(p: Phaser.Input.Pointer, d: number, time: number): void {
+    const s = session();
+    if (d !== 0 && s.washBowl(Math.abs(d) / (Math.PI * 2))) {
+      audio().play('ding');
+      this.flash('sparkling clean!');
+      this.stopStir();
+      this.refresh();
+      return;
+    }
+    if (d !== 0) {
+      if (time >= this.nextStirSound) {
+        this.nextStirSound = time + 180;
+        audio().play('scrub');
+      }
+      this.refresh();
+    }
+    // A sponge, not the spoon.
+    this.spoon.clear();
+    this.spoon.fillStyle(0xf2d14b);
+    this.spoon.fillRoundedRect(p.x - 40, p.y - 26, 80, 52, 12);
+    this.spoon.fillStyle(0x6fbf73);
+    this.spoon.fillRoundedRect(p.x - 40, p.y - 26, 80, 16, { tl: 12, tr: 12, bl: 0, br: 0 });
+    this.spoon.lineStyle(4, COLORS.ink);
+    this.spoon.strokeRoundedRect(p.x - 40, p.y - 26, 80, 52, 12);
   }
 
   // ---- Actions -------------------------------------------------------------------

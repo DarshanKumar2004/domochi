@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import type { Viewport } from '../ui/layout';
 import { SpeechBubble } from '../ui/SpeechBubble';
 import { STATION_TABS, type StationKey } from '../ui/tabs';
-import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
+import { COLORS, FONT_FAMILY } from '../ui/theme';
 import { getViewport, onLayout } from '../ui/viewport';
 import { getHud, startMainGame, stopMainGame } from './flow';
 import type { GlazeScene } from './GlazeScene';
@@ -36,6 +36,31 @@ const LINES = tutorial.steps as Record<string, string>;
 const BUBBLE_W = 680;
 /** Room the pointing hand takes beside its target (so the bubble doesn't cover it either). */
 const HAND_ROOM = 180;
+/** Where mochi's panel can sit: top or bottom, at the left, middle or right (landscape; portrait is full width). */
+type Side = 'left' | 'middle' | 'right';
+const PLACES: { top: boolean; side: Side }[] = [
+  { top: true, side: 'middle' },
+  { top: false, side: 'middle' },
+  { top: true, side: 'left' },
+  { top: true, side: 'right' },
+  { top: false, side: 'left' },
+  { top: false, side: 'right' },
+];
+/**
+ * What the panel should keep clear of at each station (name prefixes), besides
+ * the thing it's pointing at: the other bins, the grate and dial, the cups...
+ */
+const KEEP_CLEAR: Partial<Record<SceneKey, string[]>> = {
+  [SceneKeys.Dough]: ['bin-', 'dough-bowl', 'btn-dough-done'],
+  [SceneKeys.Fry]: ['fry-vat', 'fry-temp', 'fry-dial', 'btn-grate', 'btn-drop', 'btn-add-oil', 'btn-pull-all', 'fry-donut-', 'fry-rack-tray'],
+  [SceneKeys.Glaze]: ['glaze-donut', 'glaze-tray-', 'cup-', 'btn-glaze-done'],
+  [SceneKeys.Toppings]: ['toppings-board', 'toppings-shelf-', 'toppings-rack-', 'jar-', 'btn-toppings-done'],
+  [SceneKeys.Box]: ['box-shelf-', 'btn-serve'],
+};
+/** The tutorial starts the oil a little low, so mochi can show the top-up. */
+const TUTORIAL_OIL = 0.72;
+/** How long to hold the grate down before mochi moves on (ms). */
+const GRATE_HOLD_MS = 1200;
 const FLAVOR = tutorial.order[0]!;
 /** The training order's base glaze and topping (cookies & cream: its glaze, crushed cookies). */
 const recipe = menu.flavors.find((f) => f.id === FLAVOR)!;
@@ -66,6 +91,10 @@ export class TutorialScene extends Phaser.Scene {
   private bob = { t: 0 };
   private readonly bounds = new Phaser.Geom.Rectangle();
   private panelTop = true;
+  private panelSide: Side = 'middle';
+  /** Has the oil been topped up / the grate held long enough (the two fryer lessons)? */
+  private oilDone = false;
+  private grateMs = 0;
 
   constructor() {
     super(SceneKeys.Tutorial);
@@ -77,6 +106,11 @@ export class TutorialScene extends Phaser.Scene {
     this.shownKey = '';
     this.finished = false;
     this.panelTop = true;
+    this.panelSide = 'middle';
+    this.oilDone = false;
+    this.grateMs = 0;
+    // A little low on oil to start with, so the top-up gets taught too.
+    session().fryer.oil = Math.min(session().fryer.oil, TUTORIAL_OIL);
 
     this.ring = this.add.graphics().setDepth(1);
     this.hand = this.add.image(0, 0, TextureKeys.PointerHand).setOrigin(0.5, 0.05).setDepth(3).setVisible(false).setName('tutorial-hand');
@@ -86,8 +120,9 @@ export class TutorialScene extends Phaser.Scene {
     this.bubble = new SpeechBubble(this, 0, 0, BUBBLE_W, '', 0, 36, 'left').setDepth(4).setName('tutorial-bubble');
     this.next = new Button(this, 0, 0, 'Next', () => this.advance(), { width: 280, height: 120, fontSize: 46, name: 'btn-tutorial-next' }).setDepth(5);
     this.skip = this.add
-      .text(0, 0, 'skip tutorial', { fontFamily: FONT_FAMILY, fontSize: '34px', color: CSS.cream, backgroundColor: '#1f1a17cc', padding: { x: 18, y: 12 } })
-      .setOrigin(0.5)
+      // Tucked into the bubble's bottom corner, so it never sits on the station.
+      .text(0, 0, 'skip tutorial', { fontFamily: FONT_FAMILY, fontSize: '26px', fontStyle: 'bold', color: '#8a7b70', padding: { x: 12, y: 8 } })
+      .setOrigin(1, 1)
       .setDepth(5)
       .setName('btn-skip')
       .setInteractive({ useHandCursor: true });
@@ -133,10 +168,13 @@ export class TutorialScene extends Phaser.Scene {
           if (w && w.stage !== 'ready') return { id: 'stir', station: SceneKeys.Dough, target: { scene: SceneKeys.Dough, name: 'dough-stir' } };
           return { id: 'tub', station: SceneKeys.Dough, target: { scene: SceneKeys.Dough, name: 'btn-dough-done' } };
         }
+        if (!this.oilDone) return { id: 'oil', station: SceneKeys.Fry, target: { scene: SceneKeys.Fry, name: 'btn-add-oil' } };
         return { id: 'drop', station: SceneKeys.Fry, target: { scene: SceneKeys.Fry, name: 'btn-drop' } };
       }
       case 2:
       case 3: {
+        // Before the first flip: hold the grate a moment (mochi donuts float).
+        if (this.stage() === 2 && this.grateMs < GRATE_HOLD_MS) return { id: 'grate', station: SceneKeys.Fry, target: { scene: SceneKeys.Fry, name: 'btn-grate' } };
         const slot = s.fryer.slots.findIndex((d) => d !== null);
         return { id: this.stage() === 2 ? 'flip' : 'pull', station: SceneKeys.Fry, target: { scene: SceneKeys.Fry, name: `fry-donut-${slot}` } };
       }
@@ -176,8 +214,11 @@ export class TutorialScene extends Phaser.Scene {
 
   // ---- Per frame -----------------------------------------------------------------
 
-  override update(): void {
+  override update(_time: number, delta: number): void {
     if (this.finished) return;
+    const fryer = session().fryer;
+    if (fryer.oil > TUTORIAL_OIL + 0.05) this.oilDone = true;
+    if (fryer.grateHeld && fryer.count > 0) this.grateMs += delta;
     // Stay above everything, including popups (Order, Serve) that bring themselves to the top.
     const mgr = this.scene.manager;
     if (mgr.getIndex(this.scene.key) !== mgr.scenes.length - 1) this.scene.bringToTop();
@@ -197,7 +238,10 @@ export class TutorialScene extends Phaser.Scene {
     }
 
     const found = target ? this.findBounds(target) : null;
-    this.place(line, step.id, found);
+    // Everything else worth keeping clear where you are (the other bins, the grate, the cups...).
+    const here = step.station && getHud(this).currentStation === step.station ? step.station : null;
+    const clear = here ? this.findAll(here, KEEP_CLEAR[here] ?? []) : [];
+    this.place(line, step.id, found, clear);
   }
 
   /** The named object's bounds in screen space, or null if it isn't showing. */
@@ -214,22 +258,39 @@ export class TutorialScene extends Phaser.Scene {
     return null;
   }
 
+  /** Bounds of every visible object in a scene whose name starts with one of `prefixes`. */
+  private findAll(scene: SceneKey, prefixes: readonly string[]): Phaser.Geom.Rectangle[] {
+    if (!prefixes.length || !this.scene.isActive(scene)) return [];
+    type O = Phaser.GameObjects.GameObject & { visible?: boolean; list?: O[]; getBounds?: (out?: Phaser.Geom.Rectangle) => Phaser.Geom.Rectangle };
+    const out: Phaser.Geom.Rectangle[] = [];
+    const stack: O[] = [...(this.scene.get(scene).children.list as O[])];
+    while (stack.length) {
+      const o = stack.pop()!;
+      if (o.visible === false) continue;
+      if (o.name && o.getBounds && prefixes.some((p) => o.name.startsWith(p))) out.push(o.getBounds(new Phaser.Geom.Rectangle()));
+      if (o.list) stack.push(...o.list);
+    }
+    return out;
+  }
+
   /** Show the line, the Next button (talking steps), the highlight ring and the pointing hand. */
-  private place(line: string, id: StepId, b: Phaser.Geom.Rectangle | null): void {
+  private place(line: string, id: StepId, b: Phaser.Geom.Rectangle | null, clear: readonly Phaser.Geom.Rectangle[] = []): void {
     const v = getViewport(this);
     const talking = id === 'intro' || id === 'outro';
     if (!this.shownKey.startsWith(`${line}|`)) {
-      this.bubble.setMessage(line);
-      this.layoutPanel(v, talking, this.panelTop);
+      // A blank line at the end makes room for "skip tutorial" in the corner.
+      this.bubble.setMessage(`${line}\n`);
+      this.layoutPanel(v, talking, this.panelTop, this.panelSide);
       this.bubbleH = this.bubble.getBounds().height;
     }
-    // The panel goes top or bottom, whichever doesn't cover the target (and the hand beside it).
-    const top = this.chooseTop(v, talking, b);
-    const key = `${line}|${top}|${v.width}x${v.height}`;
+    // The panel goes wherever covers least: the target (and the hand beside it) above all, then the station's controls.
+    const at = this.choosePlace(v, talking, b, clear);
+    const key = `${line}|${at.top}|${at.side}|${v.width}x${v.height}`;
     if (key !== this.shownKey) {
       this.shownKey = key;
-      this.panelTop = top;
-      this.layoutPanel(v, talking, top);
+      this.panelTop = at.top;
+      this.panelSide = at.side;
+      this.layoutPanel(v, talking, at.top, at.side);
     }
 
     this.ring.clear();
@@ -249,43 +310,56 @@ export class TutorialScene extends Phaser.Scene {
   }
 
   /** Panel geometry: mochi on the left, the bubble to its right. */
-  private panelBox(v: Viewport, talking: boolean, top: boolean, h: number): { left: number; w: number; y: number; rect: Phaser.Geom.Rectangle } {
+  private panelBox(v: Viewport, talking: boolean, top: boolean, h: number, side: Side = 'middle'): { left: number; w: number; y: number; rect: Phaser.Geom.Rectangle } {
     const L = v.orientation === 'landscape';
-    const left = L ? v.safe.x + 560 : 190;
-    const w = L ? 720 : Math.min(760, v.width - left - 20);
+    const w = L ? 640 : Math.min(760, v.width - 190 - 20);
+    // In landscape the panel can sit left, middle or right (mochi takes ~190 px left of the bubble).
+    const left = !L ? 190 : side === 'left' ? v.safe.x + 200 : side === 'right' ? v.safe.x + v.safe.width - w - 24 : v.safe.x + 600;
     const y = top ? v.railHeight + 24 + h / 2 : v.height - v.tabBarHeight - 60 - h / 2 - (talking ? 130 : 0);
     // Everything the panel covers: mochi, the bubble, and the skip / Next buttons.
-    const rect = new Phaser.Geom.Rectangle(left - 190, y - h / 2 - (top ? 0 : 80), w + 190, h + 80 + (talking ? 130 : 0));
+    const rect = new Phaser.Geom.Rectangle(left - 190, y - h / 2, w + 190, h + (talking ? 130 : 0));
     return { left, w, y, rect };
   }
 
-  /** Top unless that covers the target (or its hand); if both do, whichever covers less. */
-  private chooseTop(v: Viewport, talking: boolean, b: Phaser.Geom.Rectangle | null): boolean {
-    if (!b) return true;
+  /**
+   * Where the panel covers least: the target and its hand count most (it must
+   * not hide what it's pointing at), then the station's other controls.
+   */
+  private choosePlace(v: Viewport, talking: boolean, b: Phaser.Geom.Rectangle | null, clear: readonly Phaser.Geom.Rectangle[]): { top: boolean; side: Side } {
     const h = this.bubbleH || 200;
-    const target = new Phaser.Geom.Rectangle(b.x - 20, b.y - 20, b.width + 40 + HAND_ROOM * 0.6, b.height + 40 + HAND_ROOM);
-    const cover = (top: boolean) => {
-      const r = Phaser.Geom.Rectangle.Intersection(this.panelBox(v, talking, top, h).rect, target);
+    const target = b ? new Phaser.Geom.Rectangle(b.x - 20, b.y - 20, b.width + 40 + HAND_ROOM * 0.6, b.height + 40 + HAND_ROOM) : null;
+    const area = (a: Phaser.Geom.Rectangle, o: Phaser.Geom.Rectangle) => {
+      const r = Phaser.Geom.Rectangle.Intersection(a, o);
       return r.width > 0 && r.height > 0 ? r.width * r.height : 0;
     };
-    const a = cover(true);
-    if (a === 0) return true;
-    const bot = cover(false);
-    if (bot === 0) return false;
-    return a <= bot;
+    const places = v.orientation === 'landscape' ? PLACES : PLACES.filter((p) => p.side === 'middle');
+    let best = places[0]!;
+    let bestCost = Infinity;
+    for (const p of places) {
+      const rect = this.panelBox(v, talking, p.top, h, p.side).rect;
+      let cost = target ? area(rect, target) * 20 : 0;
+      for (const o of clear) cost += area(rect, o);
+      // Ties keep the current spot (no jumping about), then the earlier (calmer) spots.
+      if (p.top === this.panelTop && p.side === this.panelSide) cost -= 1;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = p;
+      }
+    }
+    return best;
   }
 
-  private layoutPanel(v: Viewport, talking: boolean, top: boolean): void {
+  private layoutPanel(v: Viewport, talking: boolean, top: boolean, side: Side = 'middle'): void {
     const L = v.orientation === 'landscape';
-    const { w } = this.panelBox(v, talking, top, 0);
+    const { w } = this.panelBox(v, talking, top, 0, side);
     this.bubble.setScale(w / BUBBLE_W);
     const h = this.bubble.getBounds().height;
-    const { left, y } = this.panelBox(v, talking, top, h);
+    const { left, y } = this.panelBox(v, talking, top, h, side);
     const cx = left + w / 2;
     this.bubble.setPosition(cx, y);
     this.mascot.setPosition(left - 100, y + h / 2 + (L ? 0 : 10));
     this.next.setVisible(talking).setPosition(cx + w / 2 - 160, y + h / 2 + 80);
-    this.skip.setPosition(left + 120, top ? y + h / 2 + 50 : y - h / 2 - 45);
+    this.skip.setPosition(left + w - 18, y + h / 2 - 10);
   }
 
   // ---- Actions -------------------------------------------------------------------

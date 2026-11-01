@@ -4,7 +4,7 @@ import customersJson from '../../src/data/customers.json';
 import menuJson from '../../src/data/menu.json';
 import type { Balance } from '../../src/systems/balance';
 import type { CustomersData } from '../../src/systems/customers';
-import { GameSession } from '../../src/systems/GameSession';
+import { GameSession, type TrayState } from '../../src/systems/GameSession';
 import { flavorsForDay, type Menu, type Stripe } from '../../src/systems/menu';
 import { createRng } from '../../src/systems/rng';
 
@@ -12,9 +12,9 @@ const menu = menuJson as Menu;
 const customers = customersJson as CustomersData;
 const baseBalance = balanceJson as Balance;
 
-function makeSession(over: Partial<Balance> = {}, day = 1, seed = 1): GameSession {
+function makeSession(over: Partial<Balance> = {}, day = 1, seed = 1, mess?: TrayState): GameSession {
   // No active-customer cap unless a test asks for one; pacing has its own tests.
-  return new GameSession({ menu, customers, balance: { ...baseBalance, maxActiveByDay: [99], ...over }, day, rng: createRng(seed) });
+  return new GameSession({ menu, customers, balance: { ...baseBalance, maxActiveByDay: [99], ...over }, day, rng: createRng(seed), ...(mess ? { mess } : {}) });
 }
 
 const fastSpawn = { spawn: { firstDelaySec: 1, intervalSec: { min: 2, max: 2 }, maxInLine: 3 } };
@@ -340,11 +340,15 @@ function topBoard(s: GameSession, toppingId: string, n = 40) {
 function makeFlavor(s: GameSession, flavorId: string) {
   const f = menu.flavors.find((x) => x.id === flavorId)!;
   fryRack(s, 1);
-  s.startGlazing(s.rack.length - 1);
-  glazeBoard(s, f.glaze, f.drizzle, f.drizzlePattern);
-  s.finishGlazing();
+  if (f.glaze) {
+    s.startGlazing(s.rack.length - 1);
+    glazeBoard(s, f.glaze, f.drizzle, f.drizzlePattern);
+    s.finishGlazing();
+  }
   if (f.toppings.length) {
-    s.startToppings(s.shelf.length - 1);
+    // No glaze (the beignet): straight from the rack to the toppings tray.
+    if (f.glaze) s.startToppings(s.shelf.length - 1);
+    else s.startToppingsFromRack(s.rack.length - 1);
     for (const t of f.toppings) topBoard(s, t, menu.toppings.find((x) => x.id === t)!.style === 'piece' ? 1 : 40);
     s.finishToppings();
   }
@@ -570,5 +574,53 @@ describe('GameSession: box and serving', () => {
     expect(dayDone).toBe(1);
     expect(s.isDayComplete).toBe(true);
     expect(() => s.serveActiveTicket()).toThrow();
+  });
+});
+
+describe('GameSession: the beignet skips the glaze', () => {
+  it('a plain donut goes straight from the rack to the toppings tray, and powdered sugar makes it a beignet', () => {
+    const s = makeSession();
+    fryRack(s, 1);
+    expect(s.startToppingsFromRack(0)).not.toBeNull();
+    expect(s.rack.length).toBe(0);
+    topBoard(s, 'powdered-sugar', 80);
+    const d = s.finishToppings()!;
+    expect(s.flavorOf(d)).toBe('beignet');
+  });
+});
+
+describe('GameSession: moldy trays', () => {
+  const moldy = (days: number): TrayState => ({ glaze: 8, toppings: 8, mold: { glaze: days, toppings: days } });
+
+  it('a donut made on a moldy tray tastes funky: no tip, an unhappy customer', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11, moldy(1));
+    s.tick(1000);
+    const { ticket } = orderFront(s);
+    for (const f of ticket.order.flavors) makeFlavor(s, f);
+    expect(s.shelf.every((d) => (d.funky ?? 0) > 0)).toBe(true);
+    packInOrder(s, ticket.order.flavors);
+    const e = s.serveActiveTicket();
+    expect(ticket.results.funky).toBe(1);
+    expect(e.score.tip).toBe(0);
+    expect(e.score.tier).toBe('bad');
+    expect(e.sale).toBeGreaterThan(0); // still paid, for now
+  });
+
+  it('left moldy long enough, customers stop paying; scrubbing it clean fixes that', () => {
+    const s = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11, moldy(baseBalance.cleanup.moldNoPayDays ?? 2));
+    s.tick(1000);
+    const { ticket } = orderFront(s);
+    for (const f of ticket.order.flavors) makeFlavor(s, f);
+    packInOrder(s, ticket.order.flavors);
+    expect(s.serveActiveTicket().sale).toBe(0);
+
+    const clean = makeSession({ ...fastSpawn, customersPerDay: [2] }, 1, 11, moldy(3));
+    clean.wipe('glaze', 100);
+    clean.wipe('toppings', 100);
+    clean.tick(1000);
+    const t2 = orderFront(clean).ticket;
+    for (const f of t2.order.flavors) makeFlavor(clean, f);
+    packInOrder(clean, t2.order.flavors);
+    expect(clean.serveActiveTicket().sale).toBeGreaterThan(0);
   });
 });

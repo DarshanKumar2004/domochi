@@ -187,7 +187,8 @@ describe('glazeScoreFor: matching a glazed donut to a flavour', () => {
     expect(wrong).toBeLessThan(drizzled);
   });
 
-  it('beignet wants a dusting of powdered sugar', () => {
-    expect(glazeScoreFor(make('powdered-sugar', null), flavor('beignet'), B)).toBeGreaterThan(0.8);
+  it('the beignet takes no glaze (its sugar goes on at Toppings): bare is perfect, glazed is poor', () => {
+    expect(glazeScoreFor(make(null, null), flavor('beignet'), B)).toBe(1);
+    expect(glazeScoreFor(make('strawberry', null), flavor('beignet'), B)).toBeLessThan(0.5);
   });
 });

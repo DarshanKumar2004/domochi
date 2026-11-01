@@ -56,12 +56,10 @@ export class TrayWiper {
     this.refreshIcon();
   }
 
-  /** Shown while the tray is messy (or the sponge is in hand); lit up when picked. */
+  /** Always there, so you can scrub any time; faded while the tray's already clean, lit up when picked. */
   refreshIcon(): void {
-    const show = this.dirty || this.holding;
-    if (!show) this.holding = false;
-    this.icon.setVisible(show).setAlpha(this.holding ? 1 : 0.85);
-    this.iconLabel.setVisible(show).setText(this.holding ? 'scrub the tray!' : 'tap to clean');
+    this.icon.setVisible(true).setAlpha(this.holding ? 1 : this.dirty ? 0.9 : 0.5);
+    this.iconLabel.setVisible(true).setText(this.holding ? 'scrub the tray!' : this.dirty ? 'tap to clean' : 'sponge');
     if (this.holding) this.icon.setTint(0xfff2a8);
     else this.icon.clearTint();
   }

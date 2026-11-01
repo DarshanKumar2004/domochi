@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { toppingStockId } from '../systems/supplies';
 import { TextureKeys } from '../assets/keys';
-import type { ToppingWork } from '../stations/toppings';
+import type { FinishedDonut, ToppingWork } from '../stations/toppings';
 import type { Topping } from '../systems/menu';
 import { audio, balance, menu, session } from '../systems/services';
 import { Button } from '../ui/Button';
@@ -18,6 +18,8 @@ import {
   MESS_SIZE,
   pruneDonutIcons,
   TRAY_PAD,
+  paintStaleMess,
+  jarOutline,
 } from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -88,7 +90,8 @@ const LAYOUT = {
   portrait: {
     shelf: { x: 40, y: 230, w: 1000, h: 140, size: 110 },
     // Two spots side by side (centre of the pair, each donut's size, gap between centres).
-    board: { x: 540, y: 672, size: 400, dx: 500 },
+    // The same tray as the Glaze station's (size and spacing), so the two match.
+    board: { x: 540, y: 670, size: 360, dx: 400 },
     instruction: { x: 540, y: 988 },
     readout: { x: 540, y: 1032 },
     jars: { x: 470, y: 1160, step: 230, scale: 0.75 },
@@ -97,7 +100,7 @@ const LAYOUT = {
   },
   landscape: {
     shelf: { x: 1000, y: 160, w: 880, h: 120, size: 92 },
-    board: { x: 480, y: 362, size: 400, dx: 460 },
+    board: { x: 480, y: 362, size: 370, dx: 430 },
     instruction: { x: 480, y: 684 },
     readout: { x: 480, y: 730 },
     jars: { x: 1340, y: 430, step: 200, scale: 0.7 },
@@ -121,6 +124,8 @@ export class ToppingsScene extends StationScene {
   private shelfBg!: Phaser.GameObjects.Graphics;
   private shelfLabel!: Phaser.GameObjects.Text;
   private shelfImgs: Phaser.GameObjects.Image[] = [];
+  /** What each shelf-row image is: a shelf donut, or a plain one from the rack (for the beignet). */
+  private rowSrc: ({ kind: 'shelf' | 'rack'; i: number } | null)[] = [];
   private trash!: Phaser.GameObjects.Image;
   private jars: JarView[] = [];
   /** Dotted outlines where locked jars will go. */
@@ -178,6 +183,14 @@ export class ToppingsScene extends StationScene {
     this.boardTray = this.add.graphics();
     const spots = session().toppingBoards.length;
     for (let i = 0; i < spots; i++) this.boards.push(this.makeBoard(i));
+    // Mess left from before (not cleaned up yesterday, or before a reload) is still there, maybe moldy.
+    const stale = session().messOn('toppings');
+    if (stale > 0) {
+      this.boards.forEach((b, i) => {
+        paintStaleMess(b.mess.context, stale / this.boards.length, session().moldOn('toppings'), i + 1, ['#2b2420', '#f1ece2', '#ff8a3d', '#c8955f']);
+        b.mess.refresh();
+      });
+    }
     this.activeRing = this.add.graphics();
     this.boardZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('toppings-board');
 
@@ -314,7 +327,9 @@ export class ToppingsScene extends StationScene {
       img.setDepth(5);
       if (this.overTrash(p.worldX, p.worldY)) {
         const ghost = this.ghostOf(img);
-        if (session().trashShelfDonut(i)) this.toTrash(p.worldX, p.worldY, ghost, true);
+        const src = this.rowSrc[i];
+        const gone = src?.kind === 'rack' ? session().trashRackDonut(src.i) : src ? session().trashShelfDonut(src.i) : false;
+        if (gone) this.toTrash(p.worldX, p.worldY, ghost, true);
         else ghost.destroy();
       } else {
         // Dropped on a spot: that one (if it's free).
@@ -376,8 +391,7 @@ export class ToppingsScene extends StationScene {
       fill.setVisible(false);
     }
     const label = this.add
-      .text(0, 0, lockedUntil === null ? t.name : `${t.name}
-soon`, {
+      .text(0, 0, lockedUntil === null ? t.name : '', {
         fontFamily: FONT_FAMILY,
         fontSize: '26px',
         color: lockedUntil === null ? CSS.cream : CSS.muted,
@@ -434,18 +448,9 @@ soon`, {
       jar.fill.setPosition(jx, jy).setScale(L.jars.scale);
       jar.label.setPosition(jx, jy + 130 * L.jars.scale + 10);
       if (jar.lockedUntil !== null) {
-        // A dotted outline where the jar will be.
-        const w = 140 * L.jars.scale;
-        const h = 190 * L.jars.scale;
-        const pts = [
-          { x: -w / 2, y: -h / 2 },
-          { x: w / 2, y: -h / 2 },
-          { x: w / 2, y: h / 2 },
-          { x: -w / 2, y: h / 2 },
-          { x: -w / 2, y: -h / 2 },
-        ];
-        this.lockedJars.lineStyle(4, COLORS.cream, 0.5);
-        drawDashedPath(this.lockedJars, jx, jy, 1, pts, 10, 8);
+        // A dotted jar where the next topping will go (no name: it's a surprise).
+        this.lockedJars.lineStyle(4, COLORS.cream, 0.45);
+        for (const path of jarOutline(130 * L.jars.scale, 180 * L.jars.scale)) drawDashedPath(this.lockedJars, jx, jy, 1, path, 10, 8);
       }
     });
 
@@ -472,11 +477,15 @@ soon`, {
     const work = s.toppingWork;
 
     pruneDonutIcons(this);
+    const row: { kind: 'shelf' | 'rack'; i: number; d: FinishedDonut }[] = s.shelf.map((d, i) => ({ kind: 'shelf' as const, i, d }));
+    if (s.unglazedOnMenu) s.rack.forEach((fd, i) => row.push({ kind: 'rack', i, d: { id: fd.id, fry: fd, layers: [] } }));
+    this.rowSrc = this.shelfImgs.map((_, i) => (row[i] ? { kind: row[i]!.kind, i: row[i]!.i } : null));
     this.shelfImgs.forEach((img, i) => {
-      const d = s.shelf[i];
-      img.setVisible(!!d);
-      if (d) {
-        img.setTexture(donutIcon(this, d));
+      const e = row[i];
+      img.setVisible(!!e);
+      if (e) {
+        img.setName(e.kind === 'rack' ? `toppings-rack-${e.i}` : `toppings-shelf-${e.i}`);
+        img.setTexture(donutIcon(this, e.d));
         img.setPosition(this.shelfPos.x + i * this.shelfPos.step, this.shelfPos.y).setDisplaySize(this.shelfPos.size, this.shelfPos.size);
       }
     });
@@ -496,7 +505,13 @@ soon`, {
     if (!work) {
       const st = session();
       if (st.phase === 'closing' && st.messOn('toppings') > 0) this.instruction.setText('closing time: scrub the tray clean');
-      else this.instruction.setText((s.shelf.length ? 'tap a glazed donut to top it' : 'no glazed donuts: glaze some first!') + (st.messOn('toppings') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : ''));
+      else {
+        const plain = s.unglazedOnMenu;
+        const any = s.shelf.length || (plain && s.rack.length);
+        const none = plain ? 'no donuts yet: fry some first!' : 'no glazed donuts: glaze some first!';
+        const scrub = st.moldOn('toppings') > 0 ? '\nthe tray is moldy! scrub it clean first' : st.messOn('toppings') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : '';
+        this.instruction.setText((any ? 'tap a donut to top it' : none) + scrub);
+      }
     }
     else if (!this.jars.some((j) => j.lockedUntil === null)) this.instruction.setText("nothing on today's menu needs toppings");
     else if (!t) this.instruction.setText('pick a jar');
@@ -635,7 +650,7 @@ soon`, {
         this.wiper.start(p);
         this.flash('scrubbing the tray clean');
       }
-      else this.flash(s.shelf.length ? 'take a donut from the shelf first' : 'glaze some donuts first');
+      else this.flash(s.shelf.length || (s.unglazedOnMenu && s.rack.length) ? 'take a donut from the shelf first' : s.unglazedOnMenu ? 'fry some donuts first' : 'glaze some donuts first');
       return;
     }
     const t = this.selectedTopping();
@@ -798,6 +813,7 @@ soon`, {
 
   // ---- Actions ----------------------------------------------------------------
 
+  /** Take the donut shown at row image `i` (a shelf donut, or a plain one from the rack). */
   private takeFromShelf(i: number, spot?: number): void {
     const s = session();
     if (s.toppingBoards.every((w) => w)) {
@@ -805,8 +821,10 @@ soon`, {
       return;
     }
     const img = this.shelfImgs[i]!;
+    const src = this.rowSrc[i];
+    if (!src) return;
     const from = { x: img.x, y: img.y, size: img.displayWidth, key: img.texture.key };
-    if (!s.startToppings(i, spot)) return;
+    if (!(src.kind === 'rack' ? s.startToppingsFromRack(src.i, spot) : s.startToppings(src.i, spot))) return;
     const b = this.boards[s.activeToppingSpot]!;
     // A new donut on the tray: the old mess under it fades a bit.
     fadeTray(b.mess.context, TRAY_KEEP);

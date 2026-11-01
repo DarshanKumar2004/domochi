@@ -14,11 +14,12 @@ function layer(kind: 'base' | 'drizzle', glazeId: string): GlazeLayer {
   return { kind, glazeId, style: kind === 'base' ? 'dip' : 'drizzle', segments: [0, 0, 0, 0], coverage: 1, spill: 0, ballsTouched: 8 };
 }
 
-function donut(id: number, base: string, drizzle?: string, toppings: string[] = []): FinishedDonut {
+function donut(id: number, base: string | undefined, drizzle?: string, toppings: string[] = []): FinishedDonut {
   return {
     id,
     fry: { id, a: 1, b: 1, temperature: 1, score: 100 },
-    layers: drizzle ? [layer('base', base), layer('drizzle', drizzle)] : [layer('base', base)],
+    // No base: a plain donut (the beignet skips the glaze).
+    layers: base === undefined ? [] : drizzle ? [layer('base', base), layer('drizzle', drizzle)] : [layer('base', base)],
     toppings: toppings.map((t) => ({ toppingId: t, x: 0, y: -0.65, rot: 0, on: true, ball: 0 })),
   };
 }

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import balanceJson from '../../src/data/balance.json' with { type: 'json' };
 import { SceneKeys } from '../../src/scenes/sceneKeys';
-import { advance, boundsNamed, drawPath, findNamed, isVisibleNamed, openDay, pauseClock, seedTutorialDone, shot, tapNamed, toPage, waitForScene } from './helpers';
+import { advance, boundsNamed, drawPath, findNamed, isVisibleNamed, openDay, pauseClock, seedTutorialDone, shot, tapNamed, toPage, waitForScene, stirDough } from './helpers';
 
 interface SessionView {
   phase: string;
@@ -9,7 +9,7 @@ interface SessionView {
   oilDirt: number;
   line: { id: number; state: string }[];
   pickups: unknown[];
-  cleanup: { glazeTray: boolean; toppingsTray: boolean; oil: boolean };
+  cleanup: { glazeTray: boolean; toppingsTray: boolean; oil: boolean; bowl: boolean };
   inviteWasAccepted: boolean;
   messOn(t: string): number;
   addMess(t: string, n: number): void;
@@ -127,7 +127,11 @@ test('a full day: make the dough, open the window, then clean up and close for t
   await waitForScene(page, SceneKeys.Fry);
   await tapNamed(page, SceneKeys.Fry, 'btn-filter-oil');
   await expect.poll(() => s((x) => x.oilDirt)).toBe(0);
-  expect(await s((x) => x.cleanup)).toEqual({ glazeTray: true, toppingsTray: true, oil: true });
+  // And wash the dough bowl: scrub round the empty bowl.
+  await tapNamed(page, SceneKeys.Hud, 'tab-Dough');
+  await waitForScene(page, SceneKeys.Dough);
+  await stirDough(page);
+  expect(await s((x) => x.cleanup)).toEqual({ glazeTray: true, toppingsTray: true, oil: true, bowl: true });
 
   await tapNamed(page, SceneKeys.Hud, 'tab-Lobby');
   await waitForScene(page, SceneKeys.Lobby);

@@ -39,8 +39,9 @@ const MELODY = [
   [3, -1, 2, -1, 1, 2, -1, 0],
   [1, -1, 2, 3, -1, 2, 1, -1],
 ];
-const MUSIC_VOLUME = 0.05;
-const SFX_VOLUME = 0.5;
+// Loud enough for a phone speaker at half volume (Kumar, 2026-11-01); a limiter keeps the mix from crackling.
+const MUSIC_VOLUME = 0.2;
+const SFX_VOLUME = 0.85;
 
 type Ctx = AudioContext;
 
@@ -84,12 +85,20 @@ export class AudioService {
       this.ctx = this.createContext();
       if (!this.ctx) return;
       const ctx = this.ctx;
+      // Everything goes through a gentle limiter, so loud moments don't clip.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -10;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 8;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.2;
+      limiter.connect(ctx.destination);
       this.sfxGain = ctx.createGain();
       this.sfxGain.gain.value = SFX_VOLUME;
-      this.sfxGain.connect(ctx.destination);
+      this.sfxGain.connect(limiter);
       this.musicGain = ctx.createGain();
       this.musicGain.gain.value = MUSIC_VOLUME;
-      this.musicGain.connect(ctx.destination);
+      this.musicGain.connect(limiter);
       // One second of white noise, reused for every noisy sound.
       this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -274,7 +283,8 @@ export class AudioService {
       const at = this.nextNoteAt;
       if (beat === 0) {
         // Soft bass on the root, and the chord as a quiet pad.
-        this.tone(at, eighth * 7, chord[0]! / 2, 'sine', 0.5, undefined, this.musicGain);
+        // A triangle (not a sine): its overtones carry on a phone speaker, which can't play the low note itself.
+        this.tone(at, eighth * 7, chord[0]! / 2, 'triangle', 0.4, undefined, this.musicGain);
         for (const f of chord) this.tone(at, eighth * 8, f, 'sine', 0.08, undefined, this.musicGain);
       }
       const m = MELODY[bar]![beat]!;

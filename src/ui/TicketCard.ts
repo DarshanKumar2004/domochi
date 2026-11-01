@@ -18,7 +18,7 @@ export function recipeLine(flavorId: string, menu: Menu): string {
   const f = menu.flavors.find((x) => x.id === flavorId);
   if (!f) return '';
   const name = (id: string | undefined) => menu.glazes.find((g) => g.id === id)?.name ?? id ?? '';
-  const parts = [name(f.glaze)];
+  const parts = f.glaze ? [name(f.glaze)] : [];
   if (f.drizzle) parts.push(`${name(f.drizzle)} drizzle`);
   for (const t of f.toppings) parts.push(menu.toppings.find((x) => x.id === t)?.name ?? t);
   return parts.join(' + ');

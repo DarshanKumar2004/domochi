@@ -12,6 +12,7 @@ function fakeContext() {
     destination: {},
     createGain: () => node(),
     createBiquadFilter: () => node(),
+    createDynamicsCompressor: () => ({ ...node(), threshold: param(), knee: param(), ratio: param(), attack: param(), release: param() }),
     createOscillator: () => {
       counts.oscillators++;
       return { ...node(), start: vi.fn(), stop: vi.fn() };

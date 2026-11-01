@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../assets/keys';
 import { audio, balance, menu, session } from '../systems/services';
+import { BoxPile } from '../ui/BoxPile';
 import { Button } from '../ui/Button';
 import { donutIcon, pruneDonutIcons } from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
@@ -52,8 +53,7 @@ export class BoxScene extends StationScene {
   private lidImg!: Phaser.GameObjects.Image;
   private serveButton!: Button;
   /** Pick the box: single, trio, flight (and bigger, for big orders). */
-  private sizeButtons: { id: string; size: number; button: Button }[] = [];
-  private sizeRing!: Phaser.GameObjects.Graphics;
+  private sizeButtons: BoxPile[] = [];
   private sizesPos = { x: 0, y: 0, step: 0, scale: 1 };
   private hint!: Phaser.GameObjects.Text;
   private instruction!: Phaser.GameObjects.Text;
@@ -110,20 +110,10 @@ export class BoxScene extends StationScene {
     this.instruction = text(34, CSS.muted).setName('box-instruction');
     this.flashText = text(48, CSS.ink, true).setBackgroundColor(CSS.cream).setPadding(24, 14, 24, 14).setDepth(40).setVisible(false).setName('box-flash');
     this.serveButton = new Button(this, 0, 0, 'Close lid & serve', () => this.serve(), { width: 640, name: 'btn-serve' });
-    this.sizeRing = this.add.graphics();
+    // The boxes on the counter: a pile of each size (tap one to use it).
     this.sizeButtons = [...menu.boxes]
       .sort((a, b) => a.size - b.size)
-      .map((b) => ({
-        id: b.id,
-        size: b.size,
-        button: new Button(this, 0, 0, `${b.size}  ${b.name.replace(/^the /, '')}`, () => this.pickBox(b.id), {
-          width: 270,
-          height: 120,
-          fontSize: 40,
-          fill: COLORS.dough,
-          name: `box-size-${b.id}`,
-        }),
-      }));
+      .map((b) => new BoxPile(this, b.id, b.size, b.name.replace(/^the /, ''), () => this.pickBox(b.id)));
     listen(this, session().events, 'changed', () => this.refresh());
   }
 
@@ -302,25 +292,17 @@ export class BoxScene extends StationScene {
     this.serveButton.setEnabled(!!active && s.boxCount > 0 && !this.closing);
   }
 
-  /** The box-size row: single, trio and flight (and bigger boxes if the order needs one); the chosen one ringed. */
+  /** The piles of boxes: single, trio and flight (and the dozen if the order needs it); the chosen one ringed. */
   private refreshSizes(ordered: number): void {
     const choice = session().boxChoice;
     // Single, trio and flight; the dozen only when an order needs more than 6.
-    const shown = this.sizeButtons.filter((b) => ordered > 0 && (b.size <= 6 || (ordered > 6 && b.size >= ordered)));
+    const shown = this.sizeButtons.filter((b) => ordered > 0 && (b.slots <= 6 || (ordered > 6 && b.slots >= ordered)));
     const p = this.sizesPos;
-    this.sizeRing.clear();
-    for (const b of this.sizeButtons) {
-      b.button.setVisible(shown.includes(b));
-      const left = session().stockOf(boxStockId(b.id));
-      const name = menu.boxes.find((x) => x.id === b.id)!.name.replace(/^the /, '');
-      b.button.setLabel(Number.isFinite(left) ? `${name} (${left})` : `${b.size}  ${name}`);
-    }
+    for (const b of this.sizeButtons) b.setVisible(shown.includes(b));
     shown.forEach((b, i) => {
-      b.button.setPosition(p.x + (i - (shown.length - 1) / 2) * p.step * p.scale, p.y).setScale(p.scale);
-      if (b.id === choice) {
-        this.sizeRing.lineStyle(8, COLORS.pink);
-        this.sizeRing.strokeRoundedRect(b.button.x - 145 * p.scale, p.y - 70 * p.scale, 290 * p.scale, 140 * p.scale, 40 * p.scale);
-      }
+      // The pile sits on its base line; its name and count go underneath.
+      b.setPosition(p.x + (i - (shown.length - 1) / 2) * p.step * p.scale, p.y + 30 * p.scale).setScale(p.scale);
+      b.draw(session().stockOf(boxStockId(b.boxId)), b.boxId === choice);
     });
   }
 

@@ -43,6 +43,8 @@ export interface SaveData {
   regulars: Record<string, number>;
   /** The day being played, saved as you go so a reload picks it back up (gone once the day's done). */
   inProgress?: { day: number; snap: DaySnapshot; stickers: string[] };
+  /** The trays as the last day left them (mess not cleaned up, and days dirty: mold). */
+  trays?: { glaze: number; toppings: number; bowl?: boolean; mold: { glaze: number; toppings: number; bowl?: number } };
   /** mochi's journal: stickers earned (ids, in order) and a page per finished day. */
   journal: { stickers: string[]; pages: JournalPage[]; seen: number };
   settings: {
@@ -123,6 +125,15 @@ export function sanitizeSave(raw: unknown): SaveData {
     if (typeof j.seen === 'number' && j.seen >= 0) data.journal.seen = Math.floor(j.seen);
   }
 
+  if (isRecord(raw.trays) && isRecord(raw.trays.mold)) {
+    const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+    data.trays = {
+      glaze: n(raw.trays.glaze),
+      toppings: n(raw.trays.toppings),
+      bowl: raw.trays.bowl === true,
+      mold: { glaze: Math.floor(n(raw.trays.mold.glaze)), toppings: Math.floor(n(raw.trays.mold.toppings)), bowl: Math.floor(n(raw.trays.mold.bowl)) },
+    };
+  }
   if (isRecord(raw.settings)) {
     if (typeof raw.settings.sound === 'boolean') data.settings.sound = raw.settings.sound;
     if (typeof raw.settings.music === 'boolean') data.settings.music = raw.settings.music;

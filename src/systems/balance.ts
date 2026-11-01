@@ -45,7 +45,8 @@ export interface Balance {
   dough: DoughBalance;
   deliveries: { byDay: number[]; size: Range };
   events: { inviteChance: Record<'great' | 'good' | 'okay' | 'bad', number>; giftBonus: number; fromDay?: number };
-  cleanup: { messDoneAt: number; tidyBonus: number; oilDirtMax: number; wipePerUnit: number };
+  /** moldNoPayDays: once a tray has been dirty this many days, its donuts aren't paid for. */
+  cleanup: { messDoneAt: number; tidyBonus: number; oilDirtMax: number; wipePerUnit: number; moldNoPayDays?: number; bowlWashTurns?: number };
   /** A day at the window lasts this long once you open. */
   day: { lengthSec: number };
   payment: PaymentBalance;

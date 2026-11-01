@@ -270,11 +270,13 @@
     "fromDay": 30
   },
   "cleanup": {
-    "_note": "Closing time: wipe both trays (mess at or below messDoneAt) and filter the oil. A tidy close earns tidyBonus. Oil dirt +1 per donut fried; the vat looks fully dirty at oilDirtMax.",
+    "_note": "Closing time: wipe both trays (mess at or below messDoneAt) and filter the oil. A tidy close earns tidyBonus. Oil dirt +1 per donut fried; the vat looks fully dirty at oilDirtMax. A tray not cleaned up stays dirty into the next day and grows mold (Kumar 2026-11-01): donuts made on it taste funky (no tip, unhappy customer), and after moldNoPayDays dirty days customers won't pay for them. Scrubbing it clean clears the mold. The dough bowl gets dirty with every batch; scrub round it bowlWashTurns times to wash it (part of a tidy close). Left dirty overnight it grows mold, and no dough can be mixed in it until it is washed.",
     "messDoneAt": 2,
     "tidyBonus": 2,
     "oilDirtMax": 30,
-    "wipePerUnit": 0.35
+    "wipePerUnit": 0.35,
+    "moldNoPayDays": 2,
+    "bowlWashTurns": 3
   },
   "day": {
     "_note": "With the full day (not the tutorial): the window is open for lengthSec. Walk-ups keep coming until then; when time's up, anyone still in line goes home, and the orders already taken still get served (or sent home). Days never run out. customersPerDay only applies without the full day (tests).",
@@ -454,20 +456,20 @@
         "unlockDay": 45
       },
       {
-        "id": "glaze-powdered-sugar",
-        "name": "powdered sugar",
-        "kind": "glaze",
-        "pack": 12,
-        "price": 3,
-        "unlockDay": 1
-      },
-      {
         "id": "glaze-white-icing",
         "name": "white icing",
         "kind": "glaze",
         "pack": 12,
         "price": 3,
         "unlockDay": 3
+      },
+      {
+        "id": "topping-powdered-sugar",
+        "name": "powdered sugar",
+        "kind": "topping",
+        "pack": 12,
+        "price": 3,
+        "unlockDay": 1
       },
       {
         "id": "topping-cookie-butter-cookie",
@@ -505,7 +507,7 @@
       "box-flight": 3,
       "box-domochi-box": 1,
       "oil": 2,
-      "glaze-powdered-sugar": 12
+      "topping-powdered-sugar": 12
     },
     "priceSwing": 0.25,
     "friendCheckSec": 60,

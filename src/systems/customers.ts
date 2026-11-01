@@ -29,6 +29,8 @@ export interface CustomersData {
   /** What a customer says when you put extra donuts in their box. */
   giftLines: string[];
   /** Ethan's friends, who drop off supplies you're low on ({item}, {qty}). */
+  /** Donuts off a moldy tray: "funky" (no tip), then "noPay" once it's been dirty a while. */
+  funkyLines?: { funky: string[]; noPay: string[] };
   friends?: {
     names: string[];
     lines: string[];

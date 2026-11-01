@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SceneKeys } from '../../src/scenes/sceneKeys';
 import balanceJson from '../../src/data/balance.json' with { type: 'json' };
-import { stirDough, advance, boundsNamed, drawPath, isVisibleNamed, pauseClock, shot, tapNamed, toPage, waitForScene } from './helpers';
+import { stirDough, advance, boundsNamed, drawPath, isVisibleNamed, pauseClock, shot, tapNamed, toPage, waitForScene, holdNamed } from './helpers';
 
 type Slot = { down: number; up: number; flips: number } | null;
 interface SessionView {
@@ -81,9 +81,19 @@ test('the guided first order: mochi the donut walks you through every station', 
   await tapNamed(page, SceneKeys.Hud, 'tab-Fry');
   await waitForScene(page, SceneKeys.Fry);
   await advance(page, 12_000); // the oil heats up
+  // The oil's a little low: top it up first.
+  await expect.poll(() => line(page)).toContain('+ oil');
+  await shot(page, 'tutorial-3a-oil');
+  await tapNamed(page, SceneKeys.Fry, 'btn-add-oil');
   await expect.poll(() => line(page)).toContain('Drop');
   await tapNamed(page, SceneKeys.Fry, 'btn-drop');
-  await page.waitForTimeout(700);
+  // Mochi donuts float: hold the grate a moment.
+  await expect.poll(() => line(page)).toContain('hold the grate');
+  await shot(page, 'tutorial-3b-grate');
+  const letGo = await holdNamed(page, SceneKeys.Fry, 'btn-grate');
+  await page.waitForTimeout(1600);
+  await letGo();
+  await page.waitForTimeout(400);
   await expect.poll(() => line(page)).toContain('flip');
   await cookUntil(page, (d) => Math.abs(d.down - 1) <= 0.1);
   await tapNamed(page, SceneKeys.Fry, 'fry-donut-0');

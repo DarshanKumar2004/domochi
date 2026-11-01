@@ -389,3 +389,91 @@ export function pruneDonutIcons(scene: Phaser.Scene): void {
     goneSince.delete(key);
   }
 }
+
+/**
+ * Old mess left on a tray from before (yesterday's, or before a reload): dried
+ * splotches, more for a messier tray. Once it's sat dirty overnight (`moldDays`),
+ * fuzzy grey-green mold spots too.
+ */
+export function paintStaleMess(ctx: CanvasRenderingContext2D, level: number, moldDays: number, seed: number, colors: readonly string[]): void {
+  let r = seed * 9301 + 49297;
+  const rand = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
+  const n = Math.min(26, Math.round(4 + level * 1.5));
+  ctx.save();
+  for (let i = 0; i < n; i++) {
+    ctx.globalAlpha = 0.45 + rand() * 0.35;
+    ctx.fillStyle = colors[Math.floor(rand() * colors.length)] ?? '#c8a27a';
+    const x = MESS_SIZE * (0.08 + rand() * 0.84);
+    const y = MESS_SIZE * (0.08 + rand() * 0.84);
+    const s = MESS_SIZE * (0.02 + rand() * 0.05);
+    ctx.beginPath();
+    ctx.ellipse(x, y, s, s * (0.5 + rand() * 0.6), rand() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (moldDays > 0) {
+    const spots = Math.min(30, 8 + moldDays * 8);
+    for (let i = 0; i < spots; i++) {
+      const x = MESS_SIZE * (0.08 + rand() * 0.84);
+      const y = MESS_SIZE * (0.08 + rand() * 0.84);
+      const s = MESS_SIZE * (0.012 + rand() * 0.03);
+      // A fuzzy patch: a soft halo with a darker centre.
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#9fb38a';
+      ctx.beginPath();
+      ctx.arc(x, y, s * 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = rand() < 0.5 ? '#5f7a4f' : '#7d8f6a';
+      ctx.beginPath();
+      ctx.arc(x, y, s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+type Pt = { x: number; y: number };
+
+/** A glaze cup's outline (paths, centred on 0,0): a tapered tumbler with a handle on the right. */
+export function cupOutline(w: number, h: number): Pt[][] {
+  const body: Pt[] = [
+    { x: -w / 2, y: -h / 2 },
+    { x: w / 2, y: -h / 2 },
+    { x: w * 0.36, y: h / 2 },
+    { x: -w * 0.36, y: h / 2 },
+    { x: -w / 2, y: -h / 2 },
+  ];
+  const handle: Pt[] = [];
+  for (let k = 0; k <= 12; k++) {
+    const a = -Math.PI / 2 + (k / 12) * Math.PI;
+    handle.push({ x: w * 0.44 + Math.cos(a) * w * 0.2, y: -h * 0.05 + Math.sin(a) * h * 0.22 });
+  }
+  return [body, handle];
+}
+
+/** A topping jar's outline (paths, centred on 0,0): a lid on top of a round-shouldered jar. */
+export function jarOutline(w: number, h: number): Pt[][] {
+  const lidH = h * 0.16;
+  const lid: Pt[] = [
+    { x: -w * 0.36, y: -h / 2 },
+    { x: w * 0.36, y: -h / 2 },
+    { x: w * 0.36, y: -h / 2 + lidH },
+    { x: -w * 0.36, y: -h / 2 + lidH },
+    { x: -w * 0.36, y: -h / 2 },
+  ];
+  const top = -h / 2 + lidH;
+  const r = w * 0.18;
+  const body: Pt[] = [];
+  const arc = (cx: number, cy: number, from: number, to: number) => {
+    for (let k = 0; k <= 6; k++) {
+      const a = from + ((to - from) * k) / 6;
+      body.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+    }
+  };
+  arc(-w / 2 + r, top + r, Math.PI, Math.PI * 1.5);
+  arc(w / 2 - r, top + r, -Math.PI / 2, 0);
+  arc(w / 2 - r, h / 2 - r, 0, Math.PI / 2);
+  arc(-w / 2 + r, h / 2 - r, Math.PI / 2, Math.PI);
+  body.push(body[0]!);
+  return [lid, body];
+}

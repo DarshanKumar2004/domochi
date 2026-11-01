@@ -409,7 +409,7 @@ export class StoreScene extends Phaser.Scene {
     const day = save().data.day;
     const onMenu = new Set<string>();
     for (const f of flavorsForDay(menu, day)) {
-      onMenu.add(glazeStockId(f.glaze));
+      if (f.glaze) onMenu.add(glazeStockId(f.glaze));
       if (f.drizzle) onMenu.add(glazeStockId(f.drizzle));
       for (const tp of f.toppings ?? []) onMenu.add(toppingStockId(tp));
     }

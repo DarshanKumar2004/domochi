@@ -12,8 +12,11 @@ const CSS = `
 .dm-card .dm-muted{color:#6b5d52;font-size:14px}
 .dm-card textarea,.dm-card input{width:100%;box-sizing:border-box;border:3px solid #1f1a17;border-radius:14px;padding:10px;font:16px ${FONT_FAMILY};background:#fff;margin:6px 0}
 .dm-card textarea{min-height:120px;resize:vertical}
-.dm-row{display:flex;gap:10px;margin-top:10px}
-.dm-btn{flex:1;min-height:52px;border:3px solid #1f1a17;border-radius:16px;font:bold 18px ${FONT_FAMILY};cursor:pointer;background:#e9c48f;color:#1f1a17}
+.dm-row{display:flex;gap:12px;margin:14px 0 8px}
+.dm-btn{flex:1;min-height:52px;border:3px solid #1f1a17;border-radius:16px;font:bold 18px ${FONT_FAMILY};cursor:pointer;background:#e9c48f;color:#1f1a17;box-shadow:0 5px 0 rgba(0,0,0,.28)}
+.dm-btn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
+/* A phone held sideways: a shorter form, so it fits with room under the buttons. */
+@media (max-height:520px){.dm-card{padding:14px 18px 16px}.dm-card h2{font-size:22px}.dm-card p{margin:4px 0;font-size:15px}.dm-card textarea{min-height:64px}.dm-card input,.dm-card textarea{padding:8px;margin:4px 0}.dm-btn{min-height:46px}}
 .dm-btn.dm-go{background:#f4a6c0}
 .dm-card a{color:#b0406a;font-weight:bold}
 `;

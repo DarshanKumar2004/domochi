@@ -66,6 +66,8 @@ export interface GlazedDonut {
   id: number;
   fry: FriedDonut;
   layers: GlazeLayer[];
+  /** Made on a tray that grew mold (how many days it's been dirty): customers taste it. */
+  funky?: number;
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -303,6 +305,8 @@ export function topLayers(layers: readonly GlazeLayer[]): { base?: GlazeLayer; d
 
 export function glazeScoreFor(d: GlazedDonut, flavor: Flavor, b: GlazeBalance): number {
   const { base, drizzle } = topLayers(d.layers);
+  // A flavour with no glaze (the beignet): perfect bare, poor if it was glazed anyway.
+  if (flavor.glaze === undefined) return base || drizzle ? b.wrongGlazeFactor * 0.5 : 1;
   const baseScore = base && base.style !== 'drizzle' ? layerScore(base.coverage, base.spill, base.style, base.glazeId === flavor.glaze, b) : 0;
   if (flavor.drizzle) {
     const quality = drizzle ? (flavor.drizzlePattern ? drizzlePatternQuality(drizzle, flavor.drizzlePattern, b) : drizzleQuality(drizzle, b)) : 0;

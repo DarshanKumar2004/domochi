@@ -383,5 +383,18 @@
         }
       }
     ]
+  },
+  "funkyLines": {
+    "_note": "Donuts made on a tray that wasn't cleaned and grew mold (Kumar 2026-11-01). funky: no tip. noPay: after cleanup.moldNoPayDays dirty days, they won't pay.",
+    "funky": [
+      "hmm... this tastes kinda funky?",
+      "is it just me, or does this taste a little off?",
+      "uh, something's weird about this one..."
+    ],
+    "noPay": [
+      "ew, this tastes moldy! I'm not paying for that.",
+      "nope, this is funky. you can keep it.",
+      "yuck! clean your trays, I'm not paying."
+    ]
   }
 }

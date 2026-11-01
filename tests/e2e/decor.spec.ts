@@ -32,12 +32,15 @@ test('back after a while: the crew made some money', async ({ page }) => {
   await tapNamed(page, SceneKeys.Preload, 'prompt-start');
   await waitForScene(page, SceneKeys.Lobby);
   await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const sc = (window as unknown as { __game: { scene: { getScene(k: string): { children: { list: { name?: string; text?: string; visible?: boolean }[] } } } } }).__game.scene.getScene('HudScene');
-        const t = sc.children.list.find((o) => o.name === 'hud-toast');
-        return t?.visible ? t.text : '';
-      }),
+    // It shows a moment after the lobby loads (slower when several browsers run at once).
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const sc = (window as unknown as { __game: { scene: { getScene(k: string): { children: { list: { name?: string; text?: string; visible?: boolean }[] } } } } }).__game.scene.getScene('HudScene');
+          const t = sc.children.list.find((o) => o.name === 'hud-toast');
+          return t?.visible ? t.text : '';
+        }),
+      { timeout: 15_000 },
     )
     .toContain('while you were away');
   await shot(page, 'crew-1-away');

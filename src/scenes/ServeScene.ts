@@ -33,8 +33,9 @@ export class ServeScene extends Phaser.Scene {
     const cust = ticket ? s.customer(ticket.customerId) : undefined;
     const r = ticket?.results;
     const score = r?.score;
-    // A gift in the box gets its own happy line.
-    const thanks = cust && score ? (score.gifts > 0 ? s.giftLine() : s.thanksLine(cust, score.tier)) : '';
+    // A donut off a moldy tray gets a "funky" comment; a gift in the box gets its own happy line.
+    const funky = r?.funky ?? 0;
+    const thanks = cust && score ? (funky > 0 ? s.funkyLine(funky) : score.gifts > 0 ? s.giftLine() : s.thanksLine(cust, score.tier)) : '';
 
     // Everything lives in one container centred on the screen, laid out relative to the card centre.
     const card = this.add.container(0, 0, [addCard(this, CARD_W, CARD_H)]);

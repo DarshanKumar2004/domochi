@@ -11,6 +11,7 @@ import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { Truck } from '../ui/Truck';
 import { getViewport, onLayout } from '../ui/viewport';
 import { listen } from './listen';
+import { Pill } from '../ui/Pill';
 import { SceneKeys } from './sceneKeys';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -82,7 +83,7 @@ const LAYOUT = {
 interface CustomerView {
   id: number;
   image: Phaser.GameObjects.Image;
-  tag: Phaser.GameObjects.Text;
+  tag: Pill;
   target: { x: number; y: number; scale: number } | null;
   moving: boolean;
   leaving: boolean;
@@ -91,7 +92,7 @@ interface CustomerView {
 /** The lot by domochi's trailer: the line, the waiting area, and handing over orders. */
 export class LobbyScene extends Phaser.Scene {
   private views = new Map<number, CustomerView>();
-  private frontTag!: Phaser.GameObjects.Text;
+  private frontTag!: Pill;
   private doneText!: Phaser.GameObjects.Text;
   private bubble: SpeechBubble | null = null;
   private truck: Truck | null = null;
@@ -107,7 +108,7 @@ export class LobbyScene extends Phaser.Scene {
   private pickupsText!: Phaser.GameObjects.Text;
   /** mochi's journal: tap mochi on the lot. */
   private journalButton!: Phaser.GameObjects.Image;
-  private journalLabel!: Phaser.GameObjects.Text;
+  private journalLabel!: Pill;
 
   constructor() {
     super(SceneKeys.Lobby);
@@ -147,22 +148,9 @@ export class LobbyScene extends Phaser.Scene {
       .setVisible(!!specialName)
       .setName('lobby-special');
     // A little chalkboard naming the patio where customers wait.
-    const waitingLabel = this.add
-      .text(0, 0, 'waiting patio', { fontFamily: FONT_FAMILY, fontSize: '34px', color: CSS.cream, backgroundColor: '#2b2522', padding: { x: 16, y: 6 } })
-      .setOrigin(0.5)
-      .setDepth(4);
+    const waitingLabel = new Pill(this, 'waiting patio', { fontSize: 34, color: CSS.cream, fill: 0x2b2522 }).setDepth(4);
 
-    this.frontTag = this.add
-      .text(0, 0, 'Tap me!', {
-        fontFamily: FONT_FAMILY,
-        fontSize: '42px',
-        fontStyle: 'bold',
-        color: CSS.ink,
-        backgroundColor: CSS.cream,
-        padding: { x: 18, y: 10 },
-      })
-      .setOrigin(0.5)
-      .setDepth(10);
+    this.frontTag = new Pill(this, 'Tap me!', { fontSize: 40, color: CSS.ink, fill: COLORS.cream, bold: true, padX: 20, padY: 8 }).setDepth(10);
     this.tweens.add({ targets: this.frontTag, scale: 1.1, duration: 500, yoyo: true, repeat: -1 });
 
     this.doneText = this.add
@@ -211,10 +199,7 @@ export class LobbyScene extends Phaser.Scene {
       audio().play('tap');
       if (!this.scene.isActive(SceneKeys.Journal)) this.scene.launch(SceneKeys.Journal);
     });
-    this.journalLabel = this.add
-      .text(0, 0, 'journal', { fontFamily: FONT_FAMILY, fontSize: '30px', fontStyle: 'bold', color: CSS.cream, backgroundColor: '#2b2522', padding: { x: 12, y: 4 } })
-      .setOrigin(0.5, 0)
-      .setDepth(8);
+    this.journalLabel = new Pill(this, 'journal', { fontSize: 30, color: CSS.cream, fill: 0x2b2522, bold: true, padX: 14, padY: 4 }).setDepth(8);
     this.tweens.add({ targets: this.journalButton, angle: { from: -4, to: 4 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     this.events.on(Phaser.Scenes.Events.WAKE, this.refreshJournalBadge, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.WAKE, this.refreshJournalBadge, this));
@@ -251,7 +236,7 @@ export class LobbyScene extends Phaser.Scene {
       // Not on the tutorial day: mochi's busy teaching.
       const showJournal = !session().isTutorial;
       this.journalButton.setPosition(c.x + L.journal.x, c.y + L.journal.y).setScale(L.journal.scale).setVisible(showJournal);
-      this.journalLabel.setPosition(c.x + L.journal.x, c.y + L.journal.y + 105 * L.journal.scale).setVisible(showJournal);
+      this.journalLabel.setPosition(c.x + L.journal.x, c.y + L.journal.y + 105 * L.journal.scale + this.journalLabel.height / 2).setVisible(showJournal);
       this.refreshJournalBadge();
       this.sync(true);
     });
@@ -355,10 +340,11 @@ export class LobbyScene extends Phaser.Scene {
             `• wipe the glaze tray ${tick(c.glazeTray)}`,
             `• wipe the toppings tray ${tick(c.toppingsTray)}`,
             `• filter the fryer oil ${tick(c.oil)}`,
+            `• wash the dough bowl ${tick(c.bowl)}`,
           ].join('\n'),
         )
         .setVisible(true);
-      this.closeButton.setLabel(c.glazeTray && c.toppingsTray && c.oil ? 'Close up' : 'Close anyway');
+      this.closeButton.setLabel(c.glazeTray && c.toppingsTray && c.oil && c.bowl ? 'Close up' : 'Close anyway');
     } else {
       this.panelText.setVisible(false);
     }
@@ -417,7 +403,7 @@ export class LobbyScene extends Phaser.Scene {
   private refreshJournalBadge(): void {
     const j = save().data.journal;
     const fresh = j.stickers.length > j.seen;
-    this.journalLabel?.setText(fresh ? 'new sticker!' : 'journal').setBackgroundColor(fresh ? '#b0406a' : '#2b2522');
+    this.journalLabel?.setText(fresh ? 'new sticker!' : 'journal').setFill(fresh ? 0xb0406a : 0x2b2522);
   }
 
   private closeEarly(): void {
@@ -546,17 +532,7 @@ export class LobbyScene extends Phaser.Scene {
     const image = this.add.image(v.width + 120, target.y, key).setOrigin(0.5, 1).setScale(target.scale).setDepth(5);
     image.setInteractive({ useHandCursor: true });
     image.on(Phaser.Input.Events.POINTER_UP, () => this.onCustomerTap(cust.id));
-    const tag = this.add
-      .text(0, 0, '', {
-        fontFamily: FONT_FAMILY,
-        fontSize: '40px',
-        fontStyle: 'bold',
-        color: CSS.cream,
-        backgroundColor: CSS.ink,
-        padding: { x: 12, y: 4 },
-      })
-      .setOrigin(0.5)
-      .setDepth(6);
+    const tag = new Pill(this, '', { fontSize: 36, color: CSS.cream, fill: COLORS.ink, bold: true, padX: 14, padY: 4 }).setDepth(6);
     return { id: cust.id, image, tag, target: null, moving: false, leaving: false };
   }
 
@@ -572,11 +548,14 @@ export class LobbyScene extends Phaser.Scene {
     const hearts = waiting && !cust.delivery ? s.patienceHearts(cust) : 3;
     const mood = waiting ? ` ${'♥'.repeat(hearts)}${'♡'.repeat(3 - hearts)}` : '';
     const label = (reg ? (no ? `${reg.name} ${no}` : reg.name) : no) + mood;
-    view.tag.setText(label).setVisible(label !== '').setBackgroundColor(hearts === 0 ? '#b03a3a' : CSS.ink);
+    view.tag.setText(label).setVisible(label !== '').setFill(hearts === 0 ? 0xb03a3a : COLORS.ink);
   }
 
   private positionTag(view: CustomerView): void {
-    view.tag.setPosition(view.image.x, view.image.y - CUSTOMER_H * view.image.scale - 24);
+    // Smaller over the patio, where customers are drawn smaller too.
+    const lineScale = LAYOUT[getViewport(this).orientation].line.scale;
+    const k = Phaser.Math.Clamp(view.image.scale / lineScale, 0.7, 1);
+    view.tag.setScale(k).setPosition(view.image.x, view.image.y - CUSTOMER_H * view.image.scale - 24 * k);
   }
 
   /** Served customers walk off the left edge. */

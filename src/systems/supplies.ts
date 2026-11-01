@@ -75,6 +75,10 @@ export function fillStock(saved: Stock | undefined, b: SuppliesBalance): Stock {
   if (!saved) return startingStock(b);
   const s: Stock = {};
   for (const it of b.items) s[it.id] = Math.max(0, Math.floor(saved[it.id] ?? 0));
+  // The beignet's sugar used to be a glaze: a save from then keeps its sugar.
+  if (saved['glaze-powdered-sugar'] !== undefined && saved['topping-powdered-sugar'] === undefined && 'topping-powdered-sugar' in s) {
+    s['topping-powdered-sugar'] = Math.max(0, Math.floor(saved['glaze-powdered-sugar']));
+  }
   return s;
 }
 

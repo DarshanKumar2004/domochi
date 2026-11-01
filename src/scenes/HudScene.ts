@@ -67,6 +67,12 @@ export class HudScene extends Phaser.Scene {
     // Good morning: today's weather and what it means.
     const wx = session().weather;
     if (wx && session().phase === 'prep') this.time.delayedCall(1200, () => this.showToast(`${wx.icon ?? ''} today: ${wx.note}`.trim()));
+    // A tray nobody cleaned yesterday has grown mold: say so (donuts made on it taste funky).
+    const moldy = [...(['glaze', 'toppings'] as const).filter((t) => session().moldOn(t) > 0).map((t) => `the ${t} tray`), ...(session().bowlMoldy ? ['the dough bowl'] : [])];
+    if (moldy.length && session().phase === 'prep') {
+      const which = moldy.length > 1 ? `${moldy.slice(0, -1).join(', ')} and ${moldy[moldy.length - 1]}` : moldy[0];
+      this.time.delayedCall(1300, () => this.showToast(`yuck! ${which} grew mold overnight.\nscrub ${moldy.length > 1 ? 'them' : 'it'} clean, or customers will taste it!\n(tap to close)`, true));
+    }
     // The day so far is saved every few seconds, and whenever the page is hidden.
     this.time.addEvent({ delay: 5000, loop: true, callback: () => saveDayInProgress() });
     const onHide = () => {

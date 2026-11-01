@@ -62,6 +62,22 @@
   ],
   "toppings": [
     {
+      "id": "powdered-sugar",
+      "name": "powdered sugar",
+      "colors": [
+        "#ffffff",
+        "#fbf8f2",
+        "#f1ece2"
+      ],
+      "style": "sprinkle",
+      "shape": "crumb",
+      "size": 0.028,
+      "amount": {
+        "min": 45,
+        "max": 130
+      }
+    },
+    {
       "id": "cookie-butter-cookie",
       "name": "cookie butter cookie",
       "colors": [
@@ -118,8 +134,9 @@
       "name": "beignet",
       "price": 4,
       "description": "a louisiana classic, reimagined. our chewy, pull-apart mochi ring finished beignet-style with a snowy dusting of powdered sugar. light, fluffy and made fresh daily.",
-      "glaze": "powdered-sugar",
-      "toppings": [],
+      "toppings": [
+        "powdered-sugar"
+      ],
       "unlockDay": 1
     },
     {

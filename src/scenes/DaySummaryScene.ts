@@ -191,6 +191,8 @@ export class DaySummaryScene extends Phaser.Scene {
       if (s.regularsLevels) d.regulars = { ...s.regularsLevels };
       d.journal.pages = addPage(d.journal.pages, page);
       delete d.inProgress; // the day's done: tomorrow starts fresh
+      // ...except for trays nobody cleaned: they stay dirty (and grow mold).
+      if (s.tracksSupplies) d.trays = s.traysForTomorrow();
     });
     // Players' notes for Ethan go out as the day's report.
     void feedback().sendReport(sum.day);

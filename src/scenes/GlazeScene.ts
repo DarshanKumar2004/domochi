@@ -22,6 +22,8 @@ import {
   MESS_SIZE,
   pruneDonutIcons,
   TRAY_PAD,
+  paintStaleMess,
+  cupOutline,
 } from '../ui/donutArt';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -190,6 +192,14 @@ export class GlazeScene extends StationScene {
     this.boardTray = this.add.graphics();
     const spots = session().glazeBoards.length;
     for (let i = 0; i < spots; i++) this.boards.push(this.makeBoard(i));
+    // Mess left from before (not cleaned up yesterday, or before a reload) is still there, maybe moldy.
+    const stale = session().messOn('glaze');
+    if (stale > 0) {
+      this.boards.forEach((b, i) => {
+        paintStaleMess(b.mess.context, stale / this.boards.length, session().moldOn('glaze'), i + 1, ['#f4a6c0', '#c68a4e', '#efe7da', '#7a4a2a']);
+        b.mess.refresh();
+      });
+    }
     this.activeRing = this.add.graphics();
     this.boardZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('glaze-board');
 
@@ -352,7 +362,7 @@ export class GlazeScene extends StationScene {
     }
     const name = glaze.name.replace(/ glaze$/, '');
     const label = this.add
-      .text(0, 0, lockedUntil === null ? name : `${name}\nsoon`, {
+      .text(0, 0, lockedUntil === null ? name : '', {
         fontFamily: FONT_FAMILY,
         fontSize: '24px',
         color: lockedUntil === null ? CSS.cream : CSS.muted,
@@ -417,18 +427,9 @@ export class GlazeScene extends StationScene {
       cup.img.setPosition(cx, cy).setScale(L.cups.scale);
       cup.label.setPosition(cx, cy + 68 * L.cups.scale + 8).setScale(Math.min(1, L.cups.scale + 0.2));
       if (cup.lockedUntil !== null) {
-        // A dotted outline where the cup will be.
-        const w = 120 * L.cups.scale;
-        const h = 130 * L.cups.scale;
-        const pts = [
-          { x: -w / 2, y: -h / 2 },
-          { x: w / 2, y: -h / 2 },
-          { x: w / 2, y: h / 2 },
-          { x: -w / 2, y: h / 2 },
-          { x: -w / 2, y: -h / 2 },
-        ];
-        this.lockedCups.lineStyle(4, COLORS.cream, 0.5);
-        drawDashedPath(this.lockedCups, cx, cy, 1, pts, 10, 8);
+        // A dotted cup where the next glaze will go (no name: it's a surprise).
+        this.lockedCups.lineStyle(4, COLORS.cream, 0.45);
+        for (const path of cupOutline(110 * L.cups.scale, 120 * L.cups.scale)) drawDashedPath(this.lockedCups, cx, cy, 1, path, 10, 8);
       }
     });
     this.handCup.setScale(1);
@@ -491,9 +492,12 @@ export class GlazeScene extends StationScene {
     const work = this.work(this.active);
     if (!this.anyWork) {
       if (s.phase === 'closing' && s.messOn('glaze') > 0) this.instruction.setText('closing time: scrub the tray clean');
+      // Nothing on the menu needs glaze yet (just the beignet): its sugar goes on at Toppings.
+      else if (!this.cups.some((c) => c.lockedUntil === null) && !s.isTutorial) this.instruction.setText('no glazes on the menu yet!\nbeignets go straight to Toppings for their sugar');
       else {
         const base = s.rack.length ? 'tap a donut on the rack (or two) to glaze it' : s.shelf.length ? 'no fried donuts: fry some first! (or tap a glazed one to touch it up)' : 'no fried donuts: fry some first!';
-        this.instruction.setText(base + (s.messOn('glaze') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : ''));
+        const scrub = s.moldOn('glaze') > 0 ? '\nthe tray is moldy! scrub it clean first' : s.messOn('glaze') > balance.cleanup.messDoneAt ? '\n(or scrub the tray clean)' : '';
+        this.instruction.setText(base + scrub);
       }
     } else if (!work?.hasGlaze) this.instruction.setText('pick a cup, then pour over the donut');
     else this.instruction.setText('add a drizzle, or tap Done');

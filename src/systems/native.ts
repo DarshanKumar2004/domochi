@@ -2,15 +2,17 @@
 // button, full screen, a locked orientation, and the share sheet. On the web
 // every one of these is a no-op, so the same build runs in both.
 import { App } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
-import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Share } from '@capacitor/share';
 import { StatusBar } from '@capacitor/status-bar';
 import type { SaveStorage } from './SaveService';
 
 export type OrientationChoice = 'landscape' | 'portrait' | 'auto';
+
+/** The app's own plugin (android/.../OrientationPlugin.java): landscape and portrait follow the sensor, so either way up works. */
+const Orientation = registerPlugin<{ set(o: { mode: OrientationChoice }): Promise<void> }>('Orientation');
 
 /** Running as the installed app (not in a browser)? */
 export function isNative(): boolean {
@@ -45,8 +47,7 @@ export class PreferencesStorage implements SaveStorage {
 export async function applyOrientation(choice: OrientationChoice): Promise<void> {
   if (!isNative()) return;
   try {
-    if (choice === 'auto') await ScreenOrientation.unlock();
-    else await ScreenOrientation.lock({ orientation: choice });
+    await Orientation.set({ mode: choice });
   } catch (e) {
     console.warn('[native] could not set the orientation', e);
   }

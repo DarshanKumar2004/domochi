@@ -99,6 +99,8 @@ export interface Ticket {
     napkin?: boolean;
     /** The customer invited domochi to this event (an events.json id). */
     invite?: string;
+    /** A donut in it came off a moldy tray (days it had been dirty). */
+    funky?: number;
     /** A regular's friendship before and after this order. */
     regular?: { name: string; before: number; after: number };
   };
@@ -180,6 +182,8 @@ export interface DaySnapshot {
   doughLeft: number;
   doughQ: number;
   trayMess: { glaze: number; toppings: number };
+  mold?: { glaze: number; toppings: number; bowl?: number };
+  bowl?: { dirty: boolean; wash: number };
   dirt: number;
   inviteId: string | null;
   inviteAccepted: boolean;
@@ -223,6 +227,15 @@ export interface SessionEvents extends Record<string, unknown> {
   usual: { customerId: number; name: string; line: string };
 }
 
+/** The glaze and toppings trays between days: mess left on them, and days they've sat dirty. */
+export interface TrayState {
+  glaze: number;
+  toppings: number;
+  mold: { glaze: number; toppings: number; bowl?: number };
+  /** The dough bowl: dirty from yesterday's batches (not washed)? */
+  bowl?: boolean;
+}
+
 export interface SessionDeps {
   menu: Menu;
   customers: CustomersData;
@@ -258,6 +271,8 @@ export interface SessionDeps {
   regulars?: Record<string, number>;
   /** Decorations on the lot (balance.decor ids): small perks. */
   decor?: string[];
+  /** The trays as yesterday left them: mess not cleaned up, and how many days each has sat dirty (mold!). */
+  mess?: TrayState;
   /** Money in the bank before today (what a friend's errand can be paid from, with today's takings). */
   bank?: () => number;
 }
@@ -301,6 +316,11 @@ export class GameSession {
   private doughWork: DoughWork | null = null;
   /** Glaze and toppings that missed the donut and are sitting on each tray. */
   private readonly trayMess = { glaze: 0, toppings: 0 };
+  /** Days each tray has sat dirty (0 = no mold). Scrubbing it clean clears it. */
+  private readonly mold = { glaze: 0, toppings: 0, bowl: 0 };
+  /** The dough bowl needs washing (a batch was made in it since it was last washed), and how far along the wash is (0–1). */
+  private bowlDirty = false;
+  private bowlWash = 0;
   private dirt = 0;
   /** Today's invite (one a day), and whether you said yes. */
   private inviteId: string | null = null;
@@ -347,6 +367,15 @@ export class GameSession {
     for (let i = 0; i < pickups; i++) this.addPickup();
     this.supplies = deps.stock ? { ...deps.stock } : null;
     this.friendship = deps.regulars ? { ...deps.regulars } : null;
+    // Yesterday's mess is still there if nobody cleaned it (and it's started to grow).
+    if (deps.mess) {
+      this.trayMess.glaze = deps.mess.glaze;
+      this.trayMess.toppings = deps.mess.toppings;
+      this.mold.glaze = deps.mess.glaze > 0 ? deps.mess.mold.glaze : 0;
+      this.mold.toppings = deps.mess.toppings > 0 ? deps.mess.mold.toppings : 0;
+      this.bowlDirty = !!deps.mess.bowl;
+      this.mold.bowl = this.bowlDirty ? (deps.mess.mold.bowl ?? 0) : 0;
+    }
   }
 
   /** Everything worth keeping about the day so far (see DaySnapshot). */
@@ -378,6 +407,8 @@ export class GameSession {
       doughLeft: Number.isFinite(this.doughLeft) ? this.doughLeft : 0,
       doughQ: this.doughQ,
       trayMess: { ...this.trayMess },
+      mold: { ...this.mold },
+      bowl: { dirty: this.bowlDirty, wash: this.bowlWash },
       dirt: this.dirt,
       inviteId: this.inviteId,
       inviteAccepted: this.inviteAccepted,
@@ -414,6 +445,11 @@ export class GameSession {
     this.doughQ = s.doughQ;
     this.trayMess.glaze = s.trayMess.glaze;
     this.trayMess.toppings = s.trayMess.toppings;
+    this.mold.glaze = s.mold?.glaze ?? 0;
+    this.mold.toppings = s.mold?.toppings ?? 0;
+    this.mold.bowl = s.mold?.bowl ?? 0;
+    this.bowlDirty = s.bowl?.dirty ?? false;
+    this.bowlWash = s.bowl?.wash ?? 0;
     this.dirt = s.dirt;
     this.inviteId = s.inviteId;
     this.inviteAccepted = s.inviteAccepted;
@@ -728,6 +764,7 @@ export class GameSession {
   scoop(id: string): boolean {
     if (!this.deps.balance.dough.ingredients.some((i) => i.id === id)) return false;
     if (this.stockOf(id) < 1) return false;
+    if (this.bowlMoldy) return false;
     const w = this.startDough()!;
     this.use(id);
     w.scoop(id);
@@ -859,6 +896,14 @@ export class GameSession {
   }
 
   /** What a customer says when there are gift donuts in the box. */
+  /** What a customer says about a donut off a moldy tray (and whether they'll pay). */
+  funkyLine(days: number): string {
+    const f = this.deps.customers.funkyLines;
+    const noPay = days >= (this.deps.balance.cleanup.moldNoPayDays ?? 2);
+    const lines = noPay ? f?.noPay : f?.funky;
+    return lines?.length ? pickLine(lines, this.deps.rng) : noPay ? "ew, this tastes moldy! I'm not paying for that." : 'hmm... this tastes kinda funky?';
+  }
+
   giftLine(): string {
     return pickLine(this.deps.customers.giftLines, this.deps.rng);
   }
@@ -1023,16 +1068,44 @@ export class GameSession {
   }
 
   /** What still needs cleaning before closing (true = done). */
-  get cleanup(): { glazeTray: boolean; toppingsTray: boolean; oil: boolean } {
+  get cleanup(): { glazeTray: boolean; toppingsTray: boolean; oil: boolean; bowl: boolean } {
     const at = this.deps.balance.cleanup.messDoneAt;
-    return { glazeTray: this.trayMess.glaze <= at, toppingsTray: this.trayMess.toppings <= at, oil: this.dirt === 0 };
+    return { glazeTray: this.trayMess.glaze <= at, toppingsTray: this.trayMess.toppings <= at, oil: this.dirt === 0, bowl: !this.bowlDirty };
+  }
+
+  /** The dough bowl needs washing. */
+  get bowlNeedsWash(): boolean {
+    return this.bowlDirty;
+  }
+
+  /** Days the bowl has sat dirty (mold!): no mixing in it until it's washed. */
+  get bowlMoldy(): boolean {
+    return this.bowlDirty && this.mold.bowl > 0;
+  }
+
+  /** How far along washing the bowl is (0–1). */
+  get bowlWashProgress(): number {
+    return this.bowlWash;
+  }
+
+  /** Scrub the empty bowl (`turns` of the sponge round it). Returns true once it's clean. */
+  washBowl(turns: number): boolean {
+    if (!this.bowlDirty || this.doughWork) return !this.bowlDirty;
+    this.bowlWash = Math.min(1, this.bowlWash + turns / (this.deps.balance.cleanup.bowlWashTurns ?? 3));
+    if (this.bowlWash >= 1) {
+      this.bowlDirty = false;
+      this.bowlWash = 0;
+      this.mold.bowl = 0;
+    }
+    this.events.emit('changed', undefined);
+    return !this.bowlDirty;
   }
 
   /** Close up after the last customer (clean or not): the day is done. */
   closeUp(): boolean {
     if (this.dayPhase !== 'closing') return false;
     const c = this.cleanup;
-    this.tidyClose = c.glazeTray && c.toppingsTray && c.oil;
+    this.tidyClose = c.glazeTray && c.toppingsTray && c.oil && c.bowl;
     this.checkGoal();
     this.dayPhase = 'closed';
     this.events.emit('phase', this.dayPhase);
@@ -1085,6 +1158,11 @@ export class GameSession {
     this.doughQ = (this.doughQ * left + w.quality * added) / (left + added);
     if (Number.isFinite(this.doughLeft)) this.doughLeft += added;
     this.doughWork = null;
+    // The bowl needs a wash now (in a full day).
+    if (this.deps.dayFlow) {
+      this.bowlDirty = true;
+      this.bowlWash = 0;
+    }
     this.events.emit('doughMade', { quality: w.quality });
     this.events.emit('changed', undefined);
     return { quality: w.quality, added };
@@ -1119,9 +1197,31 @@ export class GameSession {
     const was = this.trayMess[tray];
     this.trayMess[tray] = Math.max(0, was - amount);
     const clean = this.trayMess[tray] <= this.deps.balance.cleanup.messDoneAt;
-    if (clean) this.trayMess[tray] = 0;
+    if (clean) {
+      this.trayMess[tray] = 0;
+      this.mold[tray] = 0;
+    }
     if (was !== this.trayMess[tray]) this.events.emit('changed', undefined);
     return clean;
+  }
+
+  /** Days a tray has sat dirty (0: no mold). */
+  moldOn(tray: 'glaze' | 'toppings'): number {
+    return this.mold[tray];
+  }
+
+  /** The trays for tomorrow: anything not cleaned stays, and a dirty tray grows mold overnight. */
+  traysForTomorrow(): TrayState {
+    const done = this.deps.balance.cleanup.messDoneAt;
+    const left = (t: 'glaze' | 'toppings') => (this.trayMess[t] > done ? Math.round(this.trayMess[t] * 100) / 100 : 0);
+    const glaze = left('glaze');
+    const toppings = left('toppings');
+    return {
+      glaze,
+      toppings,
+      bowl: this.bowlDirty,
+      mold: { glaze: glaze > 0 ? this.mold.glaze + 1 : 0, toppings: toppings > 0 ? this.mold.toppings + 1 : 0, bowl: this.bowlDirty ? this.mold.bowl + 1 : 0 },
+    };
   }
 
   /** How dirty the fryer oil is (donuts fried since it was last filtered). */
@@ -1349,6 +1449,7 @@ export class GameSession {
     const w = at >= 0 ? this.boards[at] : null;
     if (!w || !w.hasGlaze || this.shelfFull) return null;
     const d = w.finish();
+    if (this.mold.glaze > 0) d.funky = Math.max(d.funky ?? 0, this.mold.glaze);
     this.shelfDonuts.push(d);
     this.boards[at] = null;
     this.events.emit('changed', undefined);
@@ -1409,12 +1510,34 @@ export class GameSession {
     return w;
   }
 
+  /**
+   * A plain fried donut straight from the rack onto the toppings tray, for
+   * flavours with no glaze (the beignet: fry, then powdered sugar).
+   */
+  startToppingsFromRack(rackIndex: number, slot?: number): ToppingWork | null {
+    const to = slot !== undefined && slot >= 0 && slot < this.topBoards.length && !this.topBoards[slot] ? slot : this.topBoards.findIndex((w) => !w);
+    const d = this.rackDonuts[rackIndex];
+    if (to < 0 || !d) return null;
+    this.rackDonuts.splice(rackIndex, 1);
+    const w = new ToppingWork({ id: d.id, fry: d, layers: [] }, this.deps.menu, this.deps.balance.toppings, this.deps.balance.glaze);
+    this.topBoards[to] = w;
+    this.activeTop = to;
+    this.events.emit('changed', undefined);
+    return w;
+  }
+
+  /** Does anything on today's menu skip the glaze (so plain rack donuts go to Toppings)? */
+  get unglazedOnMenu(): boolean {
+    return flavorsForDay(this.deps.menu, this.day).some((f) => f.glaze === undefined);
+  }
+
   /** Done with one donut (the active one by default): it goes back on the shelf. */
   finishToppings(slot?: number): FinishedDonut | null {
     const i = slot ?? this.activeToppingSpot;
     const w = this.topBoards[i];
     if (!w) return null;
     const d = w.finish();
+    if (this.mold.toppings > 0) d.funky = Math.max(d.funky ?? 0, this.mold.toppings);
     this.topBoards[i] = null;
     this.shelfDonuts.push(d);
     this.events.emit('changed', undefined);
@@ -1612,6 +1735,17 @@ export class GameSession {
       score.giftTip = 0;
     }
     if (pay.takesFromJar > 0) score.tip = -Math.min(pay.takesFromJar, Math.max(0, this.tipJar));
+    // A donut from a moldy tray tastes funky: no tip, an unhappy customer, and once
+    // the mold's been there a while (moldNoPayDays), they won't pay at all.
+    const funky = packed.reduce((m, p) => Math.max(m, p.donut?.funky ?? 0), 0);
+    let paid = sale;
+    if (funky > 0) {
+      score.tip = 0;
+      score.giftTip = 0;
+      score.tier = 'bad';
+      t.results.funky = funky;
+      if (funky >= (balance.cleanup.moldNoPayDays ?? 2)) paid = 0;
+    }
     // A hot streak: good or great orders in a row tip a little more each time.
     if (score.tier === 'great' || score.tier === 'good') {
       this.streakCount++;
@@ -1620,7 +1754,7 @@ export class GameSession {
       if (bonus > 0 && score.tip > 0) score.tip = Math.round(score.tip * (1 + bonus) * 100) / 100;
       if (this.streakCount >= 2) this.events.emit('streak', { count: this.streakCount, bonus });
     } else this.streakCount = 0;
-    if (sale > 0) this.specials += specialCount;
+    if (paid > 0) this.specials += specialCount;
     t.results.price = price;
     t.results.score = score;
     // A regular gets to know you better (or not).
@@ -1640,8 +1774,8 @@ export class GameSession {
         t.results.invite = this.inviteId;
       }
     }
-    t.results.sale = sale;
-    const event: ServedEvent = { customer: c, ticket: t, waitMs, score, sale };
+    t.results.sale = paid;
+    const event: ServedEvent = { customer: c, ticket: t, waitMs, score, sale: paid };
     this.events.emit('served', event);
     this.events.emit('changed', undefined);
     this.checkGoal();

@@ -556,3 +556,30 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - **For the store:** `public/privacy.html` (contact is domochi's Instagram and site, not a personal email); `store/` has the listing text, the feature graphic, the 512 icon and screenshots (`npm run store-art`); `ANDROID.md` has Kumar's steps (Android Studio, the upload key, building the AAB, Play Console, the 12-tester / 14-day closed test, data safety answers).
   - **Signing:** release builds use `android/keystore.properties` (git-ignored), with the `.jks` kept outside the repo.
   - **Fixed along the way:** the "today's special" chalkboard drew with holes in it (Phaser 4 draws a tilted text with a background wrongly), so it's no longer tilted. In portrait, the pickups list could slide under the tab bar; it now stops above it.
+- **Kumar's notes from playing the Android build (2026-11-01):**
+  - **The beignet skips the Glaze station** (Kumar chose this). Its powdered sugar is a topping (`topping-powdered-sugar`, shaken on like the cookie crumbs). Flavours may now have no `glaze`.
+    - Plain donuts go from the rack straight onto the toppings tray (`startToppingsFromRack`). When something on the menu takes no glaze, the Toppings station's row shows rack donuts after the shelf ones (named `toppings-rack-N`).
+    - Its glaze score is perfect bare and poor if glazed anyway.
+    - On days 1–2 the Glaze station says "no glazes on the menu yet!".
+    - Old saves carry their glaze-powdered-sugar stock over to the topping.
+  - **Flip it either way up:** "landscape" and "portrait" now follow the sensor, so a phone on a charger can turn 180°. That needed the game's own tiny Android plugin (`OrientationPlugin.java`: SENSOR_LANDSCAPE / SENSOR_PORTRAIT / FULL_USER), because `@capacitor/screen-orientation` locks one fixed way. That library was removed.
+  - **Louder:** music 0.05 → 0.2, effects 0.5 → 0.85, through a limiter so it doesn't crackle. The bass is a triangle now, since a phone speaker can't play the low sine.
+  - **Trays left dirty stay dirty, and grow mold** (`TrayState`, `save.trays`, `GameSession.traysForTomorrow`, `cleanup.moldNoPayDays: 2`).
+    - Overnight mold: donuts made on the tray taste "funky", which means no tip and a bad reaction.
+    - Two or more dirty days: those customers don't pay at all.
+    - Scrubbing clean clears the mold. The trays show the old mess and fuzzy mold, and mochi warns about it in the morning.
+  - **Locked cups and jars** are dotted cup and jar shapes with no name (no spoilers).
+  - **Pop-up forms:** buttons have the game's raised look and room underneath. Short landscape screens get a compact form.
+  - **Rounded labels:** "Tap me!", customer tags, "journal" and "waiting patio" are pills (`ui/Pill.ts`). Tags shrink on the patio.
+  - **Tutorial:**
+    - It now teaches **+ oil** (it starts a little low) and **holding the grate** before the first flip.
+    - mochi's panel picks the least-covering of six spots (top or bottom × left, middle or right in landscape), avoiding the target and each station's controls (`KEEP_CLEAR`).
+    - "skip tutorial" sits inside the bubble's corner.
+  - **The sponge is always out** at the Glaze and Toppings stations, so you can scrub any time. It's faded when the tray is already clean.
+  - **The dough bowl needs washing too.**
+    - Every batch tipped into the tub dirties it. Scrubbing round the empty bowl `cleanup.bowlWashTurns` (3) times washes it, with a sponge instead of the spoon.
+    - It's on the closing checklist, and needed for a tidy close.
+    - Left dirty overnight, it grows mold and no dough can be mixed until it's washed (`TrayState.bowl`, `mold.bowl`).
+  - **Box choice as piles of boxes** (`ui/BoxPile.ts`): a single bag, then the trio, flight and domochi boxes, wider for bigger boxes and stacked up to three high to show stock, with the name and count under each. Tap a pile to use it; the chosen pile is ringed in pink.
+  - **Same-size trays:** the Toppings tray now uses the Glaze tray's exact size and spacing.
+  - **Choppiness on the emulator:** measured through the web view's debugger, every station holds about 60 fps idle and about 55 fps while pouring, with a few slow frames. The game keeps up, so the choppy feel is most likely the emulator's input and display path. Check again on a real phone.

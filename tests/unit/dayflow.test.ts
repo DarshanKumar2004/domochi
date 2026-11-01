@@ -168,12 +168,13 @@ describe('a full day: prep, open, closing', () => {
     expect(s.phase).toBe('closing');
     expect(s.isDayComplete).toBe(false);
     expect(complete).toBe(0);
-    expect(s.cleanup).toEqual({ glazeTray: false, toppingsTray: true, oil: false });
+    expect(s.cleanup).toEqual({ glazeTray: false, toppingsTray: true, oil: false, bowl: false });
     expect(s.wipe('glaze', 3)).toBe(false);
     expect(s.wipe('glaze', 10)).toBe(true);
     expect(s.messOn('glaze')).toBe(0);
     s.filterOil();
-    expect(s.cleanup).toEqual({ glazeTray: true, toppingsTray: true, oil: true });
+    s.washBowl(balance.cleanup.bowlWashTurns!);
+    expect(s.cleanup).toEqual({ glazeTray: true, toppingsTray: true, oil: true, bowl: true });
     expect(s.closeUp()).toBe(true);
     expect(s.isDayComplete).toBe(true);
     expect(complete).toBe(1);
@@ -564,7 +565,7 @@ describe('glazes and toppings are supplies', () => {
     expect(s.stockOf('glaze-strawberry')).toBe(0);
     // Every glaze and topping a flavour needs is on sale from (at latest) that flavour's day.
     for (const f of menu.flavors) {
-      const needs = [f.glaze, ...(f.drizzle ? [f.drizzle] : [])].map((g) => `glaze-${g}`).concat((f.toppings ?? []).map((t) => `topping-${t}`));
+      const needs = [...(f.glaze ? [f.glaze] : []), ...(f.drizzle ? [f.drizzle] : [])].map((g) => `glaze-${g}`).concat((f.toppings ?? []).map((t) => `topping-${t}`));
       for (const id of needs) {
         const it = balance.supplies.items.find((i) => i.id === id);
         expect(it, id).toBeDefined();
@@ -573,7 +574,7 @@ describe('glazes and toppings are supplies', () => {
     }
     // Day 1's flavours start stocked; later ones start at 0.
     const st = startingStock(balance.supplies);
-    expect(st['glaze-powdered-sugar']).toBeGreaterThan(0); // the beignet is the starter
+    expect(st['topping-powdered-sugar']).toBeGreaterThan(0); // the beignet is the starter
     expect(st['glaze-strawberry']).toBe(0);
     expect(st['glaze-cookie-butter']).toBe(0);
   });
@@ -755,5 +756,63 @@ describe("a friend's store run when you're out of baking materials", () => {
     expect(visits).toHaveLength(1);
     expect(broke.outOfMaterials).toBe(false);
     expect(broke.summary().errandSpent).toBe(0);
+  });
+});
+
+describe('trays left dirty overnight grow mold', () => {
+  const S = balance.supplies;
+  const start = (mess?: { glaze: number; toppings: number; mold: { glaze: number; toppings: number } }) =>
+    new GameSession({ menu, customers, balance, day: 5, rng: createRng(3), dayFlow: true, events, stock: startingStock(S), ...(mess ? { mess } : {}) });
+
+  it("a tray that wasn't cleaned stays dirty tomorrow, and grows mold; a clean one doesn't", () => {
+    const s = start();
+    s.addMess('glaze', 10);
+    const tomorrow = s.traysForTomorrow();
+    expect(tomorrow.glaze).toBe(10);
+    expect(tomorrow.mold.glaze).toBe(1);
+    expect(tomorrow.toppings).toBe(0);
+    expect(tomorrow.mold.toppings).toBe(0);
+    const next = start(tomorrow);
+    expect(next.messOn('glaze')).toBe(10);
+    expect(next.moldOn('glaze')).toBe(1);
+    // Another day without cleaning: worse.
+    expect(next.traysForTomorrow().mold.glaze).toBe(2);
+    // Scrubbing it clean clears the mold.
+    next.wipe('glaze', 100);
+    expect(next.moldOn('glaze')).toBe(0);
+    expect(next.traysForTomorrow()).toEqual({ glaze: 0, toppings: 0, bowl: false, mold: { glaze: 0, toppings: 0, bowl: 0 } });
+  });
+
+});
+
+describe('the dough bowl needs washing', () => {
+  const start = (mess?: { glaze: number; toppings: number; bowl?: boolean; mold: { glaze: number; toppings: number; bowl?: number } }) =>
+    new GameSession({ menu, customers, balance, day: 5, rng: createRng(3), dayFlow: true, events, stock: startingStock(balance.supplies), ...(mess ? { mess } : {}) });
+
+  it('a batch dirties it; scrubbing round the empty bowl washes it; a tidy close needs it clean', () => {
+    const s = start();
+    expect(s.cleanup.bowl).toBe(true);
+    perfectBatch(s);
+    s.finishDough();
+    expect(s.bowlNeedsWash).toBe(true);
+    expect(s.cleanup.bowl).toBe(false);
+    expect(s.washBowl(1)).toBe(false);
+    expect(s.washBowl(balance.cleanup.bowlWashTurns!)).toBe(true);
+    expect(s.cleanup.bowl).toBe(true);
+  });
+
+  it('left dirty overnight it grows mold: no mixing until it is washed', () => {
+    const s = start();
+    perfectBatch(s);
+    s.finishDough();
+    const tomorrow = s.traysForTomorrow();
+    expect(tomorrow.bowl).toBe(true);
+    expect(tomorrow.mold.bowl).toBe(1);
+    const next = start(tomorrow);
+    expect(next.bowlMoldy).toBe(true);
+    expect(next.scoop('rice-flour')).toBe(false);
+    next.washBowl(99);
+    expect(next.bowlMoldy).toBe(false);
+    expect(next.scoop('rice-flour')).toBe(true);
   });
 });
