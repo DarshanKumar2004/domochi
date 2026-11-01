@@ -146,7 +146,9 @@ export function feedback(): FeedbackService {
         }
       },
     };
-    feedbackService = new FeedbackService(store, (brandJson as { feedbackEndpoint?: string }).feedbackEndpoint ?? '');
+    // Only the built game sends: the dev server and the tests keep notes queued (no stray emails).
+    const endpoint = import.meta.env.PROD ? ((brandJson as { feedbackEndpoint?: string }).feedbackEndpoint ?? '') : '';
+    feedbackService = new FeedbackService(store, endpoint);
   }
   return feedbackService;
 }

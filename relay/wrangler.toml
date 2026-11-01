@@ -3,6 +3,9 @@
 name = "domochi-feedback"
 main = "feedback-worker.js"
 compatibility_date = "2025-01-01"
+# Served at https://domochi-feedback.kumardarshan425.workers.dev (no preview links needed).
+workers_dev = true
+preview_urls = false
 
 [vars]
 # Pages allowed to send reports: the live site, and the dev server.

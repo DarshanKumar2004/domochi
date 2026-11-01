@@ -7,7 +7,7 @@
   "city": "Lafayette, LA",
   "website": "https://www.domochitreats.com",
   "instagram": "@domochi.treats",
-  "feedbackEndpoint": "",
+  "feedbackEndpoint": "https://domochi-feedback.kumardarshan425.workers.dev",
   "_feedbackNote": "Where players' flavour ideas and notes for Ethan go: a URL that takes a JSON POST and emails it on (e.g. a Formspree form, or a small serverless function). Empty = notes wait on the device until it's set. TODO-BRAND: Kumar to pick the service and Ethan's address.",
   "coupons": {
     "enabled": true,

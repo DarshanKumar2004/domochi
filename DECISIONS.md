@@ -529,3 +529,7 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - mochi asks "hey, what's your name? would you like to join the team? Ethan would love to have you!" in an HTML card over the game. The name is saved as `playerName`, and the "while you were away" note names everyone ("Geo, Bruce and Kim sold $X").
 - **Coupons switched ON** (Kumar, 2026-11-01). On a three-star day from day 50, the summary shows the code and a green banner: "screenshot this and bring it to the domochi trailer to redeem your reward!" The journal page keeps the code too.
   - **Still TODO-BRAND:** Ethan decides the reward and any daily cap. There's no server check, so staff go by the screenshot (the code has the day in it).
+- **Feedback relay is live** (Kumar deployed it on 2026-11-01): `https://domochi-feedback.kumardarshan425.workers.dev`, now set as `brand.json` `feedbackEndpoint`.
+  - **Tested live:** a real note reached Kumar's inbox, another site's request got a 403, and the preflight from the GitHub Pages site is allowed.
+  - **Only the built game sends** (`import.meta.env.PROD`). The dev server and the Playwright runs keep notes queued, so tests never email anyone.
+  - **Switching to Ethan:** `npx wrangler secret put FEEDBACK_TO`. Resend first needs domochitreats.com verified before it will deliver to anyone other than the account owner.
