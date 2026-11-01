@@ -628,3 +628,15 @@ describe('GameSession: moldy trays', () => {
     expect(clean.serveActiveTicket().sale).toBeGreaterThan(0);
   });
 });
+
+describe('GameSession: taking a donut off the glazing tray', () => {
+  it('an unglazed donut goes back on the rack (a glazed one stays)', () => {
+    const s = makeSession();
+    fryRack(s, 2);
+    expect(s.startGlazing(0)).not.toBeNull();
+    expect(s.rack.length).toBe(1);
+    expect(s.returnToRack()).toBe(true);
+    expect(s.rack.length).toBe(2);
+    expect(s.glazeWork).toBeNull();
+  });
+});

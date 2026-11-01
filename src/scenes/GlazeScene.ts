@@ -518,7 +518,8 @@ export class GlazeScene extends StationScene {
     }
     const work = this.work(this.active);
     this.redoButton.setEnabled(this.anyWork);
-    this.doneButton.setEnabled(s.glazeBoards.some((w) => w?.hasGlaze) && !s.shelfFull);
+    // Done sends glazed donuts to the shelf, and unglazed ones back to the rack.
+    this.doneButton.setEnabled(s.glazeBoards.some((w) => (w?.hasGlaze && !s.shelfFull) || (w && !w.hasGlaze)));
 
     this.cupHighlight.clear();
     const cup = this.cups.find((c) => c.glaze.id === this.selected);
@@ -976,6 +977,13 @@ export class GlazeScene extends StationScene {
     const s = session();
     this.stopPour();
     let sent = 0;
+    // No glaze on it (out of glaze, say): it goes back on the rack.
+    let back = 0;
+    for (let i = 0; i < this.boards.length; i++) {
+      const w = this.work(i);
+      if (w && !w.hasGlaze && s.returnToRack(i)) back++;
+    }
+    if (back) this.flash('back on the rack');
     for (let i = 0; i < this.boards.length; i++) {
       const w = this.work(i);
       if (!w?.hasGlaze) continue;

@@ -721,6 +721,15 @@ export class ToppingsScene extends StationScene {
       else {
         this.fingerX = sp.x;
         this.fingerY = sp.y;
+        // Shaking across onto the other donut: that one's now the one you're working on
+        // (its count, guide ring and Done follow), whether or not the finger lifted.
+        const spot = this.nearestSpot(this.fingerX, this.fingerY);
+        const b = this.boards[spot]!;
+        const s = session();
+        if (spot !== s.activeToppingSpot && this.work(spot) && Phaser.Math.Distance.Between(this.fingerX, this.fingerY, b.x, b.y) < b.size * 0.6) {
+          s.setActiveTopping(spot);
+          this.refresh();
+        }
       }
     }
 

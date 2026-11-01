@@ -1456,6 +1456,17 @@ export class GameSession {
     return d;
   }
 
+  /** Take an unglazed donut off the glazing tray, back onto the rack (out of glaze, or changed your mind). */
+  returnToRack(slot?: number): boolean {
+    const at = this.boardSlot(slot);
+    const w = at >= 0 ? this.boards[at] : null;
+    if (!w || w.hasGlaze || this.rackFull) return false;
+    this.rackDonuts.push(w.finish().fry);
+    this.boards[at] = null;
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
   /** Redo: throw away a donut on the tray (you'll glaze another one). */
   trashGlazing(slot?: number): boolean {
     const at = this.boardSlot(slot);

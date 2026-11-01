@@ -601,3 +601,4 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
     - A little while after a pickup is ordered and the window's open, the courier's car drives in and parks: two spots in landscape, one in portrait (the next courier waits for it).
     - The driver walks to the patio and waits with a "#N pickup" tag. Once the order's handed over, they walk back and drive off.
     - The car is drawn in code (`courier-car`), tinted per courier.
+  - **Fixes (Kumar):** shaking across onto the second toppings donut without lifting now makes it the active one, so its count, guide ring and Done follow. An unglazed donut on the glazing tray (out of glaze, say) can always come off: **Done** puts it back on the rack (`returnToRack`).
