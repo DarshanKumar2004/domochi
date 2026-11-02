@@ -18,6 +18,7 @@ const CSS = `
 /* A phone held sideways: a shorter form, so it fits with room under the buttons. */
 @media (max-height:520px){.dm-card{padding:14px 18px 16px}.dm-card h2{font-size:22px}.dm-card p{margin:4px 0;font-size:15px}.dm-card textarea{min-height:64px}.dm-card input,.dm-card textarea{padding:8px;margin:4px 0}.dm-btn{min-height:46px}}
 .dm-btn.dm-go{background:#f4a6c0}
+.dm-pick{margin:4px 0 2px}.dm-pick .dm-btn{min-height:46px;font-size:16px;box-shadow:0 3px 0 rgba(0,0,0,.2)}
 .dm-card a{color:#b0406a;font-weight:bold}
 `;
 
@@ -99,16 +100,19 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * A little form: a flavour idea, or a note for Ethan. `send` keeps it and
- * sends it on (it says whether the note was kept).
+ * One little form for Ethan: pick "a note" or "a flavor idea" at the top.
+ * `send` keeps it and sends it on (it says whether the note was kept).
  */
-export function showFeedback(kind: FeedbackKind, send: (text: string, name: string) => boolean, onClose?: () => void): void {
-  const title = kind === 'flavor' ? 'suggest a new flavor' : 'let Ethan know';
-  const prompt = kind === 'flavor' ? 'what mochi donut should Ethan make next?' : 'a hello, a thank-you, an idea... Ethan reads them all';
+export function showFeedback(send: (kind: FeedbackKind, text: string, name: string) => boolean, onClose?: () => void, start: FeedbackKind = 'note'): void {
+  const prompts: Record<FeedbackKind, { prompt: string; placeholder: string }> = {
+    note: { prompt: 'a hello, a thank-you, an idea... Ethan reads them all', placeholder: 'type here' },
+    flavor: { prompt: 'what mochi donut should Ethan make next?', placeholder: 'ube with coconut flakes!' },
+  };
   const { card, close } = openCard(
-    `<h2>${title}</h2>
-     <p>${prompt}</p>
-     <textarea maxlength="500" placeholder="${kind === 'flavor' ? 'ube with coconut flakes!' : 'type here'}"></textarea>
+    `<h2>let Ethan know</h2>
+     <div class="dm-row dm-pick" role="radiogroup"><button class="dm-btn" data-k="note" role="radio">a note for Ethan</button><button class="dm-btn" data-k="flavor" role="radio">a flavor idea</button></div>
+     <p data-x="prompt"></p>
+     <textarea maxlength="500"></textarea>
      <input maxlength="60" placeholder="your first name (optional)">
      <p class="dm-muted">Sent straight to domochi. Please don't include private info.</p>
      <div class="dm-row"><button class="dm-btn" data-x="close">Cancel</button><button class="dm-btn dm-go" data-x="send">Send</button></div>`,
@@ -116,9 +120,23 @@ export function showFeedback(kind: FeedbackKind, send: (text: string, name: stri
   );
   const text = card.querySelector('textarea')!;
   const name = card.querySelector('input')!;
+  const prompt = card.querySelector<HTMLElement>('[data-x="prompt"]')!;
+  let kind: FeedbackKind = start;
+  const pick = (k: FeedbackKind) => {
+    kind = k;
+    prompt.textContent = prompts[k].prompt;
+    text.placeholder = prompts[k].placeholder;
+    card.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => {
+      const on = b.dataset.k === k;
+      b.classList.toggle('dm-go', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+  };
+  card.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => b.addEventListener('click', () => pick(b.dataset.k as FeedbackKind)));
+  pick(start);
   card.querySelector('[data-x="close"]')!.addEventListener('click', close);
   card.querySelector('[data-x="send"]')!.addEventListener('click', () => {
-    if (!send(text.value, name.value)) {
+    if (!send(kind, text.value, name.value)) {
       text.focus();
       return;
     }

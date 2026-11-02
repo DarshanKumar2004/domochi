@@ -616,3 +616,5 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - **Volume sliders** jumped to 100%. Inside the scaled Settings card the finger position was worked out wrong, so it's now measured on screen from the slider's own bounds; `settings.spec.ts` tests it.
   - **Home and Settings buttons** are smaller, with more room between them.
   - **Powdered sugar** is a snowy coat again: a soft round `dust` grain (semi-transparent puffs), 11 per shake, spread wider (2.6× scatter), with an ideal amount of 380–1100 grains (`maxPieces` 3200).
+  - **One "Let Ethan know" button** on the home screen (Kumar). The form has a choice at the top, "a note for Ethan" or "a flavor idea", and the prompt and placeholder follow it. The home screen now has three buttons: About us, Let Ethan know, Secret word.
+  - **Couriers come in the morning** (Kumar): they arrive a few seconds into morning prep and wait at the patio until their order's ready. In landscape, the morning "Open the window" button moved up a little and the cars down, so the parked cars aren't hidden behind it.

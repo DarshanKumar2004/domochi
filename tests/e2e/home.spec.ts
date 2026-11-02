@@ -23,7 +23,8 @@ test('home screen: about us, a flavour idea for Ethan, then play; Settings goes 
   expect(await page.evaluate(() => (window as unknown as { __session?: unknown }).__session)).toBeUndefined();
 
   // A flavour idea: kept for the day's report.
-  await tapNamed(page, SceneKeys.Preload, 'btn-suggest');
+  await tapNamed(page, SceneKeys.Preload, 'btn-tell-ethan');
+  await page.locator('.dm-card [data-k="flavor"]').click();
   await page.locator('.dm-card textarea').fill('ube with coconut flakes');
   await page.locator('.dm-card input').fill('Kim');
   await page.locator('.dm-card [data-x="send"]').click();

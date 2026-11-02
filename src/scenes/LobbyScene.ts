@@ -62,13 +62,13 @@ const LAYOUT = {
     // The line starts at the serving window and runs right, along the front of the trailer.
     line: { x: [300, 450, 600, 750], feetY: 720, scale: 0.8 },
     // Checklists and buttons in the open middle of the lot, clear of the line and the patio.
-    panel: { x: 1240, y: 330, buttonY: 640, width: 520 },
+    panel: { x: 1240, y: 330, buttonY: 605, width: 520 },
     pickups: { x: 1730, y: 215 },
     parking: [
-      [1330, 772],
-      [1080, 772],
+      [1330, 790],
+      [1080, 790],
     ],
-    closeEarly: { x: 1240, y: 640 },
+    closeEarly: { x: 1240, y: 605 },
     // The patio sits on the lot, below the sidewalk (not up in the sky).
     waiting: {
       x: 1730,
@@ -98,9 +98,9 @@ interface CourierView {
 
 /** Courier car colours (the car is drawn white, so a tint colours it). */
 const CAR_TINTS = [0xffb4c8, 0x9fd3e8, 0xffe08a, 0xb9e3a8, 0xd2c1f0];
-/** A courier turns up this long after a pickup is ordered (game ms), the next ones a bit later. */
-const COURIER_DELAY_MS = 12_000;
-const COURIER_STAGGER_MS = 14_000;
+/** Couriers turn up in the morning, before opening (Kumar): this long after the day starts (game ms), the next ones a bit later. */
+const COURIER_DELAY_MS = 3_000;
+const COURIER_STAGGER_MS = 6_000;
 
 interface CustomerView {
   id: number;
@@ -478,8 +478,8 @@ export class LobbyScene extends Phaser.Scene {
   // ---- Couriers (pickup orders) -------------------------------------------------
 
   /**
-   * Pickup orders get a courier: once the window's open, their car drives in
-   * and parks on the lot, and the driver waits at the patio. When the order's
+   * Pickup orders get a courier: in the morning, before opening, their car
+   * drives in and parks on the lot, and the driver waits at the patio. When the order's
    * handed over, they walk back and drive off.
    */
   private syncCouriers(): void {
@@ -490,7 +490,7 @@ export class LobbyScene extends Phaser.Scene {
     const ids = new Set(pickups.map((p) => p.id));
     // Collected (or gone): back to the car and away.
     for (const [id, cv] of this.couriers) if (!ids.has(id) && cv.state !== 'leaving') this.courierLeave(cv, id);
-    if (s.phase === 'prep' || s.isTutorial) return;
+    if (s.isTutorial) return;
     pickups.forEach((p, j) => {
       if (this.couriers.has(p.id)) return;
       const t = p.ticketNo !== undefined ? s.ticket(p.ticketNo) : undefined;

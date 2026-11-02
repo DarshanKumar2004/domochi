@@ -117,7 +117,7 @@ export class PreloadScene extends Phaser.Scene {
       this.news.setPosition(rx, s.y + 95);
       this.truck.setPosition(rx, s.y + 430).setScale(0.85);
       // Three under the trailer; the secret word under the logo.
-      this.homeButtons.forEach((b, i) => (i < 3 ? b.setPosition(rx + (i - 1) * 335, s.y + 830).setScale(0.84) : b.setPosition(lx, s.y + 985).setScale(0.84)));
+      this.homeButtons.forEach((b, i) => b.setPosition(rx + (i - 1) * 335, s.y + 830).setScale(0.88));
       this.barBg.setPosition(rx, s.y + 830);
       this.barFill.setPosition(rx - BAR_WIDTH / 2, s.y + 830);
       this.prompt.setPosition(rx, s.y + 940);
@@ -130,7 +130,7 @@ export class PreloadScene extends Phaser.Scene {
       this.news.setPosition(cx, s.y + 815);
       this.truck.setPosition(cx, s.y + 1150).setScale(1);
       // Four across (a little smaller).
-      this.homeButtons.forEach((b, i) => b.setPosition(cx + (i - 1.5) * 262, s.y + 1560).setScale(0.7));
+      this.homeButtons.forEach((b, i) => b.setPosition(cx + (i - 1) * 340, s.y + 1560).setScale(0.88));
       this.barBg.setPosition(cx, s.y + 1560);
       this.barFill.setPosition(cx - BAR_WIDTH / 2, s.y + 1560);
       this.prompt.setPosition(cx, s.y + 1700);
@@ -227,15 +227,15 @@ export class PreloadScene extends Phaser.Scene {
   private makeHomeButtons(): void {
     const opts = (name: string) => ({ width: 320, height: 120, fontSize: 34, fill: COLORS.dough, name });
     // A note goes out as soon as it's sent (if that fails, it waits for the end of the day or the next visit).
-    const thanks = (kind: FeedbackKind) => (text: string, name: string) => {
+    const thanks = (kind: FeedbackKind, text: string, name: string) => {
       const kept = feedback().add(kind, text, name);
       if (kept) void feedback().sendReport(save().data.day);
       return kept;
     };
     this.homeButtons = [
       new Button(this, 0, 0, 'About us', () => showAbout(), opts('btn-about')),
-      new Button(this, 0, 0, 'Suggest a flavor', () => showFeedback('flavor', thanks('flavor')), { ...opts('btn-suggest'), fontSize: 30 }),
-      new Button(this, 0, 0, 'Let Ethan know', () => showFeedback('note', thanks('note')), { ...opts('btn-tell-ethan'), fontSize: 30 }),
+      // A note or a flavour idea for Ethan: one button, pick which in the form.
+      new Button(this, 0, 0, 'Let Ethan know', () => showFeedback(thanks), { ...opts('btn-tell-ethan'), fontSize: 30 }),
       // The real trailer's weekly secret word: a treat for visiting.
       new Button(this, 0, 0, 'Secret word', () => showTrailerWord((w) => claimTrailerWord(w)), { ...opts('btn-secret-word'), fill: COLORS.pink, fontSize: 30 }),
     ];
