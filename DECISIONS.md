@@ -618,3 +618,20 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
   - **Powdered sugar** is a snowy coat again: a soft round `dust` grain (semi-transparent puffs), 11 per shake, spread wider (2.6× scatter), with an ideal amount of 380–1100 grains (`maxPieces` 3200).
   - **One "Let Ethan know" button** on the home screen (Kumar). The form has a choice at the top, "a note for Ethan" or "a flavor idea", and the prompt and placeholder follow it. The home screen now has three buttons: About us, Let Ethan know, Secret word.
   - **Couriers come in the morning** (Kumar): they arrive a few seconds into morning prep and wait at the patio until their order's ready. In landscape, the morning "Open the window" button moved up a little and the cars down, so the parked cars aren't hidden behind it.
+- **Security pass and Ethan's daily email (2026-11-02, Kumar asked for "a full cyber security patch" and a daily email for Ethan).**
+  - **Review:**
+    - Nothing players type is ever put into the page as HTML (the join-team name is escaped; news.json text is drawn as game text).
+    - No known vulnerabilities in the libraries that ship (`npm audit --omit=dev`).
+    - The upload key and its password file are outside git (`*.jks`, `android/keystore.properties`); the key's backups are outside the repo.
+    - The secret words can be worked out from the public code, so their rewards stay in-game.
+  - **Relay hardening** (the one internet-facing piece). The Origin check stops other websites but not scripts, so:
+    - Reports over 16 KB are refused.
+    - Each sender (by IP) gets 10 a day, and the relay takes at most 300 a day (counted in Workers KV).
+    - The dev server's origin was removed from the allowed list.
+    - Tested locally: 10 accepted then 429, 413 for a big report, 403 for another origin.
+  - **Ethan's daily email** (`relay/digest.js`, the Worker's `scheduled` run at 14:00 UTC, KV store `NOTES`):
+    - Notes are kept, and one email a day goes out only when there's something to tell him: the day's notes (flavour ideas first), the full list of secret words once, then this week's and next week's word every Monday.
+    - `DIGEST_TO` is where it goes; `INSTANT_TO` optionally still sends each note at once (Kumar, while testing).
+    - Resend needs domochitreats.com verified before it will email Ethan.
+  - **Content-Security-Policy** on the built game (website and app, `vite.config.ts`): only its own code, and network calls only to the relay and the game site. Checked: the built game runs with it and nothing is blocked.
+  - **Quality of life:** the day pauses while Settings, the journal, an invite or a friend's errand card is open. The home screen's "Secret word" button shows a "new word!" badge until this week's word is found.

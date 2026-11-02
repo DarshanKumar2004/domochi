@@ -15,6 +15,8 @@ import { SceneKeys } from './sceneKeys';
 
 /** Longest step the game clock takes per frame, so a hitch doesn't skip time. */
 const MAX_TICK_MS = 250;
+/** Pop-ups that pause the day while they're open. */
+const PAUSING = [SceneKeys.Settings, SceneKeys.Journal, SceneKeys.Invite, SceneKeys.Errand] as const;
 
 /**
  * Always-on-top layer: ticket rail along the top, tab bar along the bottom.
@@ -188,7 +190,9 @@ export class HudScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
-    if (!isClockPaused()) session().tick(Math.min(delta, MAX_TICK_MS));
+    // The day waits while a menu or a question is open (Settings, the journal, an invite, a friend's errand).
+    if (isClockPaused() || PAUSING.some((k) => this.scene.isActive(k))) return;
+    session().tick(Math.min(delta, MAX_TICK_MS));
   }
 
   private toast!: Phaser.GameObjects.Text;

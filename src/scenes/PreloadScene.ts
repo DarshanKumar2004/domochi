@@ -15,6 +15,8 @@ import { getViewport, onLayout } from '../ui/viewport';
 import { startMainGame } from './flow';
 import { activeNews } from '../systems/news';
 import { roundBg } from '../ui/roundBg';
+import { Pill } from '../ui/Pill';
+import { trailerWeek } from '../systems/trailerCode';
 import { SceneKeys } from './sceneKeys';
 
 /**
@@ -118,6 +120,7 @@ export class PreloadScene extends Phaser.Scene {
       this.truck.setPosition(rx, s.y + 430).setScale(0.85);
       // Three under the trailer; the secret word under the logo.
       this.homeButtons.forEach((b, i) => b.setPosition(rx + (i - 1) * 335, s.y + 830).setScale(0.88));
+      this.refreshWordBadge();
       this.barBg.setPosition(rx, s.y + 830);
       this.barFill.setPosition(rx - BAR_WIDTH / 2, s.y + 830);
       this.prompt.setPosition(rx, s.y + 940);
@@ -131,6 +134,7 @@ export class PreloadScene extends Phaser.Scene {
       this.truck.setPosition(cx, s.y + 1150).setScale(1);
       // Four across (a little smaller).
       this.homeButtons.forEach((b, i) => b.setPosition(cx + (i - 1) * 340, s.y + 1560).setScale(0.88));
+      this.refreshWordBadge();
       this.barBg.setPosition(cx, s.y + 1560);
       this.barFill.setPosition(cx - BAR_WIDTH / 2, s.y + 1560);
       this.prompt.setPosition(cx, s.y + 1700);
@@ -194,6 +198,7 @@ export class PreloadScene extends Phaser.Scene {
     this.barBg.setVisible(false);
     this.barFill.setVisible(false);
     for (const b of this.homeButtons) b.setVisible(true);
+    this.refreshWordBadge();
     this.tweens.add({ targets: this.prompt, alpha: 0.35, duration: 700, yoyo: true, repeat: -1 });
     let started = false;
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
@@ -222,6 +227,15 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   private homeButtons: Button[] = [];
+  private wordBadge?: Pill;
+
+  /** Show the badge while this week's secret word hasn't been found. */
+  private refreshWordBadge(): void {
+    const b = this.homeButtons[2];
+    if (!b || !this.wordBadge) return;
+    const found = save().data.trailerWeeks?.includes(trailerWeek(new Date())) ?? false;
+    this.wordBadge.setVisible(b.visible && !found).setPosition(b.x + 100 * b.scaleX, b.y - 52 * b.scaleY);
+  }
 
   /** About us, suggest a flavour, a note for Ethan: shown once loading's done. */
   private makeHomeButtons(): void {
@@ -237,8 +251,10 @@ export class PreloadScene extends Phaser.Scene {
       // A note or a flavour idea for Ethan: one button, pick which in the form.
       new Button(this, 0, 0, 'Let Ethan know', () => showFeedback(thanks), { ...opts('btn-tell-ethan'), fontSize: 30 }),
       // The real trailer's weekly secret word: a treat for visiting.
-      new Button(this, 0, 0, 'Secret word', () => showTrailerWord((w) => claimTrailerWord(w)), { ...opts('btn-secret-word'), fill: COLORS.pink, fontSize: 30 }),
+      new Button(this, 0, 0, 'Secret word', () => showTrailerWord((w) => claimTrailerWord(w), () => this.refreshWordBadge()), { ...opts('btn-secret-word'), fill: COLORS.pink, fontSize: 30 }),
     ];
     for (const b of this.homeButtons) b.setDepth(3).setVisible(false);
+    // "new word!" on the secret word button until this week's word is found (a nudge to visit the trailer).
+    this.wordBadge = new Pill(this, 'new word!', { fontSize: 24, color: '#fffaf0', fill: 0xb0406a, bold: true, padX: 10, padY: 3 }).setDepth(4).setVisible(false).setName('home-word-badge');
   }
 }

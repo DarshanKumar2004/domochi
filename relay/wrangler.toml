@@ -1,5 +1,6 @@
 # The feedback relay (see feedback-worker.js and README.md).
-# Secrets (RESEND_API_KEY, FEEDBACK_TO) are set with `npx wrangler secret put`, never here.
+# Secrets (RESEND_API_KEY, FEEDBACK_TO, DIGEST_TO, INSTANT_TO) are set with
+# `npx wrangler secret put NAME`, never here.
 name = "domochi-feedback"
 main = "feedback-worker.js"
 compatibility_date = "2025-01-01"
@@ -8,5 +9,16 @@ workers_dev = true
 preview_urls = false
 
 [vars]
-# Pages allowed to send reports: the live site, the Android app (Capacitor serves it from https://localhost), and the dev server.
-ALLOWED_ORIGINS = "https://darshankumar2004.github.io,https://localhost,http://localhost:5173"
+# Pages allowed to send notes: the live site, and the Android app (Capacitor serves it
+# from https://localhost). The dev server never sends (only the built game does).
+ALLOWED_ORIGINS = "https://darshankumar2004.github.io,https://localhost"
+
+# Where notes wait for Ethan's daily email (and the daily limits are counted).
+[[kv_namespaces]]
+binding = "NOTES"
+id = "3be800fba4404e89a1ce997eea0b9784"
+
+# Ethan's email: every day at 14:00 UTC (8 am in Lafayette in winter, 9 am in summer),
+# only when there's something to tell him.
+[triggers]
+crons = ["0 14 * * *"]

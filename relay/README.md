@@ -37,3 +37,21 @@ Until a domain is verified in Resend, mail comes from `onboarding@resend.dev`, a
 ## If the key ever leaks
 
 Revoke it in the Resend dashboard, make a new one, and run `npx wrangler secret put RESEND_API_KEY` again.
+
+## Ethan's daily email (set up 2026-11-02)
+
+Notes are now kept in a Cloudflare KV store (`NOTES`, already created; its id is in `wrangler.toml`). Once a day at 8 am Lafayette time the Worker emails **one** digest, only when there's something to say:
+- the day's player notes (flavour ideas first);
+- the trailer's secret words: the **full list once** (the first digest), then **this week's and next week's every Monday**.
+
+Secrets (each command asks for the value):
+```
+npx wrangler secret put DIGEST_TO     # who gets the daily email (Ethan; Kumar's address until the domain is verified)
+npx wrangler secret put INSTANT_TO    # optional: also email each note straight away (Kumar, while testing)
+npx wrangler deploy
+```
+Resend only delivers to the Resend account's own address until a domain (domochitreats.com) is verified in Resend. Until then, set `DIGEST_TO` to Kumar's address. Once the domain is verified, set `FEEDBACK_FROM` (for example `domochi game <game@domochitreats.com>`) and point `DIGEST_TO` at Ethan.
+
+**Abuse limits:** reports over 16 KB are refused, one sender gets 10 reports a day, and the relay takes at most 300 a day. The Origin check stops other websites, but not scripts, so these limits are what protect the inbox and the Resend quota.
+
+**Test the daily email by hand:** `npx wrangler dev --test-scheduled`, then open `http://localhost:8787/__scheduled`.
