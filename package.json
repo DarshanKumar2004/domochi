@@ -17,8 +17,8 @@
     "app-art": "node scripts/make-app-art.mjs && capacitor-assets generate --android --assetPath resources --iconBackgroundColor #fffaf0 --splashBackgroundColor #fffaf0",
     "android:sync": "npm run build && cap sync android",
     "android:open": "cap open android",
-    "android:bundle": "npm run android:sync && cd android && gradlew.bat bundleRelease",
-    "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:bundle": "npm run android:sync && node scripts/gradle.mjs bundleRelease",
+    "android:apk": "npm run android:sync && node scripts/gradle.mjs assembleDebug",
     "store-art": "playwright test -c playwright.store.config.ts",
     "trailer-words": "node scripts/trailer-words.mjs"
   },
