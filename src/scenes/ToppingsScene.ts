@@ -42,7 +42,7 @@ const SLOTS = 6;
 /** How far above your finger the jar is held (game px). */
 const JAR_LIFT = 190;
 /** Falling-piece pool size. */
-const FALLING = 160;
+const FALLING = 260;
 /** Size of the falling-piece textures, and the piece radius drawn in them (share of half). */
 const PIECE_TEX = 64;
 const PIECE_TEX_R = 0.7;
@@ -741,7 +741,8 @@ export class ToppingsScene extends StationScene {
         if (time - this.lastEmit > tb.sprinkleEveryMs * 4) this.lastEmit = time - tb.sprinkleEveryMs * 4;
         while (time - this.lastEmit >= tb.sprinkleEveryMs && !work.full) {
           this.lastEmit += tb.sprinkleEveryMs;
-          for (let k = 0; k < (t.stream ?? 1); k++) this.emit(t, time, this.fingerX, this.fingerY, tb.scatter * (t.stream ? 1.4 : 1));
+          // A fine powder (a stream) spreads wider, like a sifter's cloud.
+          for (let k = 0; k < (t.stream ?? 1); k++) this.emit(t, time, this.fingerX, this.fingerY, tb.scatter * (t.stream ? 2.6 : 1));
           if (time >= this.nextShakeSound) {
             this.nextShakeSound = time + 120;
             audio().play('shake');

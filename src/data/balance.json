@@ -144,7 +144,7 @@
     "sprinkleEveryMs": 60,
     "scatter": 0.09,
     "fallMs": 220,
-    "maxPieces": 1500,
+    "maxPieces": 3200,
     "onDonutMargin": 0.03,
     "tooMuchZeroAtFactor": 2.5,
     "evennessFloor": 0.4,

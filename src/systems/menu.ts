@@ -16,7 +16,7 @@ export interface Glaze {
 /** 'sprinkle': shaken on in many small pieces. 'piece': placed one at a time (a whole cookie). */
 export type ToppingStyle = 'sprinkle' | 'piece';
 /** How a piece is drawn. */
-export type ToppingShape = 'crumb' | 'loop' | 'flake' | 'biscuit';
+export type ToppingShape = 'crumb' | 'loop' | 'flake' | 'biscuit' | 'dust';
 
 export interface Topping {
   id: string;
@@ -78,7 +78,7 @@ export interface Menu {
 const HEX = /^#[0-9a-f]{6}$/i;
 const STYLES: readonly string[] = ['dip', 'drizzle', 'dust'];
 const TOPPING_STYLES: readonly string[] = ['sprinkle', 'piece'];
-const SHAPES: readonly string[] = ['crumb', 'loop', 'flake', 'biscuit'];
+const SHAPES: readonly string[] = ['crumb', 'loop', 'flake', 'biscuit', 'dust'];
 
 function duplicates(ids: string[]): string[] {
   return ids.filter((id, i) => ids.indexOf(id) !== i);

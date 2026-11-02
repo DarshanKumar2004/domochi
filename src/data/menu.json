@@ -70,13 +70,13 @@
         "#f1ece2"
       ],
       "style": "sprinkle",
-      "shape": "crumb",
-      "size": 0.02,
+      "shape": "dust",
+      "size": 0.028,
       "amount": {
-        "min": 160,
-        "max": 420
+        "min": 380,
+        "max": 1100
       },
-      "stream": 5
+      "stream": 11
     },
     {
       "id": "cookie-butter-cookie",

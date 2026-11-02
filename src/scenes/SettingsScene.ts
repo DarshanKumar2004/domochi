@@ -53,12 +53,12 @@ export class SettingsScene extends Phaser.Scene {
         screen.setLabel(names[next]);
         void save().update((d) => void (d.settings.orientation = next));
         void applyOrientation(next);
-      }, { width: 640, fill: COLORS.dough, name: 'btn-orientation', fontSize: 44 });
+      }, { width: 600, height: 112, fill: COLORS.dough, name: 'btn-orientation', fontSize: 42 });
       card.add(screen);
       y += 150;
     }
 
-    card.add(new Button(this, 0, y, 'Replay tutorial', () => this.replayTutorial(), { width: 640, name: 'btn-replay-tutorial' }));
+    card.add(new Button(this, 0, y, 'Replay tutorial', () => this.replayTutorial(), { width: 600, height: 112, fontSize: 48, name: 'btn-replay-tutorial' }));
     y += 150;
     const reset = new Button(
       this,
@@ -76,14 +76,14 @@ export class SettingsScene extends Phaser.Scene {
           .reset()
           .then(() => this.replayTutorial());
       },
-      { width: 640, fill: COLORS.danger, name: 'btn-reset' },
+      { width: 600, height: 112, fontSize: 48, fill: COLORS.danger, name: 'btn-reset' },
     );
     card.add(reset);
     y += 150;
     // Back to the home screen (about us, notes for Ethan); the day so far is saved.
-    card.add(new Button(this, 0, y, 'Home screen', () => this.goHome(), { width: 640, fill: COLORS.dough, name: 'btn-home' }));
+    card.add(new Button(this, 0, y, 'Home screen', () => this.goHome(), { width: 600, height: 112, fontSize: 48, fill: COLORS.dough, name: 'btn-home' }));
     y += 165;
-    card.add(new Button(this, 0, y, 'Close', () => this.scene.stop(), { width: 400, fill: COLORS.dough, name: 'btn-close-settings' }));
+    card.add(new Button(this, 0, y, 'Close', () => this.scene.stop(), { width: 380, height: 112, fontSize: 48, fill: COLORS.dough, name: 'btn-close-settings' }));
 
     onLayout(this, (v) => card.setPosition(v.width / 2, v.height / 2).setScale(Math.min(1, (v.height - 40) / cardH)));
   }

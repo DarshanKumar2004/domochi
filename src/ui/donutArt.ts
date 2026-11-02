@@ -224,6 +224,15 @@ export function drawToppingPiece(ctx: CanvasRenderingContext2D, size: number, p:
   ctx.lineWidth = Math.max(1, size / ART_SIZE * 2);
   ctx.strokeStyle = 'rgba(31,26,23,0.55)';
   switch (t.shape) {
+    case 'dust': {
+      // Powdered sugar: a soft round puff, so a few hundred of them make a snowy coat.
+      ctx.globalAlpha = 0.55 + rnd() * 0.35;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * (0.7 + rnd() * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
     case 'crumb': {
       // A jagged little chunk.
       ctx.fillStyle = color;

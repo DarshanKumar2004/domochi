@@ -31,9 +31,11 @@ export class Slider extends Phaser.GameObjects.Container {
     this.valueText = scene.add.text(TRACK_W / 2 + 30, 0, '', { fontFamily: FONT_FAMILY, fontSize: '36px', color: CSS.ink }).setOrigin(0, 0.5);
     // One generous hit area over the whole track: tap anywhere or drag.
     const hit = scene.add.zone(0, 0, TRACK_W + KNOB_R * 2, KNOB_R * 3).setInteractive({ useHandCursor: true, draggable: true }).setName(name);
+    // Where the finger is along the track, measured on screen (the slider sits in a scaled card).
     const fromPointer = (p: Phaser.Input.Pointer) => {
-      const local = this.pointToContainer(new Phaser.Math.Vector2(p.worldX, p.worldY)) as Phaser.Math.Vector2;
-      this.set((local.x + TRACK_W / 2) / TRACK_W);
+      const b = hit.getBounds();
+      const along = ((p.worldX - b.x) / b.width) * (TRACK_W + KNOB_R * 2) - KNOB_R;
+      this.set(along / TRACK_W);
     };
     hit.on(Phaser.Input.Events.POINTER_DOWN, fromPointer);
     hit.on(Phaser.Input.Events.DRAG, fromPointer);
