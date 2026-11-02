@@ -221,7 +221,7 @@ export interface SessionEvents extends Record<string, unknown> {
   goal: { text: string; reward: number };
   /** Good or great orders in a row (from the second one on). */
   streak: { count: number; bonus: number };
-  /** You're out of baking materials and a friend offers a run to the store (say yes or no). */
+  /** You were out of baking materials and a friend ran to the store (the supplies are in; you paid). */
   errand: { name: string; line: string; errand: Errand };
   /** A regular who knows you ordered "the usual": straight onto the rail. */
   usual: { customerId: number; name: string; line: string };
@@ -831,8 +831,10 @@ export class GameSession {
       this.events.emit('changed', undefined);
       return;
     }
+    // You can't bake without it, so there's no saying no (Kumar): the friend brings it, you pay for it.
     this.offer = errand;
-    const line = pickLine(friends?.errandLines?.length ? friends.errandLines : ["you're out of {items}! want me to run to the store?"], this.deps.rng, { items });
+    const line = pickLine(friends?.errandLines?.length ? friends.errandLines : ["you're out of {items}! I ran to the store for you."], this.deps.rng, { items });
+    this.answerErrand(true);
     this.events.emit('errand', { name, line, errand });
     this.events.emit('changed', undefined);
   }

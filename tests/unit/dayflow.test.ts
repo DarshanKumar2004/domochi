@@ -10,7 +10,7 @@ import { GameSession, type PopupEvent } from '../../src/systems/GameSession';
 import type { Menu } from '../../src/systems/menu';
 import { createRng } from '../../src/systems/rng';
 import { tipFor } from '../../src/systems/score';
-import { boxStockId, clockText, doughCostPerDonut, errandFor, fillStock, paymentFor, priceOn, startingStock } from '../../src/systems/supplies';
+import { boxStockId, clockText, doughCostPerDonut, errandFor, fillStock, paymentFor, priceOn, startingStock, type Errand } from '../../src/systems/supplies';
 
 const balance = balanceJson as Balance;
 const menu = menuJson as Menu;
@@ -717,18 +717,19 @@ describe("a friend's store run when you're out of baking materials", () => {
     expect(errandFor(sb, eb, D.recipe, startingStock(sb), 100, price)).toBeNull();
   });
 
-  it('out of flour in the morning: a friend offers a run; yes brings it and costs the supplies plus the fee (once a day)', () => {
+  it('out of flour in the morning: a friend just brings it (no saying no), and it costs the supplies plus the fee (once a day)', () => {
     const s = withBank(50);
-    const offers: string[] = [];
-    s.events.on('errand', (e) => offers.push(e.line));
+    const runs: Errand[] = [];
+    const lines: string[] = [];
+    s.events.on('errand', (e) => (runs.push(e.errand), lines.push(e.line)));
     expect(s.outOfMaterials).toBe(true);
     run(s, (eb.delaySec - 1) * 1000);
-    expect(s.errandOffer).toBeNull(); // not straight away
+    expect(runs).toHaveLength(0); // not straight away
     run(s, 2000);
-    const e = s.errandOffer!;
-    expect(offers).toHaveLength(1);
-    expect(offers[0]).toContain('rice flour');
-    expect(s.answerErrand(true)).toBe(true);
+    expect(runs).toHaveLength(1);
+    const e = runs[0]!;
+    expect(lines[0]).toContain('rice flour');
+    expect(s.errandOffer).toBeNull(); // nothing to answer: it's done
     expect(s.outOfMaterials).toBe(false);
     expect(s.stockOf('rice-flour')).toBeGreaterThanOrEqual(D.recipe['rice-flour']! * eb.batches);
     expect(s.cash).toBeCloseTo(50 - e.cost - e.fee);
@@ -741,13 +742,7 @@ describe("a friend's store run when you're out of baking materials", () => {
     expect(s.errandOffer).toBeNull();
   });
 
-  it('saying no leaves you out (and Close early still works once open); broke, a friend just brings a batch', () => {
-    const s = withBank(50);
-    run(s, (eb.delaySec + 1) * 1000);
-    expect(s.answerErrand(false)).toBe(false);
-    expect(s.outOfMaterials).toBe(true);
-    expect(s.summary().errandSpent).toBe(0);
-
+  it('broke, a friend just brings a batch, free', () => {
     const broke = withBank(0);
     const visits: string[] = [];
     broke.events.on('friend', (f) => visits.push(f.line));

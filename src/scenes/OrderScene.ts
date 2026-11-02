@@ -6,6 +6,7 @@ import { beginOverlay } from '../ui/overlay';
 import { SpeechBubble } from '../ui/SpeechBubble';
 import { TicketCard } from '../ui/TicketCard';
 import { onLayout } from '../ui/viewport';
+import { customerLook } from '../ui/customerLook';
 import { SceneKeys } from './sceneKeys';
 
 /** Popup over the Lobby: the front customer says their order and the ticket is written. */
@@ -30,7 +31,7 @@ export class OrderScene extends Phaser.Scene {
     }
 
     beginOverlay(this);
-    const customer = this.add.image(0, 0, s.typeOf(cust).sprite).setOrigin(0.5, 1);
+    const customer = this.add.image(0, 0, customerLook(s, cust)).setOrigin(0.5, 1);
     const bubble = new SpeechBubble(this, 0, 0, 760, ticket.line, -220, 48);
     const card = new TicketCard(this, 0, 0, ticket, menu);
     const gotIt = new Button(

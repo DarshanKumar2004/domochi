@@ -153,7 +153,7 @@ export class HudScene extends Phaser.Scene {
     });
     // Out of materials, with money: a friend offers a run to the store.
     listen(this, session().events, 'errand', (e) => {
-      if (!this.scene.isActive(SceneKeys.Errand)) this.scene.launch(SceneKeys.Errand, { name: e.name, line: e.line });
+      if (!this.scene.isActive(SceneKeys.Errand)) this.scene.launch(SceneKeys.Errand, { name: e.name, line: e.line, errand: e.errand });
       this.scene.bringToTop(SceneKeys.Errand);
     });
     listen(this, session().events, 'streak', (e) => {

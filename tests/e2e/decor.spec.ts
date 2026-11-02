@@ -101,7 +101,7 @@ test('a three-star day from day 50 earns a coupon for the trailer', async ({ pag
   await shot(page, 'coupon-1-summary');
 });
 
-test("out of rice flour with money in the bank: a friend offers a store run, for a fee", async ({ page }) => {
+test("out of rice flour with money in the bank: a friend just does a store run, for a fee", async ({ page }) => {
   test.setTimeout(60_000);
   await page.addInitScript(() => {
     if (sessionStorage.getItem('seeded')) return;
@@ -115,7 +115,7 @@ test("out of rice flour with money in the bank: a friend offers a store run, for
   await waitForScene(page, SceneKeys.Errand);
   await findNamed(page, SceneKeys.Errand, 'errand-total');
   await shot(page, 'errand-1-offer');
-  await tapNamed(page, SceneKeys.Errand, 'btn-errand-yes');
+  await tapNamed(page, SceneKeys.Errand, 'btn-errand-ok');
   await waitForScene(page, SceneKeys.Errand, false);
   const after = await page.evaluate(() => {
     const s = (window as unknown as { __session: { cash: number; stockOf(id: string): number; outOfMaterials: boolean } }).__session;

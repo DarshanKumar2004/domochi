@@ -14,6 +14,8 @@ import { getViewport, onLayout } from '../ui/viewport';
 import { listen } from './listen';
 import { Pill } from '../ui/Pill';
 import { roundBg } from '../ui/roundBg';
+import { customerLook } from '../ui/customerLook';
+import { CUSTOMER_MIX, customerMixKey } from '../assets/placeholders';
 import { SceneKeys } from './sceneKeys';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -46,11 +48,14 @@ const LAYOUT = {
       h: 560,
       labelY: 1500,
       scale: 0.7,
+      // Six spots, three across (couriers take the first ones).
       slots: [
-        [150, 1170],
-        [350, 1170],
-        [150, 1440],
-        [350, 1440],
+        [105, 1170],
+        [250, 1170],
+        [395, 1170],
+        [105, 1440],
+        [250, 1440],
+        [395, 1440],
       ],
     },
   },
@@ -78,10 +83,12 @@ const LAYOUT = {
       labelY: 710,
       scale: 0.55,
       slots: [
-        [1640, 535],
-        [1820, 535],
-        [1640, 680],
-        [1820, 680],
+        [1620, 535],
+        [1730, 535],
+        [1840, 535],
+        [1620, 680],
+        [1730, 680],
+        [1840, 680],
       ],
     },
   },
@@ -116,6 +123,7 @@ export class LobbyScene extends Phaser.Scene {
   private views = new Map<number, CustomerView>();
   /** Couriers on the lot, by pickup customer id. */
   private couriers = new Map<number, CourierView>();
+  private lastCourierCount = 0;
   private frontTag!: Pill;
   private doneText!: Phaser.GameObjects.Text;
   private bubble: SpeechBubble | null = null;
@@ -137,6 +145,7 @@ export class LobbyScene extends Phaser.Scene {
 
   create(): void {
     this.couriers = new Map();
+    this.lastCourierCount = 0;
     this.views = new Map();
     this.bubble = null;
     this.confirmOpen = false;
@@ -266,8 +275,11 @@ export class LobbyScene extends Phaser.Scene {
       this.place(cust, { x, y: c.y + L.line.feetY, scale: L.line.scale }, name, snap, v);
     });
 
-    s.waiting.forEach((cust, i) => {
+    // Couriers have the first patio spots; walk-ups wait in the ones after (never on top of each other).
+    const couriersHere = this.activeCouriers().length;
+    s.waiting.forEach((cust, k) => {
       present.add(cust.id);
+      const i = couriersHere + k;
       const slot = L.waiting.slots[i % L.waiting.slots.length]!;
       const wrap = Math.floor(i / L.waiting.slots.length) * 30;
       this.place(cust, { x: c.x + slot[0] + wrap, y: c.y + slot[1] - wrap, scale: L.waiting.scale }, `waiting-${cust.ticketNo}`, snap, v);
@@ -430,8 +442,8 @@ export class LobbyScene extends Phaser.Scene {
     const v = getViewport(this);
     const L = LAYOUT[v.orientation];
     const c = v.content;
-    const keys = [TextureKeys.CustomerRegular, TextureKeys.CustomerStudent, TextureKeys.CustomerOffice, TextureKeys.CustomerParent];
-    const key = keys[Math.floor(Math.random() * keys.length)]!;
+    // One of the mixed looks (friends are different people each time).
+    const key = customerMixKey(Math.floor(Math.random() * CUSTOMER_MIX));
     const y = c.y + L.groundY + (v.orientation === 'landscape' ? 150 : 200);
     const x = c.x + L.truck.x + (v.orientation === 'landscape' ? 120 : 160);
     const scale = L.line.scale * 0.95;
@@ -500,19 +512,40 @@ export class LobbyScene extends Phaser.Scene {
       if (spot < 0) return; // the lot's full: they'll come when a spot frees up
       this.courierArrive(p, spot);
     });
+    this.settleCouriers();
+    // A courier came or went: the walk-ups on the patio shift to keep clear of them.
+    const n = this.activeCouriers().length;
+    if (n !== this.lastCourierCount) {
+      this.lastCourierCount = n;
+      this.sync(false);
+    }
   }
 
-  /** Where a courier waits at the patio (after the walk-ups waiting there). */
+  /** Where a courier waits at the patio: the first spots, in arrival order (walk-ups wait after them). */
   private courierPatioSpot(id: number): { x: number; y: number; scale: number } {
-    const s = session();
     const v = getViewport(this);
     const L = LAYOUT[v.orientation];
     const c = v.content;
-    const waitingCouriers = [...this.couriers.entries()].filter(([, cv]) => cv.state !== 'leaving').map(([k]) => k);
-    const i = s.waiting.length + Math.max(0, waitingCouriers.indexOf(id));
+    const i = Math.max(0, this.activeCouriers().indexOf(id));
     const slot = L.waiting.slots[i % L.waiting.slots.length]!;
     const wrap = Math.floor(i / L.waiting.slots.length) * 30;
     return { x: c.x + slot[0] + wrap, y: c.y + slot[1] - wrap, scale: L.waiting.scale };
+  }
+
+  /** Couriers on the lot who aren't leaving, in arrival order (by pickup customer id). */
+  private activeCouriers(): number[] {
+    return [...this.couriers.entries()].filter(([, cv]) => cv.state !== 'leaving').map(([k]) => k);
+  }
+
+  /** Couriers already waiting walk over when the patio spots shift (one left, say). */
+  private settleCouriers(): void {
+    for (const [id, cv] of this.couriers) {
+      if (cv.state !== 'waiting') continue;
+      const to = this.courierPatioSpot(id);
+      if (Math.abs(cv.driver.x - to.x) < 2 && Math.abs(cv.driver.y - to.y) < 2) continue;
+      this.tweens.killTweensOf(cv.driver);
+      this.tweens.add({ targets: cv.driver, x: to.x, y: to.y, duration: 500, onUpdate: () => this.placeCourierTag(cv) });
+    }
   }
 
   private parkingSpot(spot: number): { x: number; y: number; scale: number } {
@@ -532,8 +565,8 @@ export class LobbyScene extends Phaser.Scene {
       .setTint(CAR_TINTS[p.id % CAR_TINTS.length]!)
       .setDepth(4)
       .setName(`courier-car-${p.ticketNo}`);
-    const driver = this.add.image(at.x, at.y, session().typeOf(p).sprite).setOrigin(0.5, 1).setScale(LAYOUT[v.orientation].waiting.scale).setDepth(5).setAlpha(0).setName(`courier-${p.ticketNo}`);
-    const tag = new Pill(this, `#${p.ticketNo} pickup`, { fontSize: 28, color: CSS.cream, fill: 0xb0406a, bold: true, padX: 12, padY: 3 }).setDepth(6).setVisible(false);
+    const driver = this.add.image(at.x, at.y, customerLook(session(), p)).setOrigin(0.5, 1).setScale(LAYOUT[v.orientation].waiting.scale).setDepth(5).setAlpha(0).setName(`courier-${p.ticketNo}`);
+    const tag = new Pill(this, `#${p.ticketNo} car`, { fontSize: 28, color: CSS.cream, fill: 0xb0406a, bold: true, padX: 12, padY: 3 }).setDepth(6).setVisible(false);
     const cv: CourierView = { car, driver, tag, spot, state: 'arriving' };
     this.couriers.set(p.id, cv);
     // Drive in and park, then the driver hops out and walks to the patio.
@@ -677,7 +710,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private createView(cust: Customer, target: { x: number; y: number; scale: number }, v: Viewport): CustomerView {
-    const key = session().typeOf(cust).sprite;
+    const key = customerLook(session(), cust);
     // New arrivals walk in from off the right edge.
     const image = this.add.image(v.width + 120, target.y, key).setOrigin(0.5, 1).setScale(target.scale).setDepth(5);
     image.setInteractive({ useHandCursor: true });

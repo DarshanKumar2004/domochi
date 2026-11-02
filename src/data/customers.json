@@ -280,9 +280,9 @@
       "no {items}? no problem. take these, Ethan has your back."
     ],
     "errandLines": [
-      "you're out of {items}! want me to run to the store for you?",
-      "no {items} left? I can grab some from the store, just cover me.",
-      "I'm headed to the store anyway. want me to pick up {items}?"
+      "you're out of {items}! I ran to the store for you.",
+      "no {items} left? I grabbed some from the store, just cover me.",
+      "I was headed to the store anyway: here's {items}!"
     ]
   },
   "regulars": {

@@ -5,7 +5,7 @@ import { panelOpen, showAbout, showFeedback, showTrailerWord } from '../ui/HomeP
 import { ASSET_FILES, queueAssetFile } from '../assets/files';
 import brand from '../data/brand.json';
 import { TextureKeys } from '../assets/keys';
-import { ensurePlaceholderTextures } from '../assets/placeholders';
+import { ensureCustomerMix, ensurePlaceholderTextures } from '../assets/placeholders';
 import { audio, feedback, menu, save, claimTrailerWord, setNews } from '../systems/services';
 import type { Viewport } from '../ui/layout';
 import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
@@ -146,6 +146,7 @@ export class PreloadScene extends Phaser.Scene {
 
   create(): void {
     ensurePlaceholderTextures(this);
+    ensureCustomerMix(this);
     this.loadProgress = 1;
     this.addFloaters();
     // The logo pops in.

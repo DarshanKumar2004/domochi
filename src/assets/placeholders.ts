@@ -914,3 +914,76 @@ export function createAnimations(scene: Phaser.Scene): void {
     });
   }
 }
+
+// ---- Mixed-up customers -----------------------------------------------------------
+// Walk-ups come in many looks (Kumar: "the same type of customers each time"):
+// skin, hair colour and style, shirt and trousers, and an extra (glasses, a cap,
+// a backpack), mixed into CUSTOMER_MIX steady combinations. Regulars keep their
+// own look, so you know them when they come back.
+
+/** How many mixed customer looks there are (textures customer-mix-0 …). */
+export const CUSTOMER_MIX = 18;
+export const customerMixKey = (i: number): string => `customer-mix-${i}`;
+
+const MIX_SKIN = [0xffdbac, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0x6b4226];
+const MIX_HAIR = [0x1b1210, 0x3b2a20, 0x6b4423, 0xd6a95b, 0xa8a8a8, 0xb5452f];
+const MIX_SHIRT = [0x4caf8a, 0xf4a6c0, 0xffd27a, 0x6a8fd0, 0xe57373, 0x9c7bd0, 0x5a8a4a, 0xf2efe8, 0xff9f4a];
+const MIX_PANTS = [0x3b4a6b, 0x2f3440, 0x4a4a5a, 0x6b5a4a, 0x7a8fa6];
+
+function paintMixCustomer(i: number): (g: G) => void {
+  const pick = <T,>(list: readonly T[], prime: number): T => list[(i * prime + Math.floor(i / list.length)) % list.length]!;
+  const skin = pick(MIX_SKIN, 5);
+  const hair = pick(MIX_HAIR, 7);
+  const shirt = pick(MIX_SHIRT, 4);
+  const pants = pick(MIX_PANTS, 3);
+  const style = i % 4; // short, long, puff, bun
+  const extra = Math.floor(i / 4) % 4; // none, glasses, cap, backpack
+  return (g) => {
+    // Long hair and a puff sit behind the head and shoulders.
+    g.fillStyle(hair);
+    if (style === 1) g.fillRoundedRect(32, 50, 116, 120, 40);
+    if (style === 2) g.fillCircle(90, 62, 70);
+    g.fillStyle(pants);
+    g.fillRect(45, 280, 35, 60);
+    g.fillRect(100, 280, 35, 60);
+    g.fillStyle(shirt);
+    g.fillRoundedRect(30, 130, 120, 170, 40);
+    if (extra === 3) {
+      // Backpack straps.
+      g.fillStyle(0x2b2b2b);
+      g.fillRect(44, 140, 14, 120);
+      g.fillRect(122, 140, 14, 120);
+    }
+    g.fillStyle(skin);
+    g.fillCircle(90, 75, 55);
+    g.fillStyle(hair);
+    if (style !== 2) g.fillEllipse(90, 38, 112, 50);
+    if (style === 3) g.fillCircle(90, 10, 22); // a bun on top
+    if (extra === 2) {
+      // A cap with a brim.
+      g.fillStyle(shirt === 0xf2efe8 ? 0x6a8fd0 : 0xf2efe8);
+      g.fillEllipse(90, 34, 116, 46);
+      g.fillRoundedRect(90, 38, 66, 12, 6);
+    }
+    paintFace(g);
+    if (extra === 1) {
+      // Round glasses.
+      g.lineStyle(4, DARK);
+      g.strokeCircle(70, 78, 14);
+      g.strokeCircle(110, 78, 14);
+      g.lineBetween(84, 78, 96, 78);
+    }
+  };
+}
+
+/** Make the mixed customer textures (once). */
+export function ensureCustomerMix(scene: Phaser.Scene): void {
+  for (let i = 0; i < CUSTOMER_MIX; i++) {
+    const key = customerMixKey(i);
+    if (scene.textures.exists(key)) continue;
+    const g = scene.make.graphics({}, false);
+    paintMixCustomer(i)(g);
+    g.generateTexture(key, 180, 340);
+    g.destroy();
+  }
+}

@@ -635,3 +635,8 @@ Kumar gave full creative say ("have fun!"). Everything here is data-tuned in `ba
     - Resend needs domochitreats.com verified before it will email Ethan.
   - **Content-Security-Policy** on the built game (website and app, `vite.config.ts`): only its own code, and network calls only to the relay and the game site. Checked: the built game runs with it and nothing is blocked.
   - **Quality of life:** the day pauses while Settings, the journal, an invite or a friend's errand card is open. The home screen's "Secret word" button shows a "new word!" badge until this week's word is found.
+- **2026-11-02: Patio spots, the friend's errand, and more customer looks** (Kumar's playtest):
+  - **Patio overlap fixed.** Coffee-shop couriers take the first patio spots and walk-ups take the next ones. When a courier arrives or leaves, everyone moves to their new spot. The patio has 6 spots in both orientations. The driver's tag now reads "#1 car" (shorter, so tags don't overlap in landscape).
+  - **The friend's errand is automatic.** When you're out of something the day can't run without, the friend just buys it. The supplies plus their fee come out of your cash, and the card only says "Thanks!" (no decline). If you're broke, they still bring a batch for free.
+  - **Customer variety.** 18 mixed looks (skin, hair style, shirt, pants, glasses, cap or backpack) are drawn in code (`customer-mix-0…17`). Each customer keeps the same look all day. Regulars keep their own type's look so they're recognisable.
+  - **Rotation and the nav bars:** couldn't reproduce in Playwright (one resize, a gradual resize, or rotating mid-station). Waiting on a screenshot.
