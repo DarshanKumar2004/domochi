@@ -29,8 +29,9 @@ export class TicketViewScene extends Phaser.Scene {
     // still down; without this, lifting it would close the view straight away.
     // And not in the first moment: the second tap of a double-tap shouldn't close it either.
     let armed = false;
-    const openedAt = this.time.now;
-    blocker.on(Phaser.Input.Events.POINTER_DOWN, () => (armed = this.time.now - openedAt > 450));
+    // (Wall-clock time: a new scene's own clock jumps on its first frame.)
+    const openedAt = performance.now();
+    blocker.on(Phaser.Input.Events.POINTER_DOWN, () => (armed = performance.now() - openedAt > 450));
     blocker.on(Phaser.Input.Events.POINTER_UP, () => {
       if (armed) this.scene.stop();
     });
