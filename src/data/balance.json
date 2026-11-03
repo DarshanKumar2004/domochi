@@ -726,7 +726,7 @@
     "maxLevel": 5
   },
   "guides": {
-    "_note": "Dashed guides at the Glaze station, bought once at the supply store (the tutorial shows them all). 'base' is the loops for any base coat; the others are a flavour's drizzle stripes.",
+    "_note": "Dashed guides, bought once at the supply store (the tutorial shows them all). Glaze station: 'base' is the loops for any base coat; a flavour id is that flavour's drizzle stripes. Toppings station: 'topping-<id>' is the ring that shows where to shake that topping (a topping without one listed here keeps a free ring).",
     "items": [
       {
         "id": "base",
@@ -747,6 +747,11 @@
         "id": "cookie-butter",
         "name": "cookie butter drizzle guide",
         "price": 5
+      },
+      {
+        "id": "topping-powdered-sugar",
+        "name": "powdered sugar guide",
+        "price": 4
       }
     ]
   },

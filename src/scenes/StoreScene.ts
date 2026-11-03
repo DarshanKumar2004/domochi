@@ -141,7 +141,7 @@ export class StoreScene extends Phaser.Scene {
       const tiles = balance.supplies.items.filter((it) => sec.kinds.includes(it.kind)).map((it) => this.supplyTile(it, day, sec.accent));
       sections.push(section(sec.title, sec.accent, tiles));
     }
-    sections.push(section('glaze guides: dashed lines that show you where to pour', ACCENT.guides, balance.guides.items.map((g) => this.guideTile(g))));
+    sections.push(section('guides: dashed lines that show you where to pour or shake', ACCENT.guides, balance.guides.items.map((g) => this.guideTile(g))));
     sections.push(section('decorations for the lot (each gives a little perk)', ACCENT.decor, balance.decor.items.map((d) => this.decorTile(d, day))));
     sections.push(section("your crew: they keep the trailer going while you're away", ACCENT.crew, balance.staff.hires.map((h) => this.hireTile(h, day))));
 
@@ -343,10 +343,12 @@ export class StoreScene extends Phaser.Scene {
 
   private guideTile(g: { id: string; name: string; price: number }): Tile {
     const flavor = menu.flavors.find((f) => f.id === g.id);
-    const name = g.id === 'base' ? 'base coat' : (flavor?.name ?? g.id);
+    // A Toppings guide ('topping-<id>'): the ring that shows where to shake it.
+    const topping = g.id.startsWith('topping-') ? menu.toppings.find((t) => `topping-${t.id}` === g.id) : undefined;
+    const name = g.id === 'base' ? 'base coat' : (topping?.name ?? flavor?.name ?? g.id);
     return this.makeTile(`store-guide-${g.id}`, name, money(g.price), () => {
       const owned = save().data.guides.includes(g.id);
-      return { label: owned ? 'yours ✓' : g.id === 'base' ? 'loops for every glaze' : 'drizzle stripes', low: false, can: !owned && save().data.money >= g.price, owned };
+      return { label: owned ? 'yours ✓' : g.id === 'base' ? 'loops for every glaze' : topping ? 'where to shake it' : 'drizzle stripes', low: false, can: !owned && save().data.money >= g.price, owned };
     }, () => {
       void save().update((d) => {
         if (d.guides.includes(g.id)) return;
@@ -354,7 +356,7 @@ export class StoreScene extends Phaser.Scene {
         d.money = Math.round((d.money - g.price) * 100) / 100;
       });
       stickers()?.checkGuides();
-    }, { accent: ACCENT.guides, icon: { key: TextureKeys.IconGlaze, tint: 0x8a6fc9 } });
+    }, { accent: ACCENT.guides, icon: { key: topping ? TextureKeys.IconToppings : TextureKeys.IconGlaze, tint: 0x8a6fc9 } });
   }
 
   /** mochi's tip from the plan: what to get first, and what's short if money's tight. */

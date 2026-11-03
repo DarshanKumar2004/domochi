@@ -749,6 +749,12 @@ export class GameSession {
     return undefined;
   }
 
+  /** Someone's at the window waiting to order (checked every frame by the tab bar, so no array is built). */
+  get someoneToServe(): boolean {
+    const c = this.frontOfLine;
+    return !!c && c.state === 'inLine';
+  }
+
   /** Customers in line (checked every frame while someone is due, so no array is built). */
   private get lineLength(): number {
     let n = 0;

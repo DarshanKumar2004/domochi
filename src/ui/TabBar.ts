@@ -11,6 +11,8 @@ interface TabView {
   icon: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text;
   hit: Phaser.GameObjects.Zone;
+  /** A dot on the icon: something at that station needs you (a donut to flip, a pan to take out…). */
+  badge: Phaser.GameObjects.Arc;
 }
 
 /** Papa's-style station tabs along the bottom of the screen. */
@@ -45,8 +47,12 @@ export class TabBar extends Phaser.GameObjects.Container {
         .setName(`tab-${tab.label}`)
         .setInteractive({ useHandCursor: true });
       hit.on(Phaser.Input.Events.POINTER_DOWN, () => onSelect(tab.scene));
-      this.add([icon, label, hit]);
-      this.views.push({ key: tab.scene, icon, label, hit });
+      const badge = new Phaser.GameObjects.Arc(scene, 0, 0, 15, 0, 360, false, COLORS.pink).setStrokeStyle(4, COLORS.cream).setVisible(false);
+      badge.setName(`tab-badge-${tab.label}`);
+      this.add([icon, label, badge, hit]);
+      this.views.push({ key: tab.scene, icon, label, hit, badge });
+      // A gentle pulse, so it catches the eye without nagging.
+      scene.tweens.add({ targets: badge, scale: 1.25, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     }
     scene.add.existing(this);
   }
@@ -71,9 +77,16 @@ export class TabBar extends Phaser.GameObjects.Container {
       view.label.setFontSize(font);
       view.icon.setPosition(x + this.tabWidth / 2, h * 0.39);
       view.label.setPosition(x + this.tabWidth / 2, h * 0.78);
+      view.badge.setPosition(x + this.tabWidth / 2 + 36, h * 0.39 - 30);
       view.hit.setPosition(x, 0).setSize(this.tabWidth, h);
     });
     this.drawHighlight();
+  }
+
+  /** Show or hide a station's alert dot (never on the tab you're on). */
+  setBadge(key: StationKey, on: boolean): void {
+    const v = this.views.find((x) => x.key === key);
+    if (v) v.badge.setVisible(on && key !== this.activeTab);
   }
 
   selectTab(key: StationKey): void {

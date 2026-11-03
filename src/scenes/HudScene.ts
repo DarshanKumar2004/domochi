@@ -195,6 +195,27 @@ export class HudScene extends Phaser.Scene {
     // The day waits while a menu or a question is open (Settings, the journal, an invite, a friend's errand).
     if (isClockPaused() || PAUSING.some((k) => this.scene.isActive(k))) return;
     session().tick(Math.min(delta, MAX_TICK_MS));
+    this.updateBadges();
+  }
+
+  /**
+   * Alert dots on the tabs: something at another station needs you now. A
+   * customer at the window, a donut side done (flip or pull it), a pan of
+   * kolaches golden, a pot of rice ready. Checked every frame, no allocations.
+   */
+  private updateBadges(): void {
+    const s = session();
+    this.tabBar.setBadge(SceneKeys.Lobby, s.phase === 'open' && s.someoneToServe);
+    const fb = s.fryer.balance;
+    let fry = false;
+    for (const d of s.fryer.slots) if (d && d.down >= 1 - fb.doneness.perfectWithin) fry = true;
+    this.tabBar.setBadge(SceneKeys.Fry, fry);
+    const bk = s.bakery;
+    let bake = false;
+    if (bk.inOven) for (const k of bk.pan) if (k && k.baked >= 1 - balance.bake.oven.doneness.perfectWithin) bake = true;
+    this.tabBar.setBadge(SceneKeys.Bake, bake);
+    const r = s.riceStation;
+    this.tabBar.setBadge(SceneKeys.Rice, r.cooker === 'ready' && r.portions > 0 && !r.board);
   }
 
   private toast!: Phaser.GameObjects.Text;

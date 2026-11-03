@@ -3,7 +3,7 @@ import { toppingStockId } from '../systems/supplies';
 import { TextureKeys } from '../assets/keys';
 import type { FinishedDonut, ToppingWork } from '../stations/toppings';
 import type { Topping } from '../systems/menu';
-import { audio, balance, menu, session } from '../systems/services';
+import { audio, balance, menu, save, session } from '../systems/services';
 import { Button } from '../ui/Button';
 import {
   ART_SIZE,
@@ -547,8 +547,9 @@ export class ToppingsScene extends StationScene {
     const n = work && t ? work.countOn(t.id) : 0;
     this.boards.forEach((b, i) => {
       const here = !!work && i === s.activeToppingSpot;
-      b.guideRing.setVisible(here && t?.style === 'sprinkle' && n < t.amount.min);
-      b.guideSpot.setVisible(here && t?.style === 'piece' && n < t.amount.min);
+      const guide = !!t && this.hasGuide(t.id);
+      b.guideRing.setVisible(here && guide && t?.style === 'sprinkle' && n < t.amount.min);
+      b.guideSpot.setVisible(here && guide && t?.style === 'piece' && n < t.amount.min);
     });
     if (!work) {
       this.readout.setText('');
@@ -598,6 +599,19 @@ export class ToppingsScene extends StationScene {
       b.guideSpot.lineStyle(5, COLORS.cream, 0.9);
       drawDashedPath(b.guideSpot, x, y, half, box, 14, 10);
     }
+  }
+
+  /**
+   * Is the dashed guide for this topping showing? Toppings with a guide on
+   * sale (balance.guides, 'topping-<id>') need it bought; the tutorial, and
+   * days that don't count supplies, show them all.
+   */
+  private hasGuide(toppingId: string): boolean {
+    const id = `topping-${toppingId}`;
+    if (!balance.guides.items.some((g) => g.id === id)) return true;
+    const s = session();
+    if (s.isTutorial || !s.tracksSupplies) return true;
+    return save().data.guides.includes(id);
   }
 
   private selectedTopping(): Topping | undefined {
