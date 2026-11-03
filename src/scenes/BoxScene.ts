@@ -24,7 +24,7 @@ const LAYOUT = {
     shelf: { x: 40, y: 230, w: 1000, h: 140, size: 110 },
     sizes: { x: 540, y: 448, step: 300, scale: 1 },
     box: { x: 540, y: 755, w: 960, h: 440, wideCols: 4 },
-    card: { x: 540, y: 1200, scale: 0.8 },
+    card: { x: 540, y: 1200, scale: 0.8, top: 1060, bottom: 1395 },
     hint: { x: 540, y: 1200 },
     serve: { x: 540, y: 1470, scale: 1 },
   },
@@ -32,7 +32,7 @@ const LAYOUT = {
     shelf: { x: 1000, y: 160, w: 880, h: 120, size: 92 },
     sizes: { x: 520, y: 78, step: 280, scale: 0.85 },
     box: { x: 520, y: 465, w: 920, h: 560, wideCols: 4 },
-    card: { x: 1440, y: 470, scale: 0.75 },
+    card: { x: 1440, y: 470, scale: 0.75, top: 295, bottom: 555 },
     hint: { x: 1440, y: 470 },
     serve: { x: 1440, y: 705, scale: 0.85 },
   },
@@ -68,6 +68,8 @@ export class BoxScene extends StationScene {
   private slotSize = 0;
   private shownLayout = '';
   private closing = false;
+  /** The order whose unpacked kolaches/onigiri we already warned about (a second tap serves anyway). */
+  private warnedNo = -1;
 
   constructor() {
     super(SceneKeys.Box, 'Box Station', 0x5a6b4a, null);
@@ -85,6 +87,7 @@ export class BoxScene extends StationScene {
     this.slotNumbers = [];
     this.shownLayout = '';
     this.closing = false;
+    this.warnedNo = -1;
     this.input.dragDistanceThreshold = 16;
 
     this.shelfBg = this.add.graphics();
@@ -268,12 +271,16 @@ export class BoxScene extends StationScene {
       this.instruction.setVisible(false);
     } else {
       this.hint.setVisible(false);
-      this.card = new TicketCard(this, c.x + L.card.x, c.y + L.card.y, active, menu).setScale(L.card.scale);
+      this.card = new TicketCard(this, 0, 0, active, menu);
+      // A ticket with kolaches and onigiri is taller: shrink it to fit between the box (or shelf) and the button.
+      const cardScale = Math.min(L.card.scale, (L.card.bottom - L.card.top) / this.card.cardHeight);
+      const half = (this.card.cardHeight * cardScale) / 2;
+      this.card.setScale(cardScale).setPosition(c.x + L.card.x, c.y + Phaser.Math.Clamp(L.card.y, L.card.top + half, L.card.bottom - half));
       const box = menu.boxes.find((b) => b.id === s.boxChoice);
       const n = active.order.flavors.length;
       const spare = size - n;
       // Under the box (portrait) or under the ticket (landscape).
-      const below = v.orientation === 'portrait' ? this.boxArea.y + this.boxArea.h / 2 + 40 : c.y + L.card.y + (this.card.cardHeight * L.card.scale) / 2 + 40;
+      const below = v.orientation === 'portrait' ? this.boxArea.y + this.boxArea.h / 2 + 40 : this.card.y + (this.card.cardHeight * this.card.scaleY) / 2 + 40;
       const name = box?.name ?? 'the box';
       const text =
         spare < 0
@@ -281,8 +288,13 @@ export class BoxScene extends StationScene {
           : spare === 0
             ? `${name}: ${n === 1 ? 'fill the slot' : `fill slots 1–${n} in the ticket's order`}`
             : `fill ${n === 1 ? 'slot 1' : `slots 1–${n} in order`} · + slots are for gifts!`;
+      // Kolaches and onigiri go in their own boxes, packed at their stations.
+      const sideKinds = (['kolache', 'onigiri'] as const).filter((k) => (k === 'kolache' ? active.order.kolaches : active.order.onigiri)?.length);
+      const sideNote = sideKinds.length
+        ? '\n' + sideKinds.map((k) => `${k === 'kolache' ? 'kolache box' : 'onigiri pack'} ${active.sidePacks?.[k] ? '✓' : `(pack at ${k === 'kolache' ? 'Bake' : 'Rice'})`}`).join(' · ')
+        : '';
       this.instruction
-        .setText(text)
+        .setText(text + sideNote)
         .setColor(spare < 0 ? '#ffb4a8' : CSS.muted)
         .setPosition(v.orientation === 'portrait' ? this.boxArea.x : c.x + L.card.x, below)
         .setVisible(true);
@@ -371,6 +383,13 @@ export class BoxScene extends StationScene {
     if (!s.activeTicket || this.closing) return;
     if (!s.boxCount) {
       this.flash('put the donuts in the box first');
+      return;
+    }
+    const left = s.sidesToPack;
+    if (left.length && this.warnedNo !== s.activeTicket.no) {
+      this.warnedNo = s.activeTicket.no;
+      const what = left.map((k) => (k === 'kolache' ? 'kolaches' : 'onigiri')).join(' and ');
+      this.flash(`the ${what} aren't packed yet!\ntap again to serve without them`);
       return;
     }
     this.closing = true;

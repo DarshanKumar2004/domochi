@@ -48,6 +48,8 @@ export interface SaveData {
   playerId: string;
   /** How well each regular knows you (customers.json regulars ids). */
   regulars: Record<string, number>;
+  /** Kinds (kolache, onigiri) whose starter kit has arrived (once each, the day they first come on the menu). */
+  sidesStarted?: string[];
   /** The day being played, saved as you go so a reload picks it back up (gone once the day's done). */
   inProgress?: { day: number; snap: DaySnapshot; stickers: string[] };
   /** The trays as the last day left them (mess not cleaned up, and days dirty: mold). */
@@ -117,6 +119,7 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (typeof raw.playerId === 'string' && raw.playerId) data.playerId = raw.playerId.slice(0, 32);
   if (typeof raw.lastSeen === 'number' && Number.isFinite(raw.lastSeen)) data.lastSeen = raw.lastSeen;
   if (Array.isArray(raw.decor)) data.decor = [...new Set(raw.decor.filter((g): g is string => typeof g === 'string'))];
+  if (Array.isArray(raw.sidesStarted)) data.sidesStarted = [...new Set(raw.sidesStarted.filter((g): g is string => typeof g === 'string'))];
   if (isRecord(raw.regulars)) {
     for (const [k, v] of Object.entries(raw.regulars)) if (typeof v === 'number' && Number.isInteger(v) && v >= 0) data.regulars[k] = v;
   }

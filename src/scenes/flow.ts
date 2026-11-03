@@ -11,6 +11,8 @@ const MAIN_GAME_SCENES: readonly SceneKey[] = [
   SceneKeys.Fry,
   SceneKeys.Glaze,
   SceneKeys.Toppings,
+  SceneKeys.Bake,
+  SceneKeys.Rice,
   SceneKeys.Box,
   SceneKeys.Hud,
   SceneKeys.Order,

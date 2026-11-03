@@ -837,6 +837,72 @@ function paintIconBox(g: G): void {
   g.fillRoundedRect(4, 22, 88, 18, 6);
 }
 
+/** The Bake station's oven, front view: a steel box, a window (the pan shows through it, drawn in code) and knobs. */
+function paintOven(g: G): void {
+  g.fillStyle(0x000000, 0.25);
+  g.fillRoundedRect(10, 16, 420, 300, 26);
+  g.fillStyle(0xcfd3d6);
+  g.fillRoundedRect(0, 0, 420, 300, 26);
+  g.lineStyle(7, COLORS.ink);
+  g.strokeRoundedRect(4, 4, 412, 292, 24);
+  // Window: ≈ (40, 60) to (380, 250).
+  g.fillStyle(0x2b2522);
+  g.fillRoundedRect(40, 60, 340, 190, 18);
+  g.lineStyle(5, COLORS.ink);
+  g.strokeRoundedRect(40, 60, 340, 190, 18);
+  // Handle.
+  g.fillStyle(0x8f969b);
+  g.fillRoundedRect(70, 22, 280, 20, 10);
+  g.strokeRoundedRect(70, 22, 280, 20, 10);
+  g.fillStyle(COLORS.ink);
+  for (const x of [380, 400]) g.fillCircle(x, 32, 7);
+}
+
+/** The rice cooker, front view (white, with a pink stripe). Its lid is the top 70 px. */
+function paintRiceCooker(g: G): void {
+  g.fillStyle(0x000000, 0.25);
+  g.fillEllipse(155, 248, 280, 30);
+  g.fillStyle(0xfffaf0);
+  g.fillRoundedRect(20, 70, 270, 170, 40);
+  g.lineStyle(6, COLORS.ink);
+  g.strokeRoundedRect(20, 70, 270, 170, 40);
+  g.fillStyle(0xf2efe8);
+  g.fillEllipse(155, 72, 270, 70);
+  g.strokeEllipse(155, 72, 270, 70);
+  g.fillStyle(COLORS.ink);
+  g.fillRoundedRect(130, 30, 50, 22, 10);
+  g.fillStyle(COLORS.pink);
+  g.fillRect(24, 150, 262, 18);
+  g.fillStyle(0x2b2522);
+  g.fillRoundedRect(110, 180, 90, 40, 10);
+}
+
+/** A sheet of nori (it's dragged onto the onigiri). */
+function paintNori(g: G): void {
+  g.fillStyle(0x1f2a1c);
+  g.fillRoundedRect(0, 0, 120, 150, 8);
+  g.lineStyle(4, COLORS.ink);
+  g.strokeRoundedRect(2, 2, 116, 146, 8);
+  g.lineStyle(3, 0x34452e);
+  for (let y = 22; y < 150; y += 26) g.lineBetween(8, y, 112, y);
+}
+
+function paintIconBake(g: G): void {
+  g.fillStyle(COLORS.cream);
+  g.fillRoundedRect(8, 14, 80, 70, 10);
+  g.fillStyle(COLORS.tabBar);
+  g.fillRoundedRect(18, 32, 60, 40, 8);
+  g.fillStyle(COLORS.cream);
+  g.fillEllipse(48, 54, 40, 18);
+}
+
+function paintIconRice(g: G): void {
+  g.fillStyle(COLORS.cream);
+  g.fillTriangle(48, 10, 10, 82, 86, 82);
+  g.fillStyle(COLORS.tabBar);
+  g.fillRect(32, 58, 32, 24);
+}
+
 const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.Logo]: { width: 512, height: 512, paint: paintLogoFallback },
   [TextureKeys.Truck]: { width: TRUCK_SPEC.width, height: TRUCK_SPEC.height, paint: paintTruck },
@@ -878,6 +944,11 @@ const SPECS: Record<TextureKey, PlaceholderSpec> = {
   [TextureKeys.IconGlaze]: { width: 96, height: 96, paint: paintIconGlaze },
   [TextureKeys.IconToppings]: { width: 96, height: 96, paint: paintIconToppings },
   [TextureKeys.IconBox]: { width: 96, height: 96, paint: paintIconBox },
+  [TextureKeys.Oven]: { width: 430, height: 316, paint: paintOven },
+  [TextureKeys.RiceCooker]: { width: 310, height: 264, paint: paintRiceCooker },
+  [TextureKeys.Nori]: { width: 120, height: 150, paint: paintNori },
+  [TextureKeys.IconBake]: { width: 96, height: 96, paint: paintIconBake },
+  [TextureKeys.IconRice]: { width: 96, height: 96, paint: paintIconRice },
 };
 
 const ALL_KEYS = Object.keys(SPECS) as TextureKey[];

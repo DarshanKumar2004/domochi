@@ -37,6 +37,11 @@ export const TextureKeys = {
   IconGlaze: 'icon-glaze',
   IconToppings: 'icon-toppings',
   IconBox: 'icon-box',
+  Oven: 'oven',
+  RiceCooker: 'rice-cooker',
+  Nori: 'nori',
+  IconBake: 'icon-bake',
+  IconRice: 'icon-rice',
 } as const;
 
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];

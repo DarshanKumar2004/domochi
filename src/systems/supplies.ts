@@ -3,7 +3,8 @@
 import type { DoughBalance } from '../stations/dough';
 import type { ThanksTier } from './customers';
 
-export type SupplyKind = 'ingredient' | 'box' | 'oil' | 'glaze' | 'topping';
+/** 'kitchen': the Bake and Rice stations' supplies (kolache dough, rice, nori, fillings, their toppings). */
+export type SupplyKind = 'ingredient' | 'box' | 'oil' | 'glaze' | 'topping' | 'kitchen';
 
 export interface SupplyItem {
   /** An ingredient id (balance.dough), 'box-' + a menu box id, or 'oil'. */
@@ -57,6 +58,14 @@ export interface GuideItem {
 }
 
 export type Stock = Record<string, number>;
+
+/** The stock id of a kolache or onigiri filling, and of their toppings. */
+export function fillingStockId(fillingId: string): string {
+  return `filling-${fillingId}`;
+}
+export function sideToppingStockId(toppingId: string): string {
+  return `side-topping-${toppingId}`;
+}
 
 /** The stock id of a box. */
 export function boxStockId(boxId: string): string {

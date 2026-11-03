@@ -494,6 +494,142 @@
         "pack": 12,
         "price": 3,
         "unlockDay": 45
+      },
+      {
+        "id": "kolache-dough",
+        "name": "kolache dough balls",
+        "kind": "kitchen",
+        "pack": 12,
+        "price": 4,
+        "unlockDay": 6
+      },
+      {
+        "id": "filling-sausage-cheese",
+        "name": "sausage & cheese",
+        "kind": "kitchen",
+        "pack": 12,
+        "price": 5,
+        "unlockDay": 6
+      },
+      {
+        "id": "filling-cream-cheese",
+        "name": "strawberry cream cheese",
+        "kind": "kitchen",
+        "pack": 12,
+        "price": 4,
+        "unlockDay": 21
+      },
+      {
+        "id": "side-topping-posipka",
+        "name": "posipka crumble",
+        "kind": "kitchen",
+        "pack": 48,
+        "price": 2,
+        "unlockDay": 21
+      },
+      {
+        "id": "filling-boudin",
+        "name": "boudin",
+        "kind": "kitchen",
+        "pack": 12,
+        "price": 6,
+        "unlockDay": 40
+      },
+      {
+        "id": "side-topping-jalapeno",
+        "name": "jalapeño slices",
+        "kind": "kitchen",
+        "pack": 36,
+        "price": 2,
+        "unlockDay": 40
+      },
+      {
+        "id": "box-kolache-bag",
+        "name": "kolache bags",
+        "kind": "box",
+        "pack": 10,
+        "price": 1.5,
+        "unlockDay": 6
+      },
+      {
+        "id": "box-kolache-box",
+        "name": "kolache boxes",
+        "kind": "box",
+        "pack": 6,
+        "price": 3,
+        "unlockDay": 6
+      },
+      {
+        "id": "rice",
+        "name": "rice (a pot each)",
+        "kind": "kitchen",
+        "pack": 4,
+        "price": 4,
+        "unlockDay": 10
+      },
+      {
+        "id": "nori",
+        "name": "nori sheets",
+        "kind": "kitchen",
+        "pack": 20,
+        "price": 3,
+        "unlockDay": 10
+      },
+      {
+        "id": "filling-salmon",
+        "name": "salmon",
+        "kind": "kitchen",
+        "pack": 12,
+        "price": 6,
+        "unlockDay": 10
+      },
+      {
+        "id": "filling-tuna-mayo",
+        "name": "tuna mayo",
+        "kind": "kitchen",
+        "pack": 12,
+        "price": 5,
+        "unlockDay": 26
+      },
+      {
+        "id": "side-topping-furikake",
+        "name": "furikake",
+        "kind": "kitchen",
+        "pack": 60,
+        "price": 2,
+        "unlockDay": 26
+      },
+      {
+        "id": "filling-teriyaki-chicken",
+        "name": "teriyaki chicken",
+        "kind": "kitchen",
+        "pack": 12,
+        "price": 6,
+        "unlockDay": 50
+      },
+      {
+        "id": "side-topping-sesame",
+        "name": "sesame seeds",
+        "kind": "kitchen",
+        "pack": 60,
+        "price": 2,
+        "unlockDay": 50
+      },
+      {
+        "id": "box-onigiri-pack",
+        "name": "onigiri packs",
+        "kind": "box",
+        "pack": 10,
+        "price": 1.5,
+        "unlockDay": 10
+      },
+      {
+        "id": "box-onigiri-tray",
+        "name": "onigiri trays",
+        "kind": "box",
+        "pack": 6,
+        "price": 3,
+        "unlockDay": 10
       }
     ],
     "start": {
@@ -728,6 +864,166 @@
       "great": 12,
       "stars": 8,
       "tidy": 3
+    }
+  },
+  "sides": {
+    "_note": "Kolaches and onigiri ride along with donut orders: once a kind is on the menu, an order gets some with this chance (count in range). Pickup orders get them pickupFactor × as often. Each kind goes in its own box (menu.json sides boxes, the smallest that fits). The order score mixes the donut part with each side's score by how many items each is.",
+    "kolache": {
+      "chance": 0.4,
+      "count": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    "onigiri": {
+      "chance": 0.4,
+      "count": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    "pickupFactor": 0.5,
+    "starterKit": {
+      "_note": "The first day a kind is on the menu, a starter kit of its supplies arrives (once per game).",
+      "kolache": {
+        "kolache-dough": 12,
+        "filling-sausage-cheese": 12,
+        "box-kolache-bag": 10,
+        "box-kolache-box": 4
+      },
+      "onigiri": {
+        "rice": 3,
+        "nori": 20,
+        "filling-salmon": 12,
+        "box-onigiri-pack": 10,
+        "box-onigiri-tray": 4
+      }
+    },
+    "napkinFactor": 0.85
+  },
+  "bake": {
+    "_note": "Bake station (kolaches). Hold-to-add amounts grow perSec while held (1 = just right): full marks inside ideal, 0 at zeroAt beyond. Proof rises perSec on the pan until it goes in the oven. Wash: one brush stroke across a kolache adds about 0.5. Oven like the fryer: the temperature eases to the dial (heatLagPerSec), cook rate 0 at zeroAtF and 1 at oneAtF, golden after secondsToGolden at rate 1; burntAt and it's thrown out. Score: weighted parts; temperature only counts as far as it came out golden; the wrong filling is 0.",
+    "panSize": 6,
+    "rackCapacity": 6,
+    "proof": {
+      "perSec": 0.07,
+      "ideal": {
+        "min": 0.8,
+        "max": 1.3
+      },
+      "zeroAt": 0.8
+    },
+    "fill": {
+      "perSec": 0.55,
+      "max": 2,
+      "ideal": {
+        "min": 0.85,
+        "max": 1.2
+      },
+      "zeroAt": 0.6
+    },
+    "shape": {
+      "perSec": 0.6,
+      "max": 2,
+      "ideal": {
+        "min": 0.85,
+        "max": 1.2
+      },
+      "zeroAt": 0.6
+    },
+    "wash": {
+      "max": 2,
+      "ideal": {
+        "min": 0.7,
+        "max": 1.3
+      },
+      "zeroAt": 0.7
+    },
+    "oven": {
+      "startTempF": 300,
+      "startTargetF": 375,
+      "dial": {
+        "minF": 300,
+        "maxF": 450
+      },
+      "heatLagPerSec": 0.15,
+      "idealRangeF": {
+        "min": 360,
+        "max": 390
+      },
+      "cookRate": {
+        "zeroAtF": 250,
+        "oneAtF": 375,
+        "max": 1.8
+      },
+      "secondsToGolden": 16,
+      "doorCoolF": 15,
+      "doneness": {
+        "perfectWithin": 0.1,
+        "zeroAt": 0.6
+      },
+      "burntAt": 1.75
+    },
+    "unwantedFactor": 0.6,
+    "weights": {
+      "fill": 0.15,
+      "shape": 0.15,
+      "toppings": 0.1,
+      "proof": 0.15,
+      "wash": 0.1,
+      "bake": 0.25,
+      "temperature": 0.1
+    }
+  },
+  "rice": {
+    "_note": "Rice station (onigiri). A pot takes cookSec and makes portions onigiri; its quality comes from the water level (1 inside ideal, qualityFloor at zeroAt beyond). Scoop: hold the paddle (1 = just right). Filling: distance from the middle, 0 centre to 1 edge. Press: count presses, each held idealSec; extras × extraFactor each. Nori: off-centre 0 to 1. The wrong filling is 0.",
+    "cooker": {
+      "cookSec": 20,
+      "portions": 6,
+      "water": {
+        "ideal": {
+          "min": 0.45,
+          "max": 0.58
+        },
+        "zeroAt": 0.35
+      },
+      "qualityFloor": 0.4
+    },
+    "scoop": {
+      "perSec": 0.6,
+      "max": 2,
+      "ideal": {
+        "min": 0.85,
+        "max": 1.2
+      },
+      "zeroAt": 0.6
+    },
+    "fill": {
+      "perfectWithin": 0.15,
+      "zeroAt": 0.8
+    },
+    "press": {
+      "count": 3,
+      "idealSec": {
+        "min": 0.2,
+        "max": 0.7
+      },
+      "zeroAt": 0.6,
+      "extraFactor": 0.85
+    },
+    "nori": {
+      "perfectWithin": 0.1,
+      "zeroAt": 0.6
+    },
+    "trayCapacity": 6,
+    "unwantedFactor": 0.6,
+    "weights": {
+      "rice": 0.2,
+      "quality": 0.15,
+      "filling": 0.15,
+      "shape": 0.25,
+      "toppings": 0.1,
+      "nori": 0.15
     }
   }
 }

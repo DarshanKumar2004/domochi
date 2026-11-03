@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameSession, Ticket } from '../systems/GameSession';
 import type { Menu } from '../systems/menu';
 import { addDonutIcon } from './DonutIcon';
+import { makeSideIcon } from './sideArt';
 import type { Viewport } from './layout';
 import { COLORS, CSS, FONT_FAMILY } from './theme';
 import { clockText } from '../systems/supplies';
@@ -142,7 +143,11 @@ export class TicketRail extends Phaser.GameObjects.Container {
       );
     }
     // Up to 6 mini donuts, 3 per row, sized to fit inside the ticket (a short landscape rail too).
-    const shown = t.order.flavors.slice(0, 6);
+    // Kolaches and onigiri get their spots first (they're easy to forget), donuts fill the rest.
+    const sides = [...(t.order.kolaches ?? []).map((id) => ['kolache', id] as const), ...(t.order.onigiri ?? []).map((id) => ['onigiri', id] as const)];
+    const donuts = t.order.flavors.slice(0, Math.max(1, 6 - sides.length));
+    const extra = sides.slice(0, 6 - donuts.length);
+    const shown = [...donuts, ...extra];
     const rows = shown.length > 3 ? 2 : 1;
     const top = 46;
     const gap = 3;
@@ -151,7 +156,8 @@ export class TicketRail extends Phaser.GameObjects.Container {
     shown.forEach((f, i) => {
       const ix = left + (i % 3) * (size + gap);
       const iy = top + size / 2 + Math.floor(i / 3) * (size + gap);
-      c.add(addDonutIcon(this.scene, ix, iy, size, f, this.menu));
+      if (typeof f === 'string') c.add(addDonutIcon(this.scene, ix, iy, size, f, this.menu));
+      else c.add(makeSideIcon(this.scene, ix, iy, size * 1.1, f[0], f[1], this.menu));
     });
 
     const hit = new Phaser.GameObjects.Zone(this.scene, 0, 0, TICKET_W, h)

@@ -1,5 +1,6 @@
 // Menu types and validation. Content lives in src/data/menu.json so the real
 // domochi menu can change without code changes.
+import { validateSides, type SidesMenu } from '../stations/sides';
 
 export type GlazeStyle = 'dip' | 'drizzle' | 'dust';
 
@@ -73,6 +74,8 @@ export interface Menu {
   toppings: Topping[];
   flavors: Flavor[];
   boxes: BoxSize[];
+  /** Kolaches and onigiri (each with its own fillings, toppings and boxes). */
+  sides?: SidesMenu;
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -146,6 +149,7 @@ export function validateMenu(menu: Menu): string[] {
     if (!Number.isInteger(b.size) || b.size < 1) errors.push(`box "${b.id}" size must be an integer >= 1`);
   }
   if (!menu.flavors.some((f) => f.unlockDay === 1)) errors.push('no flavor is unlocked on day 1');
+  if (menu.sides) errors.push(...validateSides(menu.sides));
   return errors;
 }
 

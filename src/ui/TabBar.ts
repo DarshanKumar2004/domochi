@@ -64,8 +64,11 @@ export class TabBar extends Phaser.GameObjects.Container {
     this.bg.fillStyle(COLORS.pink);
     this.bg.fillRect(0, 0, v.width, 6);
 
+    // Eight tabs on a phone held upright: smaller labels so "Toppings" fits.
+    const font = this.tabWidth < 150 ? 28 : this.tabWidth < 175 ? 32 : 38;
     this.views.forEach((view, i) => {
       const x = this.firstTabX + this.tabWidth * i;
+      view.label.setFontSize(font);
       view.icon.setPosition(x + this.tabWidth / 2, h * 0.39);
       view.label.setPosition(x + this.tabWidth / 2, h * 0.78);
       view.hit.setPosition(x, 0).setSize(this.tabWidth, h);

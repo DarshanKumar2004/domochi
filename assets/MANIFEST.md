@@ -51,6 +51,12 @@ Any key without a real file falls back to a placeholder drawn in code (`src/asse
 | `icon-glaze` | `public/assets/icons/glaze.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
 | `icon-toppings` | `public/assets/icons/toppings.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
 | `icon-box` | `public/assets/icons/box.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon. |
+| `icon-bake` | `public/assets/icons/bake.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon (Bake station, kolaches). |
+| `icon-rice` | `public/assets/icons/rice.png` | 96×96 | 1 | Placeholder (code) | Tab bar icon (Rice station, onigiri). |
+| `oven` | `public/assets/oven.png` | 430×316 | 1 | Placeholder (code) | Bake station oven, front view. The window is ≈ (40, 60) to (380, 250): the pan of kolaches is drawn through it in code while it bakes. |
+| `rice-cooker` | `public/assets/rice-cooker.png` | 310×264 | 1 | Placeholder (code) | Rice station rice cooker, front view; the lid is the top ≈ 70 px. Steam and the water line are drawn in code. |
+| `nori` | `public/assets/nori.png` | 120×150 | 1 | Placeholder (code) | A sheet of nori at the Rice station: dragged onto the onigiri to wrap it. |
+| (kolaches, onigiri) | (code only) | — | — | Placeholder (code) | Drawn from their state by `ui/sideArt.ts` (dough rising and browning, filling, pinched seam or pressed well, toppings; rice mound turning into a triangle, filling, nori band). Keep them code-drawn, or swap in sprites per stage. |
 
 ## Web icons (not game textures)
 

@@ -52,7 +52,7 @@ Keep dependencies minimal. Ask before adding any new library.
 
 ```
 Boot → Preload (truck + Ethan waving) → [first run?] Tutorial → Lobby
-Lobby → Order → Lobby → Fry → Glaze → Toppings → Box → Serve → Lobby …
+Lobby → Order → Lobby → Fry → Glaze → Toppings → (Bake, Rice) → Box → Serve → Lobby …
 ```
 
 The player can switch between Lobby and the kitchen stations using a bottom tab bar, the same as in Papa's games. Multiple orders can be in progress at once, tracked on order tickets.
@@ -76,7 +76,8 @@ The player can switch between Lobby and the kitchen stations using a bottom tab 
    - **Score:** correct toppings, correct amount, and distribution evenness.
 7. **BoxScene.** The player drags the finished donuts into box slots in the ticket's order, then closes the lid.
    - **Score:** correct items in the box and no wrong extras.
-8. **ServeScene.** Cuts back to the Lobby. The player hands the box to the matching customer, who reacts with a line of dialogue and leaves a **tip** based on overall quality. The result card shows each station's score.
+8. **BakeScene / RiceScene** (added 2026-11-03). Kolaches and onigiri, new at domochi, unlock later (menu.json `sides`). Bake: dough on a pan, filling, fold or press, topping, egg wash, proofing, then the oven. Rice: cook a pot, scoop, fill, press, season, nori. Each kind is packed in its own box at its station and goes out with the donut box. See DECISIONS.md.
+9. **ServeScene.** Cuts back to the Lobby. The player hands the box to the matching customer, who reacts with a line of dialogue and leaves a **tip** based on overall quality. The result card shows each station's score.
 
 ---
 

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { audio, balance, menu, save, stickers } from '../systems/services';
 import { flavorsForDay } from '../systems/menu';
-import { fillStock, glazeStockId, priceOn, shopNeeds, shoppingPlan, toppingStockId, type ShopPick, type SupplyItem } from '../systems/supplies';
+import { boxStockId, fillingStockId, fillStock, glazeStockId, priceOn, shopNeeds, shoppingPlan, sideToppingStockId, toppingStockId, type ShopPick, type SupplyItem } from '../systems/supplies';
+import { SIDE_KINDS, sideItemsForDay } from '../stations/sides';
 import { TextureKeys } from '../assets/keys';
 import type { DecorItem } from '../systems/balance';
 import type { Hire } from '../systems/staff';
@@ -65,6 +66,7 @@ const SECTIONS: { title: string; kinds: SupplyItem['kind'][]; accent: number }[]
   { title: 'dough & oil', kinds: ['ingredient', 'oil'], accent: 0xe9c48f },
   { title: 'boxes', kinds: ['box'], accent: 0xd8b58a },
   { title: 'glazes & toppings', kinds: ['glaze', 'topping'], accent: 0xf4a6c0 },
+  { title: 'kolaches & onigiri', kinds: ['kitchen'], accent: 0xb8d4c8 },
 ];
 const ACCENT = { guides: 0xc9b8ec, decor: 0xa8d8a0, crew: 0xa8c8ec } as const;
 
@@ -74,6 +76,13 @@ function supplyIcon(it: SupplyItem): Look['icon'] {
   if (ing) return { key: TextureKeys.IngredientBin, tint: hexToNumber(ing.color) };
   if (it.kind === 'oil') return { key: TextureKeys.IngredientBin, tint: 0xf2c14e };
   if (it.kind === 'box') return { key: TextureKeys.DonutBox };
+  if (it.kind === 'kitchen') {
+    if (it.id === 'rice') return { key: TextureKeys.RiceCooker };
+    if (it.id === 'nori') return { key: TextureKeys.Nori };
+    if (it.id === 'kolache-dough') return { key: TextureKeys.IngredientBin, tint: 0xf6e3c0 };
+    const fill = [...(menu.sides?.kolache.fillings ?? []), ...(menu.sides?.onigiri.fillings ?? [])].find((f) => fillingStockId(f.id) === it.id);
+    if (fill) return { key: TextureKeys.IngredientBin, tint: hexToNumber(fill.color) };
+  }
   if (it.kind === 'glaze') {
     const g = menu.glazes.find((x) => glazeStockId(x.id) === it.id);
     return { key: TextureKeys.GlazeCup, ...(g ? { tint: hexToNumber(g.color) } : {}) };
@@ -480,6 +489,18 @@ export class StoreScene extends Phaser.Scene {
       if (f.glaze) onMenu.add(glazeStockId(f.glaze));
       if (f.drizzle) onMenu.add(glazeStockId(f.drizzle));
       for (const tp of f.toppings ?? []) onMenu.add(toppingStockId(tp));
+    }
+    // Kolaches and onigiri on the menu: their dough or rice, fillings, toppings and boxes.
+    for (const kind of SIDE_KINDS) {
+      const m = menu.sides?.[kind];
+      const items = sideItemsForDay(m, day);
+      if (!m || !items.length) continue;
+      for (const id of kind === 'kolache' ? ['kolache-dough'] : ['rice', 'nori']) onMenu.add(id);
+      for (const it of items) {
+        onMenu.add(fillingStockId(it.filling));
+        for (const t of it.toppings) onMenu.add(sideToppingStockId(t));
+      }
+      for (const b of m.boxes) onMenu.add(boxStockId(b.id));
     }
     const needs = shopNeeds(balance.supplies, balance.dough.recipe, onMenu, day);
     const priceOf = (id: string) => {

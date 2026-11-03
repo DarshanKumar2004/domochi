@@ -11,6 +11,8 @@ export const SceneKeys = {
   Fry: 'FryScene',
   Glaze: 'GlazeScene',
   Toppings: 'ToppingsScene',
+  Bake: 'BakeScene',
+  Rice: 'RiceScene',
   Box: 'BoxScene',
   Serve: 'ServeScene',
   Settings: 'SettingsScene',

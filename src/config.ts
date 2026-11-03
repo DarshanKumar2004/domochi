@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { BoxScene } from './scenes/BoxScene';
+import { BakeScene } from './scenes/BakeScene';
+import { RiceScene } from './scenes/RiceScene';
 import { DaySummaryScene } from './scenes/DaySummaryScene';
 import { DoughScene } from './scenes/DoughScene';
 import { InviteScene } from './scenes/InviteScene';
@@ -50,6 +52,8 @@ export function createGameConfig(width: number, height: number): Phaser.Types.Co
       FryScene,
       GlazeScene,
       ToppingsScene,
+      BakeScene,
+      RiceScene,
       BoxScene,
       HudScene,
       OrderScene,

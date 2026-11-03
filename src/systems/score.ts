@@ -78,18 +78,35 @@ const TIERS: ThanksTier[] = ['bad', 'okay', 'good', 'great'];
  * tip. Gift donuts don't change the score, but the customer likes you more
  * (their reaction goes up a level) and tips extra.
  */
-export function scoreOrder(stations: StationScores, waitSec: number, patienceSec: number, donuts: number, b: ScoringBalance, gifts = 0): OrderScore {
+export function scoreOrder(
+  stations: StationScores,
+  waitSec: number,
+  patienceSec: number,
+  donuts: number,
+  b: ScoringBalance,
+  gifts = 0,
+  /** Kolaches and onigiri: each kind's score (0–100) and how many were ordered. */
+  sides: readonly { score: number; count: number }[] = [],
+): OrderScore {
   const wait = waitScore(waitSec, patienceSec, b);
   const w = b.weights;
-  const sum = w.fry + w.glaze + w.toppings + w.box + w.wait;
-  const total = Math.round(
-    clamp((stations.fry * w.fry + stations.glaze * w.glaze + stations.toppings * w.toppings + stations.box * w.box + wait * w.wait) / sum, 0, 100),
-  );
+  const making = w.fry + w.glaze + w.toppings + w.box;
+  const sum = making + w.wait;
+  // The donuts' part, then mixed with the sides by how many items each is.
+  let quality = making > 0 ? (stations.fry * w.fry + stations.glaze * w.glaze + stations.toppings * w.toppings + stations.box * w.box) / making : 0;
+  let items = donuts;
+  let sideSum = 0;
+  for (const sd of sides) {
+    items += sd.count;
+    sideSum += sd.score * sd.count;
+  }
+  if (items > donuts) quality = (quality * donuts + sideSum) / items;
+  const total = Math.round(clamp((quality * making + wait * w.wait) / sum, 0, 100));
   const counted = Math.min(Math.max(0, gifts), b.gift.max);
   const giftTip = Math.round(counted * b.gift.tipPerDonut * 100) / 100;
   let tier = tierFor(total, b);
   if (counted > 0) tier = TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(tier) + b.gift.tierBoost)]!;
-  return { ...stations, wait, total, tier, tip: Math.round((tipFor(total, donuts, b) + giftTip) * 100) / 100, gifts, giftTip };
+  return { ...stations, wait, total, tier, tip: Math.round((tipFor(total, items, b) + giftTip) * 100) / 100, gifts, giftTip };
 }
 
 /** Problems with the scoring numbers (empty = fine). */

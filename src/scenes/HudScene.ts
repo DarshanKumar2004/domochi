@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Pill } from '../ui/Pill';
 import { TextureKeys } from '../assets/keys';
 import { TabBar } from '../ui/TabBar';
-import { STATION_TABS, type StationKey } from '../ui/tabs';
+import { visibleTabs, type StationKey } from '../ui/tabs';
 import { TicketRail } from '../ui/TicketRail';
 import { CSS, FONT_FAMILY, COLORS } from '../ui/theme';
 import { onLayout } from '../ui/viewport';
@@ -36,7 +36,9 @@ export class HudScene extends Phaser.Scene {
   create(): void {
     this.toastQueue = [];
     this.current = SceneKeys.Lobby;
-    this.tabBar = new TabBar(this, STATION_TABS, (key) => this.goTo(key));
+    // Bake and Rice only once kolaches / onigiri are on the menu (and not in the tutorial).
+    const tabs = visibleTabs((k) => !session().isTutorial && session().sideOnMenu(k));
+    this.tabBar = new TabBar(this, tabs, (key) => this.goTo(key));
     this.tabBar.selectTab(this.current);
     this.rail = new TicketRail(
       this,

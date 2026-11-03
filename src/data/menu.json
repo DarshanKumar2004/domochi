@@ -428,5 +428,198 @@
       "price": 30,
       "description": "a full dozen mochi donuts, and you pick every flavor."
     }
-  ]
+  ],
+  "sides": {
+    "_note": "TODO-BRAND: kolaches and onigiri are new at domochi (Kumar, 2026-11-03) and not on the store yet. Names, descriptions and prices are placeholders: swap in the real ones when they're on domochitreats.com. Game-only: filling style, colours, topping amounts, boxes and unlockDay.",
+    "kolache": {
+      "fillings": [
+        {
+          "id": "sausage-cheese",
+          "name": "sausage & cheese",
+          "color": "#b0563a",
+          "accent": "#f2c14e",
+          "style": "wrap"
+        },
+        {
+          "id": "cream-cheese",
+          "name": "strawberry cream cheese",
+          "color": "#f7ecd8",
+          "accent": "#d2414f",
+          "style": "well"
+        },
+        {
+          "id": "boudin",
+          "name": "boudin",
+          "color": "#8a5d3f",
+          "accent": "#6f8f3a",
+          "style": "wrap"
+        }
+      ],
+      "toppings": [
+        {
+          "id": "posipka",
+          "name": "posipka crumble",
+          "colors": [
+            "#f3dfb2",
+            "#e8cc92",
+            "#fbecc8"
+          ],
+          "amount": {
+            "min": 4,
+            "max": 8
+          }
+        },
+        {
+          "id": "jalapeno",
+          "name": "jalapeño",
+          "colors": [
+            "#4f9a3a",
+            "#6db34f"
+          ],
+          "amount": {
+            "min": 2,
+            "max": 4
+          }
+        }
+      ],
+      "items": [
+        {
+          "id": "sausage-kolache",
+          "name": "sausage & cheese kolache",
+          "price": 3.5,
+          "description": "TODO-BRAND: soft, sweet dough wrapped round smoked sausage and melty cheese.",
+          "filling": "sausage-cheese",
+          "toppings": [],
+          "unlockDay": 6
+        },
+        {
+          "id": "strawberry-cream-kolache",
+          "name": "strawberry cream cheese kolache",
+          "price": 3.25,
+          "description": "TODO-BRAND: a pillowy bun with a sweet cream cheese and strawberry centre, posipka on top.",
+          "filling": "cream-cheese",
+          "toppings": [
+            "posipka"
+          ],
+          "unlockDay": 21
+        },
+        {
+          "id": "boudin-kolache",
+          "name": "boudin kolache",
+          "price": 4,
+          "description": "TODO-BRAND: lafayette's favourite, boudin baked in kolache dough with a little jalapeño.",
+          "filling": "boudin",
+          "toppings": [
+            "jalapeno"
+          ],
+          "unlockDay": 40
+        }
+      ],
+      "boxes": [
+        {
+          "id": "kolache-bag",
+          "name": "kolache bag",
+          "size": 2
+        },
+        {
+          "id": "kolache-box",
+          "name": "kolache box",
+          "size": 6
+        }
+      ]
+    },
+    "onigiri": {
+      "fillings": [
+        {
+          "id": "salmon",
+          "name": "salmon",
+          "color": "#ef8a62"
+        },
+        {
+          "id": "tuna-mayo",
+          "name": "tuna mayo",
+          "color": "#efe2c4",
+          "accent": "#c9b48a"
+        },
+        {
+          "id": "teriyaki-chicken",
+          "name": "teriyaki chicken",
+          "color": "#8e4a22",
+          "accent": "#c9772f"
+        }
+      ],
+      "toppings": [
+        {
+          "id": "furikake",
+          "name": "furikake",
+          "colors": [
+            "#2f4a26",
+            "#c9a64a",
+            "#e9dfc2"
+          ],
+          "amount": {
+            "min": 3,
+            "max": 7
+          }
+        },
+        {
+          "id": "sesame",
+          "name": "sesame seeds",
+          "colors": [
+            "#f4ead2",
+            "#2b2522"
+          ],
+          "amount": {
+            "min": 3,
+            "max": 7
+          }
+        }
+      ],
+      "items": [
+        {
+          "id": "salmon-onigiri",
+          "name": "salmon onigiri",
+          "price": 4,
+          "description": "TODO-BRAND: a warm rice triangle with flaked salmon inside, wrapped in crisp nori.",
+          "filling": "salmon",
+          "toppings": [],
+          "unlockDay": 10
+        },
+        {
+          "id": "tuna-mayo-onigiri",
+          "name": "tuna mayo onigiri",
+          "price": 3.75,
+          "description": "TODO-BRAND: creamy tuna mayo in the middle, furikake on the outside.",
+          "filling": "tuna-mayo",
+          "toppings": [
+            "furikake"
+          ],
+          "unlockDay": 26
+        },
+        {
+          "id": "teriyaki-onigiri",
+          "name": "teriyaki chicken onigiri",
+          "price": 4.25,
+          "description": "TODO-BRAND: sweet-savory teriyaki chicken, a sprinkle of sesame.",
+          "filling": "teriyaki-chicken",
+          "toppings": [
+            "sesame"
+          ],
+          "unlockDay": 50
+        }
+      ],
+      "boxes": [
+        {
+          "id": "onigiri-pack",
+          "name": "onigiri pack",
+          "size": 2
+        },
+        {
+          "id": "onigiri-tray",
+          "name": "onigiri tray",
+          "size": 6
+        }
+      ]
+    }
+  }
 }

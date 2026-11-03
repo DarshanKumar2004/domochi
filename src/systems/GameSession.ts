@@ -20,6 +20,11 @@ import { scoreOrder, waitScore, type OrderScore } from './score';
 import { boxStockId, doughCostPerDonut, errandFor, paymentFor, priceOn, unitCost, type Errand, type Stock } from './supplies';
 import type { WeatherType } from './weather';
 import type { Rng } from './rng';
+import { Bakery, kolacheScore, type Kolache } from '../stations/kolache';
+import { RiceStation, onigiriScore, type Onigiri } from '../stations/onigiri';
+import { identifySide, matchSides, SIDE_KINDS, sideBoxFor, sideItemsForDay, type SideKind } from '../stations/sides';
+import { fillingStockId, sideToppingStockId } from './supplies';
+import { sidesOf } from './orders';
 
 export type CustomerState = 'inLine' | 'ordering' | 'waiting' | 'served';
 
@@ -80,6 +85,8 @@ export interface Ticket {
   packBoxId?: string;
   /** A morning pickup order. */
   delivery?: boolean;
+  /** Kolache and onigiri boxes packed and closed for this order (waiting to go out with the donuts). */
+  sidePacks?: { kolache?: Kolache[]; onigiri?: Onigiri[]; napkin?: SideKind[] };
   /** Filled in when the box is closed and served. */
   results: {
     fry?: FryResult;
@@ -103,6 +110,8 @@ export interface Ticket {
     funky?: number;
     /** A regular's friendship before and after this order. */
     regular?: { name: string; before: number; after: number };
+    /** Kolaches and onigiri: score (0–100), how many were ordered, and how many weren't in their box. */
+    sides?: Partial<Record<SideKind, { score: number; count: number; missing: number }>>;
   };
 }
 
@@ -196,6 +205,8 @@ export interface DaySnapshot {
   regularsToday: string[];
   fryer: { oil: number; temp: number; target: number };
   streak?: { count: number; best: number; specials: number; goalDone?: boolean };
+  oven?: { temp: number; target: number };
+  cooker?: { state: 'empty' | 'cooking' | 'ready'; left: number; portions: number; quality: number };
 }
 
 export interface SessionEvents extends Record<string, unknown> {
@@ -225,6 +236,10 @@ export interface SessionEvents extends Record<string, unknown> {
   errand: { name: string; line: string; errand: Errand };
   /** A regular who knows you ordered "the usual": straight onto the rail. */
   usual: { customerId: number; name: string; line: string };
+  /** Kolaches that burnt in the oven and were thrown out (pan spots). */
+  kolacheBurnt: { slots: number[] };
+  /** The rice cooker finished a pot. */
+  riceReady: { portions: number };
 }
 
 /** The glaze and toppings trays between days: mess left on them, and days they've sat dirty. */
@@ -349,6 +364,15 @@ export class GameSession {
   private readonly friendship: Record<string, number> | null;
   /** Regulars who've come today (once a day each). */
   private readonly regularsToday = new Set<string>();
+  /** The Bake station: sheet pan, oven and cooling rack (kolaches). */
+  readonly bakery: Bakery;
+  /** The Rice station: cooker, board and tray (onigiri). */
+  readonly riceStation: RiceStation;
+  /** A hold button being held at the Bake or Rice station (it works on the game clock, like the fryer). */
+  private bakeHold: { slot: number; what: 'fill' | 'shape' } | null = null;
+  private scooping = false;
+  /** The open kolache box and onigiri pack for the selected order. */
+  private readonly sideBox: { kolache: Kolache[]; onigiri: Onigiri[] } = { kolache: [], onigiri: [] };
 
   constructor(private readonly deps: SessionDeps) {
     this.day = deps.day;
@@ -364,6 +388,8 @@ export class GameSession {
     this.glazeMask = ringMask(deps.balance.glaze);
     this.boards = new Array<GlazeWork | null>(Math.max(1, deps.balance.glaze.boards ?? 1)).fill(null);
     this.topBoards = new Array<ToppingWork | null>(Math.max(1, deps.balance.toppings.boards ?? 1)).fill(null);
+    this.bakery = new Bakery(deps.balance.bake);
+    this.riceStation = new RiceStation(deps.balance.rice);
     this.dayPhase = deps.dayFlow ? 'prep' : 'open';
     this.doughLeft = deps.dayFlow || deps.trackDough ? 0 : Infinity;
     for (let i = 0; i < pickups; i++) this.addPickup();
@@ -387,6 +413,7 @@ export class GameSession {
     for (const w of this.topBoards) if (w) kitchen++;
     for (const w of this.boards) if (w) kitchen++;
     for (const d of this.boxSlots) if (d) kitchen++;
+    kitchen += this.sideKitchenCount;
     const finite = (n: number) => (Number.isFinite(n) ? n : null);
     return {
       v: 1,
@@ -423,6 +450,13 @@ export class GameSession {
       regularsToday: [...this.regularsToday],
       fryer: { oil: this.fryer.oil, temp: this.fryer.temp, target: this.fryer.target },
       streak: { count: this.streakCount, best: this.bestStreakCount, specials: this.specials, goalDone: this.goalDone },
+      oven: this.bakery.ovenState,
+      cooker: {
+        state: this.riceStation.cooker,
+        left: this.riceStation.cookLeft,
+        portions: this.riceStation.portions,
+        quality: this.riceStation.cooker === 'cooking' ? this.riceStation.potQuality : this.riceStation.quality,
+      },
     };
   }
 
@@ -471,6 +505,18 @@ export class GameSession {
     this.bestStreakCount = s.streak?.best ?? 0;
     this.specials = s.streak?.specials ?? 0;
     this.goalDone = s.streak?.goalDone ?? false;
+    if (s.oven) {
+      this.bakery.temp = s.oven.temp;
+      this.bakery.target = s.oven.target;
+    }
+    if (s.cooker) {
+      const r = this.riceStation;
+      r.cooker = s.cooker.state;
+      r.cookLeft = s.cooker.left;
+      r.portions = s.cooker.portions;
+      if (r.cooker === 'cooking') r.potQuality = s.cooker.quality;
+      else r.quality = s.cooker.quality;
+    }
     this.events.emit('changed', undefined);
   }
 
@@ -621,7 +667,10 @@ export class GameSession {
     if (!types.length) return;
     const type = rng.pick(types);
     const customer: Customer = { id: this.nextCustomerId++, typeId: type.id, state: 'waiting', arrivedAtMs: this.now, delivery: true };
-    const order = generateOrder(menu, this.day, orderSizeRange(balance.deliveries.size, type.orderSize), type.favorites, balance.favoriteWeight, rng);
+    const order = generateOrder(menu, this.day, orderSizeRange(balance.deliveries.size, type.orderSize), type.favorites, balance.favoriteWeight, rng, {
+      balance: balance.sides,
+      factor: balance.sides.pickupFactor,
+    });
     const ticket: Ticket = {
       no: this.nextTicketNo++,
       customerId: customer.id,
@@ -923,6 +972,25 @@ export class GameSession {
   tick(dtMs: number): void {
     this.now += dtMs;
     this.fryer.tick(dtMs / 1000);
+    this.bakery.tick(dtMs / 1000);
+    if (this.bakery.burnt.length) {
+      const slots = this.bakery.burnt.splice(0);
+      this.trashedCount += slots.length;
+      this.events.emit('kolacheBurnt', { slots });
+      this.events.emit('changed', undefined);
+    }
+    if (this.bakeHold) {
+      const h = this.bakeHold;
+      if (h.what === 'fill') this.bakery.addFill(h.slot, dtMs / 1000);
+      else this.bakery.addShape(h.slot, dtMs / 1000);
+    }
+    if (this.scooping) this.scoopRice(dtMs / 1000);
+    const wasCooking = this.riceStation.cooker === 'cooking';
+    this.riceStation.tick(dtMs / 1000);
+    if (wasCooking && this.riceStation.cooker === 'ready') {
+      this.events.emit('riceReady', { portions: this.riceStation.portions });
+      this.events.emit('changed', undefined);
+    }
     if (this.fryer.burnt.length) {
       const slots = this.fryer.burnt.splice(0);
       this.trashedCount += slots.length;
@@ -1056,6 +1124,7 @@ export class GameSession {
       if (t) t.status = 'served';
       n++;
     }
+    this.returnSideBoxes();
     this.activeNo = null;
     this.boxSlots.length = 0;
     this.events.emit('changed', undefined);
@@ -1255,10 +1324,10 @@ export class GameSession {
     const scripted = this.deps.script?.orders[this.nextTicketNo - 1];
     const reg = this.regularOf(front);
     const order = scripted
-      ? { flavors: [...scripted.flavors], boxId: scripted.boxId }
+      ? { ...scripted, flavors: [...scripted.flavors] }
       : reg
         ? { flavors: [...reg.usual], boxId: boxFor(menu, reg.usual.length).id }
-        : generateOrder(menu, this.day, size, this.special ? [...type.favorites, this.special] : type.favorites, balance.favoriteWeight, rng);
+        : generateOrder(menu, this.day, size, this.special ? [...type.favorites, this.special] : type.favorites, balance.favoriteWeight, rng, { balance: balance.sides });
     const ticket: Ticket = {
       no: this.nextTicketNo++,
       customerId,
@@ -1294,6 +1363,7 @@ export class GameSession {
   selectTicket(no: number): boolean {
     const t = this.ticket(no);
     if (!t || t.status !== 'open') return false;
+    if (this.activeNo !== no) this.returnSideBoxes();
     this.activeNo = no;
     this.fitBox();
     this.events.emit('changed', undefined);
@@ -1669,6 +1739,282 @@ export class GameSession {
     if (this.boxSlots.length > size) this.boxSlots.length = size;
   }
 
+  // ---- Kolaches (Bake station) --------------------------------------------------
+
+  /** Is this kind on today's menu? (Its station's tab shows from then on.) */
+  sideOnMenu(kind: SideKind): boolean {
+    return sideItemsForDay(this.deps.menu.sides?.[kind], this.day).length > 0;
+  }
+
+  /** A kolache dough ball onto the pan. -1 if the pan's full, it's in the oven, or you're out of dough. */
+  placeKolache(slot?: number): number {
+    if (this.stockOf('kolache-dough') < 1) return -1;
+    const at = this.bakery.placeDough(slot);
+    if (at < 0) return -1;
+    this.use('kolache-dough');
+    this.events.emit('changed', undefined);
+    return at;
+  }
+
+  /** Choose a raw kolache's filling: 'ok', 'none' (out of it) or 'no' (can't now). */
+  setKolacheFilling(slot: number, fillingId: string): 'ok' | 'none' | 'no' {
+    const k = this.bakery.pan[slot];
+    if (!k || this.bakery.inOven || k.baked > 0 || (k.filling !== null && k.fill > 0)) return 'no';
+    if (k.filling === fillingId) return 'ok';
+    if (this.stockOf(fillingStockId(fillingId)) < 1) return 'none';
+    if (!this.bakery.setFilling(slot, fillingId)) return 'no';
+    this.use(fillingStockId(fillingId));
+    this.events.emit('changed', undefined);
+    return 'ok';
+  }
+
+  /** A pinch of a topping on a raw kolache: 'ok', 'none' (out of it) or 'no'. */
+  addKolacheTopping(slot: number, toppingId: string): 'ok' | 'none' | 'no' {
+    const k = this.bakery.pan[slot];
+    if (!k || this.bakery.inOven || k.baked > 0) return 'no';
+    if (this.stockOf(sideToppingStockId(toppingId)) < 1) return 'none';
+    this.bakery.addTopping(slot, toppingId);
+    this.use(sideToppingStockId(toppingId));
+    this.events.emit('changed', undefined);
+    return 'ok';
+  }
+
+  /** Hold the spoon ('fill') or fold & pinch ('shape') on a kolache while held; null to let go. */
+  holdKolache(slot: number, what: 'fill' | 'shape' | null): void {
+    this.bakeHold = what === null ? null : { slot, what };
+  }
+
+  /** Hold the rice paddle (scooping while held). */
+  holdScoop(on: boolean): void {
+    this.scooping = on;
+  }
+
+  /** Throw a raw kolache away. */
+  trashKolache(slot: number): boolean {
+    const ok = this.bakery.trashPan(slot);
+    if (ok) this.trashed1();
+    return ok;
+  }
+
+  /** Into the oven / out onto the rack. */
+  ovenIn(): boolean {
+    const ok = this.bakery.ovenIn();
+    if (ok) this.events.emit('changed', undefined);
+    return ok;
+  }
+  ovenOut(): boolean {
+    const ok = this.bakery.ovenOut();
+    if (ok) this.events.emit('changed', undefined);
+    return ok;
+  }
+
+  trashRackKolache(index: number): boolean {
+    if (!this.bakery.takeRack(index)) return false;
+    this.trashed1();
+    return true;
+  }
+
+  // ---- Onigiri (Rice station) ---------------------------------------------------
+
+  /** Start a pot of rice (`water` 0–1): 'ok', 'none' (out of rice) or 'no' (the pot's busy). */
+  startRice(water: number): 'ok' | 'none' | 'no' {
+    const r = this.riceStation;
+    if (r.cooker === 'cooking' || r.portions > 0) return 'no';
+    if (this.stockOf('rice') < 1) return 'none';
+    if (!r.startCooker(water)) return 'no';
+    this.use('rice');
+    this.events.emit('changed', undefined);
+    return 'ok';
+  }
+
+  /** Scoop rice while the paddle is held. */
+  scoopRice(dtSec: number): boolean {
+    const had = !!this.riceStation.board;
+    const ok = this.riceStation.scoop(dtSec);
+    if (ok && !had) this.events.emit('changed', undefined);
+    return ok;
+  }
+
+  /** The filling into the rice, `offset` from the middle: 'ok', 'none' (out of it) or 'no'. */
+  setOnigiriFilling(fillingId: string, offset: number): 'ok' | 'none' | 'no' {
+    const o = this.riceStation.board;
+    if (!o || o.rice <= 0 || o.presses.length > 0) return 'no';
+    // Moving the same filling doesn't take another spoonful.
+    if (o.filling !== fillingId) {
+      if (this.stockOf(fillingStockId(fillingId)) < 1) return 'none';
+      this.use(fillingStockId(fillingId));
+    }
+    this.riceStation.setFilling(fillingId, offset);
+    this.events.emit('changed', undefined);
+    return 'ok';
+  }
+
+  pressOnigiri(sec: number): boolean {
+    const ok = this.riceStation.press(sec);
+    if (ok) this.events.emit('changed', undefined);
+    return ok;
+  }
+
+  addOnigiriTopping(toppingId: string): 'ok' | 'none' | 'no' {
+    const o = this.riceStation.board;
+    if (!o || o.rice <= 0) return 'no';
+    if (this.stockOf(sideToppingStockId(toppingId)) < 1) return 'none';
+    this.riceStation.addTopping(toppingId);
+    this.use(sideToppingStockId(toppingId));
+    this.events.emit('changed', undefined);
+    return 'ok';
+  }
+
+  /** Wrap the nori (`offset` 0–1 off-centre): 'ok', 'none' (out of nori) or 'no'. */
+  wrapNori(offset: number): 'ok' | 'none' | 'no' {
+    const o = this.riceStation.board;
+    if (!o || o.rice <= 0 || o.nori !== null) return 'no';
+    if (this.stockOf('nori') < 1) return 'none';
+    this.riceStation.wrapNori(offset);
+    this.use('nori');
+    this.events.emit('changed', undefined);
+    return 'ok';
+  }
+
+  finishOnigiri(): Onigiri | null {
+    const o = this.riceStation.finish();
+    if (o) this.events.emit('changed', undefined);
+    return o;
+  }
+
+  trashOnigiri(): boolean {
+    const ok = this.riceStation.trashBoard();
+    if (ok) this.trashed1();
+    return ok;
+  }
+
+  trashTrayOnigiri(index: number): boolean {
+    if (!this.riceStation.takeTray(index)) return false;
+    this.trashed1();
+    return true;
+  }
+
+  // ---- Kolache and onigiri boxes ------------------------------------------------
+
+  /** Which item a kolache or onigiri is, if it has a filling. */
+  sideItemOf(kind: SideKind, x: Kolache | Onigiri): string | null {
+    const m = this.deps.menu.sides?.[kind];
+    return m ? (identifySide(m, x.filling, x.toppings)?.id ?? null) : null;
+  }
+
+  /** 0–1: how well one kolache or onigiri matches an item. */
+  sideScore(kind: SideKind, x: Kolache | Onigiri, itemId: string): number {
+    const m = this.deps.menu.sides?.[kind];
+    const item = m?.items.find((i) => i.id === itemId);
+    if (!m || !item) return 0;
+    return kind === 'kolache' ? kolacheScore(x as Kolache, item, m, this.deps.balance.bake) : onigiriScore(x as Onigiri, item, m, this.deps.balance.rice);
+  }
+
+  /** The open box of this kind for the selected order. */
+  sideBoxOf(kind: SideKind): readonly (Kolache | Onigiri)[] {
+    return this.sideBox[kind];
+  }
+
+  /** The box this kind goes in for the selected order (null if it ordered none, or it's already packed). */
+  sideBoxChoice(kind: SideKind): { id: string; name: string; size: number } | null {
+    const t = this.activeTicket;
+    const m = this.deps.menu.sides?.[kind];
+    const n = t ? sidesOf(t.order, kind).length : 0;
+    if (!t || !m || !n || t.sidePacks?.[kind]) return null;
+    return sideBoxFor(m, n);
+  }
+
+  /** The kolaches on the rack or onigiri on the tray. */
+  sideReady(kind: SideKind): readonly (Kolache | Onigiri)[] {
+    return kind === 'kolache' ? this.bakery.rack : this.riceStation.tray;
+  }
+
+  /** From the rack/tray into the selected order's box. Returns the box spot, or -1. */
+  packSide(kind: SideKind, index: number): number {
+    const box = this.sideBoxChoice(kind);
+    const from = this.sideReady(kind);
+    if (!box || !from[index] || this.sideBox[kind].length >= box.size) return -1;
+    const x = kind === 'kolache' ? this.bakery.takeRack(index)! : this.riceStation.takeTray(index)!;
+    (this.sideBox[kind] as (Kolache | Onigiri)[]).push(x);
+    this.events.emit('changed', undefined);
+    return this.sideBox[kind].length - 1;
+  }
+
+  /** Back out of the box onto the rack/tray. False if there's no room. */
+  unpackSide(kind: SideKind, index: number): boolean {
+    const x = this.sideBox[kind][index];
+    if (!x) return false;
+    if (kind === 'kolache') {
+      if (this.bakery.rackFull) return false;
+      this.bakery.rack.push(x as Kolache);
+    } else {
+      if (this.riceStation.trayFull) return false;
+      this.riceStation.tray.push(x as Onigiri);
+    }
+    this.sideBox[kind].splice(index, 1);
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
+  /** Close the box and set it aside for the order (it goes out with the donuts). False if it's empty. */
+  closeSideBox(kind: SideKind): boolean {
+    const t = this.activeTicket;
+    const box = this.sideBoxChoice(kind);
+    if (!t || !box || !this.sideBox[kind].length) return false;
+    const napkin = !this.use(boxStockId(box.id));
+    t.sidePacks ??= {};
+    if (kind === 'kolache') t.sidePacks.kolache = this.sideBox.kolache.splice(0);
+    else t.sidePacks.onigiri = this.sideBox.onigiri.splice(0);
+    if (napkin) (t.sidePacks.napkin ??= []).push(kind);
+    this.events.emit('changed', undefined);
+    return true;
+  }
+
+  /** Kinds the selected order still needs packed. */
+  get sidesToPack(): SideKind[] {
+    const t = this.activeTicket;
+    if (!t) return [];
+    return SIDE_KINDS.filter((k) => sidesOf(t.order, k).length > 0 && !t.sidePacks?.[k]);
+  }
+
+  /** Open side boxes go back to the rack/tray (another order was picked); what doesn't fit is thrown away. */
+  private returnSideBoxes(): void {
+    for (const kind of SIDE_KINDS) {
+      while (this.sideBox[kind].length) if (!this.unpackSide(kind, 0)) {
+        this.sideBox[kind].shift();
+        this.trashedCount++;
+      }
+    }
+  }
+
+  /** Kolaches and onigiri in the kitchen (pan, rack, board, tray, open boxes). */
+  private get sideKitchenCount(): number {
+    return this.bakery.panCount + this.bakery.rack.length + (this.riceStation.board ? 1 : 0) + this.riceStation.tray.length + this.sideBox.kolache.length + this.sideBox.onigiri.length;
+  }
+
+  /** Score the order's kolaches and onigiri (each kind 0–100). */
+  private scoreSides(t: Ticket): NonNullable<Ticket['results']['sides']> {
+    const out: NonNullable<Ticket['results']['sides']> = {};
+    const nap = this.deps.balance.sides.napkinFactor ?? 0.85;
+    for (const kind of SIDE_KINDS) {
+      const wanted = sidesOf(t.order, kind);
+      if (!wanted.length) continue;
+      const packed: readonly (Kolache | Onigiri)[] = t.sidePacks?.[kind] ?? [];
+      const match = matchSides(wanted, packed, (x, id) => this.sideScore(kind, x, id));
+      let sum = 0;
+      let missing = 0;
+      wanted.forEach((id, i) => {
+        const x = match[i]! >= 0 ? packed[match[i]!] : undefined;
+        if (x) sum += this.sideScore(kind, x, id);
+        else missing++;
+      });
+      let score = (sum / wanted.length) * 100;
+      if (t.sidePacks?.napkin?.includes(kind)) score *= nap;
+      out[kind] = { score: Math.round(score), count: wanted.length, missing };
+    }
+    return out;
+  }
+
   // ---- Serving ----------------------------------------------------------------
 
   /**
@@ -1716,12 +2062,16 @@ export class GameSession {
       ...(napkin ? { napkin } : {}),
       missing: needed - fried.length,
     };
+    const sides = this.scoreSides(t);
+    if (Object.keys(sides).length) t.results.sides = sides;
 
     const { afterServeSec } = balance;
     this.nextSpawnAtMs = Math.max(this.nextSpawnAtMs, this.now + this.deps.rng.int(afterServeSec.min * 1000, afterServeSec.max * 1000));
     t.status = 'served';
     t.servedAtMs = this.now;
     c.state = 'served';
+    // Anything left in an open side box for this order goes back to the rack/tray.
+    this.returnSideBoxes();
     this.activeNo = this.allTickets.find((x) => x.status === 'open')?.no ?? null;
     if (napkin) t.results.box!.score = Math.round(t.results.box!.score / 2);
     const waitMs = this.now - t.takenAtMs;
@@ -1732,6 +2082,7 @@ export class GameSession {
       needed,
       balance.scoring,
       t.results.box!.gifts,
+      Object.values(sides),
     );
     // A pop-up crowd tips more.
     if (this.deps.event) score.tip = Math.round(score.tip * this.deps.event.tipMultiplier * 100) / 100;
@@ -1838,7 +2189,7 @@ export class GameSession {
     for (const d of this.boxSlots) if (d) n++;
     if (Number.isFinite(this.doughLeft)) n += this.doughLeft;
     if (this.doughWork) n += this.doughWork.yield;
-    return n;
+    return n + this.sideKitchenCount + this.riceStation.portions;
   }
 
   /** The invite a customer made today (an events.json event), if any. */

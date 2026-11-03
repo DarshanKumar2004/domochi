@@ -45,17 +45,23 @@ export class ServeScene extends Phaser.Scene {
     card.add(text(0, -370, `"${thanks}"`, 40, { fontStyle: 'italic', align: 'center', wordWrap: { width: CARD_W - 120 } }).setOrigin(0.5).setName('serve-thanks'));
 
     const val = (x: { score: number } | undefined) => (x ? String(x.score) : '—');
+    const sideVal = (x: { score: number; missing: number }) => (x.missing ? `${x.score}  (${x.missing} missing!)` : String(x.score));
     const rows: [string, string][] = [
       ['Fry', val(r?.fry)],
       ['Glaze', val(r?.glaze)],
       ['Toppings', val(r?.toppings)],
       ['Box', r?.napkin ? `${val(r.box)}  (napkin!)` : val(r?.box)],
+      ...(r?.sides?.kolache ? [['Kolaches', sideVal(r.sides.kolache)] as [string, string]] : []),
+      ...(r?.sides?.onigiri ? [['Onigiri', sideVal(r.sides.onigiri)] as [string, string]] : []),
       ['Wait', score ? `${score.wait}  (${Math.round(this.waitMs / 1000)}s)` : `${Math.round(this.waitMs / 1000)}s`],
     ];
+    // Kolaches and onigiri make the list longer: closer rows, a little smaller.
+    const step = rows.length > 5 ? 330 / (rows.length + 0.2) : 66;
+    const font = rows.length > 5 ? 40 : 46;
     rows.forEach(([label, value], i) => {
-      const y = -265 + i * 66;
-      card.add(text(-340, y, label, 46).setOrigin(0, 0.5));
-      card.add(text(340, y, value, 46).setOrigin(1, 0.5).setName(`serve-${label.toLowerCase()}`));
+      const y = -265 + i * step;
+      card.add(text(-340, y, label, font).setOrigin(0, 0.5));
+      card.add(text(340, y, value, font).setOrigin(1, 0.5).setName(`serve-${label.toLowerCase()}`));
     });
     const line = this.add.graphics();
     line.lineStyle(4, COLORS.ink, 0.2);

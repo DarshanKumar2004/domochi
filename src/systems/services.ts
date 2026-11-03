@@ -11,7 +11,8 @@ import { boxFor } from './orders';
 import { createRng, randomSeed } from './rng';
 import { AudioService } from './AudioService';
 import type { SaveService } from './SaveService';
-import { fillStock } from './supplies';
+import { fillStock, type Stock } from './supplies';
+import { SIDE_KINDS, sideItemsForDay } from '../stations/sides';
 import { awayEarnings } from './staff';
 import journalJson from '../data/journal.json';
 import { StickerTracker, type JournalData } from './journal';
@@ -84,6 +85,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
   const booked = saveService?.data.event;
   const event = !opts.tutorial && booked?.day === day ? popupEvents.find((e) => e.id === booked.id) : undefined;
   const weather = weatherFor(day, balance.weather);
+  const stock = opts.tutorial ? undefined : withStarterKits(day);
   currentSession = new GameSession({
     menu,
     customers: customersData,
@@ -95,7 +97,7 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
       : {
           dayFlow: true,
           events: popupEvents,
-          stock: fillStock(saveService?.data.stock, balance.supplies),
+          stock: stock!,
           weather,
           regulars: { ...(saveService?.data.regulars ?? {}) },
           decor: [...(saveService?.data.decor ?? [])],
@@ -132,6 +134,27 @@ export function startSession(day: number, opts: { tutorial?: boolean } = {}): Ga
     currentTracker.events.on('earned', (st) => void s.update((d) => void (d.journal.stickers.includes(st.id) || d.journal.stickers.push(st.id))));
   }
   return currentSession;
+}
+
+/**
+ * Today's stock, plus the starter kit for kolaches or onigiri if today is the
+ * first day they're on the menu (once per game; saved straight away).
+ */
+function withStarterKits(day: number): Stock {
+  const stock = fillStock(saveService?.data.stock, balance.supplies);
+  const started = new Set(saveService?.data.sidesStarted ?? []);
+  const fresh = SIDE_KINDS.filter((k) => !started.has(k) && sideItemsForDay(menu.sides?.[k], day).length > 0);
+  if (!fresh.length || !saveService) return stock;
+  for (const k of fresh) {
+    const kit = balance.sides.starterKit?.[k];
+    if (kit && typeof kit === 'object') for (const [id, n] of Object.entries(kit)) if (id in stock) stock[id] = (stock[id] ?? 0) + n;
+  }
+  const saved = { ...stock };
+  void saveService.update((d) => {
+    d.stock = saved;
+    d.sidesStarted = [...new Set([...(d.sidesStarted ?? []), ...fresh])];
+  });
+  return stock;
 }
 
 export const journalData = journalJson as JournalData;

@@ -10,6 +10,9 @@ import type { WeatherBalance } from './weather';
 import type { DailyBalance } from './daily';
 import type { WeeklyBalance } from './weekly';
 import type { StaffBalance } from './staff';
+import { validateBake, type BakeBalance } from '../stations/kolache';
+import { validateRice, type RiceBalance } from '../stations/onigiri';
+import type { SidesBalance } from '../stations/sides';
 
 /** A decoration for the lot (bought once at the store), with a small perk. */
 export interface DecorItem {
@@ -67,6 +70,10 @@ export interface Balance {
   weekly: WeeklyBalance;
   goals: { reward: number; fromDay: number; list: { id: string; text: string; base: number; perDay: number; max: number }[] };
   streak: { tipPerOrder: number; maxBonus: number };
+  /** Kolaches and onigiri in orders, and the starter kit when each first unlocks. */
+  sides: SidesBalance & { starterKit?: Record<string, Record<string, number> | string> };
+  bake: BakeBalance;
+  rice: RiceBalance;
 }
 
 /** Entry for `day` (1-based) in a by-day list; days past the end reuse the last entry. */
@@ -145,6 +152,11 @@ export function validateBalance(b: Balance): string[] {
   if (b.deliveries.byDay.length === 0 || badRange(b.deliveries.size, 1)) errors.push('deliveries needs byDay and a size range >= 1');
   if (!(b.cleanup.messDoneAt >= 0 && b.cleanup.tidyBonus >= 0 && b.cleanup.oilDirtMax > 0 && b.cleanup.wipePerUnit > 0)) {
     errors.push('cleanup numbers must be >= 0 (oilDirtMax, wipePerUnit > 0)');
+  }
+  errors.push(...validateBake(b.bake), ...validateRice(b.rice));
+  for (const k of ['kolache', 'onigiri'] as const) {
+    const sd = b.sides[k];
+    if (!(sd.chance >= 0 && sd.chance <= 1) || badRange(sd.count, 1)) errors.push(`sides.${k} needs chance in [0, 1] and a count range >= 1`);
   }
   if (!(f.oil.minToFry > 0 && f.oil.minToFry < f.oil.lowThreshold && f.oil.lowThreshold < 1)) errors.push('fry.oil needs 0 < minToFry < lowThreshold < 1');
   return errors;

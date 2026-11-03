@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import brand from '../data/brand.json';
 import { flavorsForDay } from '../systems/menu';
+import { SIDE_KINDS, sideItemsForDay } from '../stations/sides';
+import { sidePlural } from '../systems/orders';
 import { addPage, dayNote, dayStars, nextMilestone, type JournalPage, type Milestone } from '../systems/journal';
 import { createRng } from '../systems/rng';
 import { couponCode, earnsCoupon } from '../systems/coupons';
@@ -64,6 +66,9 @@ export class DaySummaryScene extends Phaser.Scene {
     const earned = (tracker?.today ?? []).map((id) => journalData.stickers.find((st) => st.id === id)).filter((st) => !!st);
     const known = new Set(flavorsForDay(menu, sum.day).map((f) => f.id));
     const fresh = flavorsForDay(menu, sum.day + 1).filter((f) => !known.has(f.id));
+    // Kolaches and onigiri coming on the menu tomorrow (the first of each kind brings a new station).
+    const freshSides = SIDE_KINDS.flatMap((k) => sideItemsForDay(menu.sides?.[k], sum.day + 1).filter((i) => i.unlockDay === sum.day + 1).map((i) => ({ kind: k, item: i })));
+    const firstOfKind = freshSides.find(({ kind }) => sideItemsForDay(menu.sides?.[kind], sum.day).length === 0);
 
     const card = this.add.container(0, 0, [addCard(this, CARD_W, CARD_H)]).setName('day-summary');
     const text = (x: number, y: number, str: string, size: number, opts: Partial<Phaser.Types.GameObjects.Text.TextStyle> = {}) =>
@@ -130,11 +135,19 @@ export class DaySummaryScene extends Phaser.Scene {
       ? 'screenshot this and bring it to the domochi trailer to redeem your reward!'
       : [
           sum.nextEvent ? `tomorrow: pop-up at ${sum.nextEvent}!` : '',
-          fresh.length ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!\n(its glaze and toppings are at the supply store)` : sum.nextEvent ? '' : this.comingUp(sum.day),
+          fresh.length
+            ? `new tomorrow: ${fresh.map((f) => f.name).join(', ')}!\n(its glaze and toppings are at the supply store)`
+            : firstOfKind
+              ? `new tomorrow: ${sidePlural(firstOfKind.kind, firstOfKind.item.name)} and the ${firstOfKind.kind === 'kolache' ? 'Bake' : 'Rice'} station!\n(a starter kit comes with it)`
+              : freshSides.length
+                ? `new tomorrow: ${freshSides.map((x) => x.item.name).join(', ')}!\n(its filling is at the supply store)`
+                : sum.nextEvent
+                  ? ''
+                  : this.comingUp(sum.day),
         ]
           .filter(Boolean)
           .join('\n');
-    const big = !!coupon || fresh.length > 0 || !!sum.nextEvent;
+    const big = !!coupon || fresh.length > 0 || freshSides.length > 0 || !!sum.nextEvent;
     const newsText = text(0, 378, news, coupon ? 32 : 38, {
       color: coupon ? '#2f6b3a' : big ? '#b0406a' : '#6b5d52',
       fontStyle: big ? 'bold' : 'normal',
@@ -172,6 +185,7 @@ export class DaySummaryScene extends Phaser.Scene {
   private comingUp(day: number): string {
     const list: Milestone[] = [
       ...menu.flavors.map((f) => ({ day: f.unlockDay, text: `${f.name}!` })),
+      ...SIDE_KINDS.flatMap((k) => (menu.sides?.[k].items ?? []).map((i) => ({ day: i.unlockDay, text: `${sidePlural(k, i.name)}!` }))),
       { day: balance.special.fromDay ?? 1, text: 'a special of the day' },
       { day: balance.goals.fromDay, text: 'daily goals' },
       { day: balance.supplies.friendsFromDay ?? 1, text: "Ethan's friends drop by" },
