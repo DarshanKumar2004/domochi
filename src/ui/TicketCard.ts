@@ -28,7 +28,7 @@ export function recipeLine(flavorId: string, menu: Menu): string {
   return parts.join(' + ');
 }
 
-/** "sausage & cheese" / "strawberry cream cheese + posipka crumble": what goes in a kolache or onigiri. */
+/** "jalapeno cheddar sausage filling + egg wash": what goes in a kolache or onigiri. */
 export function sideRecipeLine(kind: SideKind, itemId: string, menu: Menu): string {
   const m = menu.sides?.[kind];
   const it = m?.items.find((i) => i.id === itemId);

@@ -77,7 +77,8 @@ describe('sides data', () => {
   });
 
   it('identifies an item by filling and toppings', () => {
-    expect(identifySide(sides.kolache, 'cream-cheese', { posipka: 5 })?.id).toBe('strawberry-cream-kolache');
+    expect(identifySide(sides.kolache, 'maple-bacon', {})?.id).toBe('maple-bacon-kolache');
+    expect(identifySide(sides.onigiri, 'tuna', {})?.id).toBe('tuna-onigiri');
     expect(identifySide(sides.kolache, null, {})).toBeNull();
   });
 
@@ -92,7 +93,7 @@ describe('Bakery (kolaches)', () => {
   it('proofs on the pan, then bakes golden at the ideal temperature and scores near full marks', () => {
     const b = new Bakery(bake);
     b.temp = 375;
-    perfectKolache(b, 0, 'sausage-kolache');
+    perfectKolache(b, 0, 'jalapeno-cheddar-sausage-kolache');
     run(b, 1 / bake.proof.perSec); // proof → 1
     expect(b.pan[0]!.proof).toBeCloseTo(1, 1);
     expect(b.ovenIn()).toBe(true);
@@ -102,13 +103,13 @@ describe('Bakery (kolaches)', () => {
     expect(b.pan[0]!.baked).toBeGreaterThan(0.9);
     expect(b.ovenOut()).toBe(true);
     const k = b.rack[0]!;
-    const item = sides.kolache.items.find((i) => i.id === 'sausage-kolache')!;
+    const item = sides.kolache.items.find((i) => i.id === 'jalapeno-cheddar-sausage-kolache')!;
     expect(kolacheScore(k, item, sides.kolache, bake)).toBeGreaterThan(0.9);
   });
 
   it('proof stops in the oven', () => {
     const b = new Bakery(bake);
-    perfectKolache(b, 0, 'sausage-kolache');
+    perfectKolache(b, 0, 'jalapeno-cheddar-sausage-kolache');
     run(b, 5);
     const p = b.pan[0]!.proof;
     b.ovenIn();
@@ -138,10 +139,10 @@ describe('Bakery (kolaches)', () => {
   });
 
   it('scores the wrong filling 0 and under-baked low', () => {
-    const k: Kolache = { id: 1, filling: 'boudin', fill: 1, shape: 1, wash: 1, proof: 1, toppings: {}, baked: 1, bakeSec: 10, inRangeSec: 10 };
-    const sausage = sides.kolache.items.find((i) => i.id === 'sausage-kolache')!;
+    const k: Kolache = { id: 1, filling: 'maple-bacon', fill: 1, shape: 1, wash: 1, proof: 1, toppings: {}, baked: 1, bakeSec: 10, inRangeSec: 10 };
+    const sausage = sides.kolache.items.find((i) => i.id === 'jalapeno-cheddar-sausage-kolache')!;
     expect(kolacheScore(k, sausage, sides.kolache, bake)).toBe(0);
-    const pale = { ...k, filling: 'sausage-cheese', baked: 0.3 };
+    const pale = { ...k, filling: 'jalapeno-cheddar-sausage', baked: 0.3 };
     expect(kolacheScore(pale, sausage, sides.kolache, bake)).toBeLessThan(0.75);
   });
 
@@ -164,11 +165,11 @@ describe('RiceStation (onigiri)', () => {
     expect(r.portions).toBe(rice.cooker.portions);
     r.scoop(1 / rice.scoop.perSec);
     expect(r.portions).toBe(rice.cooker.portions - 1);
-    r.setFilling('salmon', 0.05);
+    r.setFilling('tuna', 0.05);
     for (let i = 0; i < rice.press.count; i++) r.press(0.4);
     r.wrapNori(0.02);
     const o = r.finish()!;
-    const item = sides.onigiri.items.find((i) => i.id === 'salmon-onigiri')!;
+    const item = sides.onigiri.items.find((i) => i.id === 'tuna-onigiri')!;
     expect(onigiriScore(o, item, sides.onigiri, rice)).toBeGreaterThan(0.95);
   });
 
@@ -185,10 +186,10 @@ describe('RiceStation (onigiri)', () => {
   });
 
   it('no nori, or the wrong filling, costs', () => {
-    const base = { id: 1, rice: 1, quality: 1, filling: 'salmon', fillOffset: 0, presses: [0.4, 0.4, 0.4], toppings: {}, nori: 0 };
-    const item = sides.onigiri.items.find((i) => i.id === 'salmon-onigiri')!;
+    const base = { id: 1, rice: 1, quality: 1, filling: 'tuna', fillOffset: 0, presses: [0.4, 0.4, 0.4], toppings: {}, nori: 0 };
+    const item = sides.onigiri.items.find((i) => i.id === 'tuna-onigiri')!;
     expect(onigiriScore({ ...base, nori: null }, item, sides.onigiri, rice)).toBeLessThan(0.9);
-    expect(onigiriScore({ ...base, filling: 'tuna-mayo' }, item, sides.onigiri, rice)).toBe(0);
+    expect(onigiriScore({ ...base, filling: 'maple-bacon' }, item, sides.onigiri, rice)).toBe(0);
   });
 
   it('the pot empties as it’s used and can be cooked again', () => {
@@ -219,7 +220,7 @@ describe('orders with sides', () => {
       const order = generateOrder(menu, 12, { min: 1, max: 3 }, [], 1, rng, { balance: balance.sides });
       if (order.kolaches) {
         k++;
-        for (const id of order.kolaches) expect(id).toBe('sausage-kolache');
+        for (const id of order.kolaches) expect(id).toBe('jalapeno-cheddar-sausage-kolache');
       }
       if (order.onigiri) o++;
       expect(order.flavors.length).toBeGreaterThan(0);
@@ -230,10 +231,10 @@ describe('orders with sides', () => {
   });
 
   it('are priced one by one and spoken naturally', () => {
-    const order: Order = { flavors: ['strawberry'], boxId: 'single', kolaches: ['sausage-kolache', 'sausage-kolache'], onigiri: ['salmon-onigiri'] };
+    const order: Order = { flavors: ['strawberry'], boxId: 'single', kolaches: ['jalapeno-cheddar-sausage-kolache', 'jalapeno-cheddar-sausage-kolache'], onigiri: ['tuna-onigiri'] };
     expect(orderPrice(menu, order)).toBeCloseTo(4 + 3.5 * 2 + 4);
     expect(itemCount(order)).toBe(4);
-    expect(describeOrder(menu, order)).toBe('a strawberry, two sausage & cheese kolaches and a salmon onigiri');
+    expect(describeOrder(menu, order)).toBe('a strawberry, two jalapeno cheddar sausage kolaches and a tuna onigiri');
   });
 });
 
@@ -255,7 +256,7 @@ describe('scoreOrder with sides', () => {
 
 describe('GameSession: kolaches and onigiri', () => {
   const customers = customersJson as CustomersData;
-  const order: Order = { flavors: ['beignet'], boxId: 'single', kolaches: ['sausage-kolache'], onigiri: ['salmon-onigiri'] };
+  const order: Order = { flavors: ['beignet'], boxId: 'single', kolaches: ['jalapeno-cheddar-sausage-kolache'], onigiri: ['tuna-onigiri'] };
 
   function session(): GameSession {
     const s = new GameSession({ menu, customers, balance: { ...balance, maxActiveByDay: [99] }, day: 12, rng: createRng(1), script: { orders: [order] } });
@@ -271,7 +272,7 @@ describe('GameSession: kolaches and onigiri', () => {
     expect(s.sidesToPack).toEqual(['kolache', 'onigiri']);
     // Kolache: make, bake, pack.
     s.bakery.temp = 375;
-    perfectKolache(s.bakery, 0, 'sausage-kolache');
+    perfectKolache(s.bakery, 0, 'jalapeno-cheddar-sausage-kolache');
     for (let i = 0; i < 150; i++) s.tick(100); // proof ~1
     expect(s.ovenIn()).toBe(true);
     s.bakery.temp = 375;
@@ -285,7 +286,7 @@ describe('GameSession: kolaches and onigiri', () => {
     expect(s.startRice(0.5)).toBe('ok');
     for (let i = 0; i < 210; i++) s.tick(100);
     s.scoopRice(1 / rice.scoop.perSec);
-    expect(s.setOnigiriFilling('salmon', 0)).toBe('ok');
+    expect(s.setOnigiriFilling('tuna', 0)).toBe('ok');
     for (let i = 0; i < 3; i++) s.pressOnigiri(0.4);
     expect(s.wrapNori(0)).toBe('ok');
     expect(s.finishOnigiri()).not.toBeNull();
@@ -343,7 +344,7 @@ describe('GameSession: kolaches and onigiri', () => {
     const s = new GameSession({ menu, customers, balance, day: 12, rng: createRng(1), stock });
     expect(s.placeKolache()).toBe(0);
     expect(s.placeKolache()).toBe(-1);
-    expect(s.setKolacheFilling(0, 'sausage-cheese')).toBe('none');
+    expect(s.setKolacheFilling(0, 'jalapeno-cheddar-sausage')).toBe('none');
     expect(s.startRice(0.5)).toBe('none');
   });
 

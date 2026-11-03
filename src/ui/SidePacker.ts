@@ -151,12 +151,17 @@ export class SidePacker {
     const tapOthers = others.length ? `\ntap ticket ${others.slice(0, 3).join(', ')} to pack its ${plural}` : '';
     if (!t) hint = `pick an order (tap its ticket up top)${tapOthers}`;
     else if (!wanted.length) hint = `#${t.no} has no ${plural}${tapOthers}`; else if (packed) hint = `#${t.no}: ${names} packed ✓\ntake it to the Box station`;
-    else hint = `#${t.no} wants ${names}\n${this.recipeHint(wanted)}`;
+    else {
+      // The recipe line only when there's more to it than the filling (a topping), else it just repeats the name.
+      const m = this.menu.sides?.[this.kind];
+      const extra = wanted.some((id) => (m?.items.find((i) => i.id === id)?.toppings.length ?? 0) > 0);
+      hint = `#${t.no} wants ${names}${extra ? `\n${this.recipeHint(wanted)}` : ''}`;
+    }
     this.hint.setText(hint);
     this.closeBtn.setVisible(!!choice).setEnabled(inBox.length > 0);
   }
 
-  /** "sausage & cheese" / "strawberry cream cheese + posipka crumble" for each wanted item. */
+  /** "maple bacon" / "tuna" for each wanted item. */
   private recipeHint(wanted: readonly string[]): string {
     const m = this.menu.sides?.[this.kind];
     if (!m) return '';

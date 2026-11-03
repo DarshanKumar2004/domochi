@@ -27,12 +27,12 @@ const METER_MAX = 2;
 const LAYOUT = {
   portrait: {
     pan: { x: 370, y: 400, cell: 190 },
-    tools: { x: 100, y: 790, step: 170, size: 116 },
+    tools: { x: 125, y: 790, step: 175, size: 116 },
     spoon: { x: 880, y: 270 },
     shape: { x: 880, y: 410 },
     toss: { x: 880, y: 540 },
     meters: { x: 150, y: 650, w: 300, cols: 2, colStep: 490 },
-    oven: { x: 260, y: 1028, scale: 0.72 },
+    oven: { x: 260, y: 1045, scale: 0.72 },
     dial: { x: 600, y: 1000, r: 80, temp: { x: 890, y: 1110 } },
     ovenBtn: { x: 890, y: 990, scale: 0.6 },
     packer: { ready: { x: 90, y: 1365, step: 92, size: 80 }, box: { x: 850, y: 1345, w: 330, h: 150 }, close: { x: 850, y: 1475, scale: 0.6 }, hint: { x: 540, y: 1225, width: 1000 } },
@@ -124,7 +124,7 @@ export class BakeScene extends StationScene {
     const fillings = m ? m.fillings.filter((f) => today.some((i) => i.filling === f.id)) : [];
     const toppings = m ? m.toppings.filter((t) => today.some((i) => i.toppings.includes(t.id))) : [];
     const label = (text: string) =>
-      this.add.text(0, 0, text, { fontFamily: FONT_FAMILY, fontSize: '26px', color: CSS.cream, align: 'center', wordWrap: { width: 165 } }).setOrigin(0.5, 0).setDepth(3);
+      this.add.text(0, 0, text, { fontFamily: FONT_FAMILY, fontSize: '25px', color: CSS.cream, align: 'center', wordWrap: { width: 205 } }).setOrigin(0.5, 0).setDepth(3);
     for (const f of fillings) {
       const zone = this.add.zone(0, 0, 10, 10).setName(`bake-filling-${f.id}`).setInteractive({ useHandCursor: true });
       zone.on(Phaser.Input.Events.POINTER_UP, () => this.pickFilling(f.id));

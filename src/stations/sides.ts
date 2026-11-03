@@ -13,13 +13,13 @@ export interface SideFilling {
   name: string;
   /** CSS hex colour (what shows through). */
   color: string;
-  /** A second colour for flecks (cheese in the sausage, herbs in the boudin). */
+  /** A second colour for flecks (jalapeno in the sausage, maple on the bacon). */
   accent?: string;
   /** Kolaches only: how it goes in. */
   style?: FillingStyle;
 }
 
-/** A finishing touch shaken or placed on top (posipka crumble, jalapeño, furikake…). */
+/** A finishing touch shaken or placed on top (a crumble, seeds, furikake…; none on the menu yet). */
 export interface SideTopping {
   id: string;
   name: string;

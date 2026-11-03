@@ -25,7 +25,7 @@ export function itemCount(order: Order): number {
   return order.flavors.length + sidesOf(order, 'kolache').length + sidesOf(order, 'onigiri').length;
 }
 
-/** "boudin kolaches", "salmon onigiri" (onigiri doesn't take an s). */
+/** "maple bacon kolaches", "tuna onigiri" (onigiri doesn't take an s). */
 export function sidePlural(kind: SideKind, name: string): string {
   return kind === 'kolache' ? `${name}s` : name;
 }
@@ -138,7 +138,7 @@ export function describeOrder(menu: Menu, order: Order): string {
   for (const kind of SIDE_KINDS) {
     for (const { flavorId, count } of groupFlavors(sidesOf(order, kind))) {
       const name = sideItem(menu, kind, flavorId)?.name ?? flavorId;
-      // "two boudin kolaches", "two salmon onigiri" (onigiri doesn't take an s).
+      // "two maple bacon kolaches", "two tuna onigiri" (onigiri doesn't take an s).
       parts.push(count === 1 ? `${article(name)} ${name}` : `${numberWord(count)} ${sidePlural(kind, name)}`);
     }
   }

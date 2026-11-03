@@ -504,44 +504,20 @@
         "unlockDay": 6
       },
       {
-        "id": "filling-sausage-cheese",
-        "name": "sausage & cheese",
+        "id": "filling-jalapeno-cheddar-sausage",
+        "name": "jalapeno cheddar sausages",
         "kind": "kitchen",
         "pack": 12,
         "price": 5,
         "unlockDay": 6
       },
       {
-        "id": "filling-cream-cheese",
-        "name": "strawberry cream cheese",
-        "kind": "kitchen",
-        "pack": 12,
-        "price": 4,
-        "unlockDay": 21
-      },
-      {
-        "id": "side-topping-posipka",
-        "name": "posipka crumble",
-        "kind": "kitchen",
-        "pack": 48,
-        "price": 2,
-        "unlockDay": 21
-      },
-      {
-        "id": "filling-boudin",
-        "name": "boudin",
+        "id": "filling-maple-bacon",
+        "name": "maple bacon",
         "kind": "kitchen",
         "pack": 12,
         "price": 6,
-        "unlockDay": 40
-      },
-      {
-        "id": "side-topping-jalapeno",
-        "name": "jalapeño slices",
-        "kind": "kitchen",
-        "pack": 36,
-        "price": 2,
-        "unlockDay": 40
+        "unlockDay": 21
       },
       {
         "id": "box-kolache-bag",
@@ -576,44 +552,12 @@
         "unlockDay": 10
       },
       {
-        "id": "filling-salmon",
-        "name": "salmon",
-        "kind": "kitchen",
-        "pack": 12,
-        "price": 6,
-        "unlockDay": 10
-      },
-      {
-        "id": "filling-tuna-mayo",
-        "name": "tuna mayo",
+        "id": "filling-tuna",
+        "name": "tuna",
         "kind": "kitchen",
         "pack": 12,
         "price": 5,
-        "unlockDay": 26
-      },
-      {
-        "id": "side-topping-furikake",
-        "name": "furikake",
-        "kind": "kitchen",
-        "pack": 60,
-        "price": 2,
-        "unlockDay": 26
-      },
-      {
-        "id": "filling-teriyaki-chicken",
-        "name": "teriyaki chicken",
-        "kind": "kitchen",
-        "pack": 12,
-        "price": 6,
-        "unlockDay": 50
-      },
-      {
-        "id": "side-topping-sesame",
-        "name": "sesame seeds",
-        "kind": "kitchen",
-        "pack": 60,
-        "price": 2,
-        "unlockDay": 50
+        "unlockDay": 10
       },
       {
         "id": "box-onigiri-pack",
@@ -892,14 +836,14 @@
       "_note": "The first day a kind is on the menu, a starter kit of its supplies arrives (once per game).",
       "kolache": {
         "kolache-dough": 12,
-        "filling-sausage-cheese": 12,
+        "filling-jalapeno-cheddar-sausage": 12,
         "box-kolache-bag": 10,
         "box-kolache-box": 4
       },
       "onigiri": {
         "rice": 3,
         "nori": 20,
-        "filling-salmon": 12,
+        "filling-tuna": 12,
         "box-onigiri-pack": 10,
         "box-onigiri-tray": 4
       }

@@ -46,8 +46,8 @@ async function start(page: Page): Promise<void> {
     for (let i = 0; i < 200 && !s.line.length; i++) s.tick(100);
     const c = s.line[0]!;
     const t = s.takeOrder(c.id);
-    t.order.kolaches = ['sausage-kolache'];
-    t.order.onigiri = ['salmon-onigiri'];
+    t.order.kolaches = ['jalapeno-cheddar-sausage-kolache'];
+    t.order.onigiri = ['tuna-onigiri'];
     s.finishOrdering(c.id);
   });
 }
@@ -65,8 +65,8 @@ test('bake a kolache and make an onigiri, pack both for the order', async ({ pag
   await waitForScene(page, SceneKeys.Bake);
   await tapNamed(page, SceneKeys.Bake, 'bake-pan-0');
   await expect.poll(() => view(page, (s) => !!s.bakery.pan[0])).toBe(true);
-  await tapNamed(page, SceneKeys.Bake, 'bake-filling-sausage-cheese');
-  await expect.poll(() => view(page, (s) => s.bakery.pan[0]?.filling)).toBe('sausage-cheese');
+  await tapNamed(page, SceneKeys.Bake, 'bake-filling-jalapeno-cheddar-sausage');
+  await expect.poll(() => view(page, (s) => s.bakery.pan[0]?.filling)).toBe('jalapeno-cheddar-sausage');
   // Hold the spoon, then fold & pinch, about the right time each.
   for (const [name, perSec] of [['bake-spoon', balanceJson.bake.fill.perSec], ['bake-shape', balanceJson.bake.shape.perSec]] as const) {
     const release = await holdNamed(page, SceneKeys.Bake, name);
@@ -111,10 +111,10 @@ test('bake a kolache and make an onigiri, pack both for the order', async ({ pag
   await advance(page, (1 / balanceJson.rice.scoop.perSec) * 1000);
   await scoop();
   await expect.poll(() => view(page, (s) => s.riceStation.board?.rice ?? 0)).toBeGreaterThan(0.5);
-  await tapNamed(page, SceneKeys.Rice, 'rice-filling-salmon');
+  await tapNamed(page, SceneKeys.Rice, 'rice-filling-tuna');
   const board = await boundsNamed(page, SceneKeys.Rice, 'rice-board');
   await tapGame(page, board.x + board.w / 2, board.y + board.h / 2);
-  await expect.poll(() => view(page, (s) => s.riceStation.board?.filling)).toBe('salmon');
+  await expect.poll(() => view(page, (s) => s.riceStation.board?.filling)).toBe('tuna');
   for (let i = 0; i < balanceJson.rice.press.count; i++) {
     const up = await holdNamed(page, SceneKeys.Rice, 'rice-press');
     await advance(page, 400);
