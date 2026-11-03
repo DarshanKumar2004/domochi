@@ -219,7 +219,7 @@ export async function seedStockedDay(page: Page, day = 17): Promise<void> {
   const stock = Object.fromEntries(balanceJson.supplies.items.map((i) => [i.id, 30]));
   await page.addInitScript(
     ([d, st]) => {
-      if (!localStorage.getItem('domochi.save')) localStorage.setItem('domochi.save', JSON.stringify({ tutorialDone: true, day: d, stock: st }));
+      if (!localStorage.getItem('domochi.save')) localStorage.setItem('domochi.save', JSON.stringify({ tutorialDone: true, day: d, stock: st, hintsSeen: ['BakeScene', 'RiceScene', 'ticket-tap'] }));
     },
     [day, stock] as const,
   );

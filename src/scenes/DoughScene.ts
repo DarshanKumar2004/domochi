@@ -10,6 +10,7 @@ import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { roundBg } from '../ui/roundBg';
 import { StationScene } from './StationScene';
+import { popScore } from '../ui/popText';
 
 /** The bowl texture's opening, relative to its centre (see MANIFEST: ellipse at (180, 70) of 360×250). */
 const OPENING = { dy: -55, rx: 150, ry: 36 };
@@ -106,7 +107,7 @@ export class DoughScene extends StationScene {
     this.bowlZone = this.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true }).setName('dough-stir');
     this.sponge = this.add.image(0, 0, TextureKeys.Sponge).setName('dough-sponge').setInteractive({ useHandCursor: true });
     this.spongeLabel = roundBg(this.add
-      .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold', color: '#fbf6ec', backgroundColor: '#1f1a17cc', padding: { x: 8, y: 3 } })
+      .text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '28px', fontStyle: 'bold', color: '#fbf6ec', backgroundColor: '#1f1a17cc', padding: { x: 8, y: 3 } })
       .setOrigin(0.5, 0), 0x1f1a17, 0.8, 10);
     this.sponge.on(Phaser.Input.Events.POINTER_UP, () => {
       const s = session();
@@ -123,7 +124,7 @@ export class DoughScene extends StationScene {
       this.bins.push({
         id: ing.id,
         img,
-        name: this.add.text(0, 0, ing.name, { fontFamily: FONT_FAMILY, fontSize: '26px', color: CSS.cream, align: 'center', wordWrap: { width: 170 } }).setOrigin(0.5, 0),
+        name: this.add.text(0, 0, ing.name, { fontFamily: FONT_FAMILY, fontSize: '28px', color: CSS.cream, align: 'center', wordWrap: { width: 175 } }).setOrigin(0.5, 0),
         count: this.add.text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '40px', fontStyle: 'bold', color: CSS.ink }).setOrigin(0.5),
       });
     }
@@ -145,7 +146,17 @@ export class DoughScene extends StationScene {
     this.bowlZone.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => this.startStir(p));
     this.events.on(Phaser.Scenes.Events.SLEEP, this.stopStir, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.SLEEP, this.stopStir, this));
+    // Faded buttons say why when tapped.
+    this.redoButton.setWhy(() => 'nothing in the bowl yet');
+    this.doneButton.setWhy(() => {
+      const w = session().doughBatch;
+      if (!w || w.totalScoops === 0) return 'scoop the recipe into the bowl first';
+      if (w.stage !== 'ready') return 'stir it smooth first';
+      if (w.yield > session().tubSpace) return 'the tub is too full for this batch';
+      return 'that batch is missing something';
+    });
     listen(this, session().events, 'changed', () => this.refresh());
+    listen(this, session().events, 'doughMade', ({ quality }) => popScore(this, this.bowlPos.x, this.bowlPos.y - 120 * this.bowlPos.scale, quality * 100));
   }
 
   protected layoutStation(v: Viewport): void {

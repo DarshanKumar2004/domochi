@@ -64,7 +64,7 @@ export class Button extends Phaser.GameObjects.Container {
       if (wasPressed && this.enabled) {
         audio().play('tap');
         onTap();
-      }
+      } else if (!this.enabled) explainDisabled(this, this.why?.());
     });
 
     if (opts.name) this.setName(opts.name);
@@ -72,6 +72,13 @@ export class Button extends Phaser.GameObjects.Container {
   }
 
   private enabled = true;
+  private why: (() => string | null) | undefined;
+
+  /** What to say when a faded button is tapped ("pick an order first"), instead of nothing happening. */
+  setWhy(why: () => string | null): this {
+    this.why = why;
+    return this;
+  }
 
   get isEnabled(): boolean {
     return this.enabled;
@@ -94,4 +101,27 @@ export class Button extends Phaser.GameObjects.Container {
     this.pressed = false;
     this.each((child: Phaser.GameObjects.Components.Transform) => child.setScale(1));
   }
+}
+
+/**
+ * A faded button was tapped: say why, in a little note just above it that
+ * fades away. Nothing happening at all reads as "broken" (good game UI always
+ * answers a tap).
+ */
+export function explainDisabled(button: Phaser.GameObjects.Container, why: string | null | undefined): void {
+  if (!why) return;
+  const scene = button.scene;
+  const m = button.getWorldTransformMatrix();
+  const h = button.height * Math.abs(m.d || 1);
+  const old = scene.children.getByName('why-note');
+  old?.destroy();
+  const note = scene.add
+    .text(m.tx, m.ty - h / 2 - 34, why, { fontFamily: FONT_FAMILY, fontSize: '32px', fontStyle: 'bold', color: CSS.ink, backgroundColor: '#fffaf0', padding: { x: 16, y: 8 }, align: 'center' })
+    .setOrigin(0.5)
+    .setDepth(70)
+    .setName('why-note');
+  // Keep it on screen.
+  const cam = scene.cameras.main;
+  note.setX(Phaser.Math.Clamp(note.x, note.width / 2 + 10, cam.width - note.width / 2 - 10));
+  scene.tweens.add({ targets: note, alpha: 0, delay: 1500, duration: 400, onComplete: () => note.destroy() });
 }

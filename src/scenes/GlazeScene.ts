@@ -32,6 +32,7 @@ import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { roundBg } from '../ui/roundBg';
 import { StationScene } from './StationScene';
+import { popScore } from '../ui/popText';
 
 /** Paint canvas resolution (px per side) for a donut on the tray. */
 const CANVAS = 420;
@@ -260,6 +261,9 @@ export class GlazeScene extends StationScene {
         if (this.textures.exists(b.messKey)) this.textures.remove(b.messKey);
       }
     });
+    // Faded buttons say why when tapped.
+    this.redoButton.setWhy(() => 'nothing on the tray to redo');
+    this.doneButton.setWhy(() => (session().shelfFull ? 'the shelf is full: box some donuts first' : 'tap a donut on the rack to glaze it'));
     listen(this, session().events, 'changed', () => this.refresh());
   }
 
@@ -365,7 +369,7 @@ export class GlazeScene extends StationScene {
     const label = this.add
       .text(0, 0, lockedUntil === null ? name : '', {
         fontFamily: FONT_FAMILY,
-        fontSize: '24px',
+        fontSize: '28px',
         color: lockedUntil === null ? CSS.cream : CSS.muted,
         align: 'center',
         wordWrap: { width: 160 },
@@ -995,6 +999,7 @@ export class GlazeScene extends StationScene {
       }
       sent++;
       const b = this.boards[i]!;
+      popScore(this, b.x, b.y - b.size * 0.45, s.glazeQualityOf(d));
       const ghost = this.add.image(b.x, b.y, donutIcon(this, d)).setDisplaySize(b.size, b.size).setDepth(15);
       this.tweens.add({
         targets: ghost,

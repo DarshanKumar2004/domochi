@@ -67,6 +67,9 @@ export class TicketRail extends Phaser.GameObjects.Container {
    * Day, then the clock (with the full day: time left at the window) or how
    * many are served, then money. Called every second for the clock.
    */
+  /** The selected ticket (as of the last refresh): tapping it again opens it big. */
+  private activeNo: number | undefined;
+
   refreshDay(session: GameSession): void {
     const v = this.viewport;
     if (!v) return;
@@ -97,6 +100,7 @@ export class TicketRail extends Phaser.GameObjects.Container {
     const open = session.openTickets;
     const shown = open.length > fit ? open.slice(0, fit - 1) : open;
     const activeNo = session.activeTicket?.no;
+    this.activeNo = activeNo;
 
     // Selecting a ticket only redraws its frame. Rebuilding would replace the tap
     // targets, and new ones only become tappable a frame later, which can swallow
@@ -168,7 +172,8 @@ export class TicketRail extends Phaser.GameObjects.Container {
       const now = performance.now();
       const double = this.lastTap.no === t.no && now - this.lastTap.at < DOUBLE_TAP_MS;
       this.lastTap = double ? { no: -1, at: 0 } : { no: t.no, at: now };
-      if (double) this.onOpen(t.no);
+      // Tap to pick an order; tap the picked one again (or double-tap) to see it big.
+      if (double || this.activeNo === t.no) this.onOpen(t.no);
       else this.onSelect(t.no);
     });
     c.add(hit);

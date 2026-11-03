@@ -35,5 +35,10 @@
   "outro": [
     "you did it! that's the whole kitchen: fry, glaze, toppings, box.",
     "you can make donuts ahead of time, and keep a few orders going at once. let's open for the day!"
-  ]
+  ],
+  "stationHints": {
+    "_note": "mochi's one-time hint the first time you open a station that unlocks after the tutorial (save.hintsSeen). Tap it to close.",
+    "BakeScene": "🍞 kolaches! tap the pan for a dough ball, pick a filling,\nhold the spoon, then fold & pinch. brush on egg wash,\nlet it rise a bit, then bake it golden. (tap to close)",
+    "RiceScene": "🍙 onigiri! set the water to the green line and cook a pot.\nhold to scoop, pick a filling and tap the middle,\npress 3 times, then drag the nori on. (tap to close)"
+  }
 }

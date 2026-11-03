@@ -6,7 +6,7 @@ import { TicketCard } from '../ui/TicketCard';
 import { onLayout } from '../ui/viewport';
 import { SceneKeys } from './sceneKeys';
 
-/** A ticket shown big, with each donut's recipe. Opened by double-tapping a rail ticket; tap anywhere to close. */
+/** A ticket shown big, with each donut's recipe. Opened by tapping the selected rail ticket (or double-tapping any); tap anywhere to close. */
 export class TicketViewScene extends Phaser.Scene {
   private ticketNo = 0;
 
@@ -27,8 +27,10 @@ export class TicketViewScene extends Phaser.Scene {
     const blocker = beginOverlay(this, 0.6);
     // Close on a fresh tap only. The finger that double-tapped to open this is
     // still down; without this, lifting it would close the view straight away.
+    // And not in the first moment: the second tap of a double-tap shouldn't close it either.
     let armed = false;
-    blocker.on(Phaser.Input.Events.POINTER_DOWN, () => (armed = true));
+    const openedAt = this.time.now;
+    blocker.on(Phaser.Input.Events.POINTER_DOWN, () => (armed = this.time.now - openedAt > 450));
     blocker.on(Phaser.Input.Events.POINTER_UP, () => {
       if (armed) this.scene.stop();
     });

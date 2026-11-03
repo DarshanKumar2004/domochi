@@ -26,6 +26,7 @@ import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
+import { popScore } from '../ui/popText';
 import { roundBg } from '../ui/roundBg';
 import { TrayWiper } from '../ui/TrayWiper';
 
@@ -264,6 +265,9 @@ export class ToppingsScene extends StationScene {
         if (this.textures.exists(b.messKey)) this.textures.remove(b.messKey);
       }
     });
+    // Faded buttons say why when tapped.
+    this.redoButton.setWhy(() => 'nothing on the tray to redo');
+    this.doneButton.setWhy(() => 'tap a donut on the shelf to top it');
     listen(this, session().events, 'changed', () => this.refresh());
   }
 
@@ -394,7 +398,7 @@ export class ToppingsScene extends StationScene {
     const label = this.add
       .text(0, 0, lockedUntil === null ? t.name : '', {
         fontFamily: FONT_FAMILY,
-        fontSize: '26px',
+        fontSize: '28px',
         color: lockedUntil === null ? CSS.cream : CSS.muted,
         align: 'center',
         wordWrap: { width: 190 },
@@ -903,6 +907,7 @@ export class ToppingsScene extends StationScene {
       const before = s.shelf.length;
       const d = s.finishToppings(i);
       if (!d) return;
+      popScore(this, b.x, b.y - b.size * 0.45, s.toppingQualityOf(d));
       const ghost = this.add.image(b.x, b.y, donutIcon(this, d)).setDisplaySize(b.size, b.size).setDepth(15);
       this.tweens.add({
         targets: ghost,

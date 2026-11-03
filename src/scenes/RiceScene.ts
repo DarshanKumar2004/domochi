@@ -15,6 +15,7 @@ import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
+import { popScore } from '../ui/popText';
 
 const GOOD = 0x7fd1ae;
 const LOW = 0xf0a23a;
@@ -52,7 +53,7 @@ const LAYOUT = {
     toss: { x: 1180, y: 560 },
     meters: { x: 680, y: 530, w: 260 },
     tools: { x: 840, y: 640, step: 125, size: 96 },
-    packer: { ready: { x: 1550, y: 300, step: 100, size: 88, cols: 3 }, box: { x: 1650, y: 560, w: 330, h: 150 }, close: { x: 1650, y: 705, scale: 0.55 }, hint: { x: 1650, y: 185, width: 420 } },
+    packer: { ready: { x: 1550, y: 335, step: 95, size: 84, cols: 3 }, box: { x: 1650, y: 575, w: 330, h: 140 }, close: { x: 1650, y: 710, scale: 0.55 }, hint: { x: 1650, y: 180, width: 440 } },
     flash: { x: 900, y: 330 },
   },
 } as const;
@@ -147,7 +148,7 @@ export class RiceScene extends StationScene {
     const m = menu.sides?.onigiri;
     const today = sideItemsForDay(m, session().day);
     const label = (text: string) =>
-      this.add.text(0, 0, text, { fontFamily: FONT_FAMILY, fontSize: '24px', color: CSS.cream, align: 'center', wordWrap: { width: 140 } }).setOrigin(0.5, 0).setDepth(3);
+      this.add.text(0, 0, text, { fontFamily: FONT_FAMILY, fontSize: '26px', color: CSS.cream, align: 'center', wordWrap: { width: 145 } }).setOrigin(0.5, 0).setDepth(3);
     for (const f of m ? m.fillings.filter((f) => today.some((i) => i.filling === f.id)) : []) {
       const zone = this.add.zone(0, 0, 10, 10).setName(`rice-filling-${f.id}`).setInteractive({ useHandCursor: true });
       zone.on(Phaser.Input.Events.POINTER_UP, () => this.pickFilling(f.id));
@@ -161,13 +162,23 @@ export class RiceScene extends StationScene {
 
     this.meterArt = this.add.graphics().setDepth(3);
     for (const name of ['rice', 'shape']) {
-      this.meterLabels.push(this.add.text(0, 0, name, { fontFamily: FONT_FAMILY, fontSize: '24px', color: CSS.cream }).setOrigin(1, 0.5).setDepth(3));
+      this.meterLabels.push(this.add.text(0, 0, name, { fontFamily: FONT_FAMILY, fontSize: '28px', color: CSS.cream }).setOrigin(1, 0.5).setDepth(3));
     }
     this.flashText = roundBg(
       this.add.text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: '44px', fontStyle: 'bold', color: CSS.ink, align: 'center' }).setPadding(24, 14, 24, 14).setDepth(40).setVisible(false).setName('rice-flash'),
       COLORS.cream,
     );
     this.packer = new SidePacker(this, 'onigiri', session, menu, (t) => this.flash(t), balance.rice.press.count);
+    // Faded buttons say why when tapped.
+    this.cookBtn.setWhy(() => (session().riceStation.cooker === 'cooking' ? 'the rice is cooking' : 'use up the rice in the pot first'));
+    this.scoop.setWhy(() => {
+      const r = session().riceStation;
+      if (r.board) return "it's already pressed: wrap it and tap Done";
+      return r.cooker === 'cooking' ? 'the rice is still cooking' : 'cook a pot of rice first';
+    });
+    this.press.setWhy(() => (session().riceStation.board ? "it's wrapped: tap Done" : 'scoop some rice first'));
+    this.done.setWhy(() => 'scoop some rice first');
+    this.toss.setWhy(() => 'nothing on the board');
     listen(this, session().events, 'changed', () => this.refresh());
     listen(this, session().events, 'riceReady', () => {
       audio().play('ding');
@@ -451,7 +462,11 @@ export class RiceScene extends StationScene {
     const o = s.riceStation.board;
     if (!o) return;
     if (s.riceStation.trayFull) return this.flash('the tray is full!\npack some first');
-    if (s.finishOnigiri()) audio().play('tap');
+    const done = s.finishOnigiri();
+    if (done) {
+      audio().play('tap');
+      popScore(this, this.boardPos.x, this.boardPos.y - this.boardPos.r, s.sideQualityOf('onigiri', done));
+    }
   }
 
   private tossIt(): void {

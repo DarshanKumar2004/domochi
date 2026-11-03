@@ -10,6 +10,7 @@ import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { roundBg } from '../ui/roundBg';
 import { StationScene } from './StationScene';
+import { popScore } from '../ui/popText';
 
 /** Doneness shown on the per-donut meters goes 0 → METER_MAX (golden = 1). */
 const METER_MAX = 1.5;
@@ -242,6 +243,11 @@ export class FryScene extends StationScene {
     // Leaving the station lets go of the grate and any donut being dragged.
     this.events.on(Phaser.Scenes.Events.SLEEP, this.onSleep, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.SLEEP, this.onSleep, this));
+    // Faded buttons say why when tapped.
+    this.grateButton.setWhy(() => 'nothing in the oil yet: tap Drop');
+    this.dropButton.setWhy(() => (session().dough < 1 ? 'no dough! make some at the Dough station' : 'the vat is full (or out of oil)'));
+    this.pullAllButton.setWhy(() => (session().rackFull ? 'the rack is full: glaze some donuts first' : 'nothing in the oil to pull'));
+    this.oilButton.setWhy(() => 'the oil is already full');
     listen(this, session().events, 'changed', () => this.refresh());
     listen(this, session().events, 'burnt', (e) => e.slots.forEach((s) => this.burnAnimation(s)));
     this.refresh();
@@ -256,7 +262,7 @@ export class FryScene extends StationScene {
     const img = this.add.image(0, 0, TextureKeys.DonutFry).setVisible(false).setName(`fry-donut-${i}`).setDepth(2);
     const meterLabel = (s: string) =>
       this.add
-        .text(0, 0, s, { fontFamily: FONT_FAMILY, fontSize: '17px', fontStyle: 'bold', color: CSS.cream, backgroundColor: '#1f1a17dd', padding: { x: 5, y: 1 } })
+        .text(0, 0, s, { fontFamily: FONT_FAMILY, fontSize: '22px', fontStyle: 'bold', color: CSS.cream, backgroundColor: '#1f1a17dd', padding: { x: 5, y: 1 } })
         .setOrigin(1, 0.5)
         .setDepth(4)
         .setVisible(false);
@@ -749,8 +755,10 @@ export class FryScene extends StationScene {
     }
     if (overRack) {
       const rackIndex = Math.min(s.rack.length, RACK_SHOWN - 1);
-      if (s.pullDonut(slot)) {
+      const pulled = s.pullDonut(slot);
+      if (pulled) {
         this.ghost(x, y, tint, v.img.displayWidth, this.rackSpot(rackIndex));
+        popScore(this, x, y - 60, pulled.score);
         return;
       }
       this.flash('the rack is full!');
@@ -787,6 +795,8 @@ export class FryScene extends StationScene {
       const v = this.slotViews[slot]!;
       const from = this.slotPosition(slot);
       this.ghost(from.x, from.y, tints[slot]!, v.img.displayWidth, this.rackSpot(Math.min(before + k, RACK_SHOWN - 1)), k * 70);
+      const d = s.rack[before + k];
+      if (d) this.time.delayedCall(k * 120, () => popScore(this, from.x, from.y - 60, d.score));
     });
   }
 

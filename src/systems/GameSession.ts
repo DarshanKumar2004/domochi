@@ -1900,6 +1900,29 @@ export class GameSession {
     return true;
   }
 
+  // ---- Quick feedback (station pop-ups) ---------------------------------------------
+
+  /** 0–100: how well a donut's glaze matches the best of today's flavours (for the Glaze pop-up). */
+  glazeQualityOf(d: FinishedDonut): number {
+    let best = 0;
+    for (const f of flavorsForDay(this.deps.menu, this.day)) if (f.glaze) best = Math.max(best, glazeScoreFor(d, f, this.deps.balance.glaze));
+    return Math.round(best * 100);
+  }
+
+  /** 0–100: how well a donut's toppings match the best of today's flavours with toppings. */
+  toppingQualityOf(d: FinishedDonut): number {
+    let best = 0;
+    for (const f of flavorsForDay(this.deps.menu, this.day)) if (f.toppings.length) best = Math.max(best, toppingScoreFor(d, f, this.deps.menu, this.deps.balance.toppings));
+    return Math.round(best * 100);
+  }
+
+  /** 0–100: a kolache or onigiri against the best item of its kind it could be. */
+  sideQualityOf(kind: SideKind, x: Kolache | Onigiri): number {
+    let best = 0;
+    for (const it of this.deps.menu.sides?.[kind].items ?? []) best = Math.max(best, this.sideScore(kind, x, it.id));
+    return Math.round(best * 100);
+  }
+
   // ---- Kolache and onigiri boxes ------------------------------------------------
 
   /** Which item a kolache or onigiri is, if it has a filling. */

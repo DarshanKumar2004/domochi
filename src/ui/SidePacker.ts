@@ -56,9 +56,9 @@ export class SidePacker {
       scene.add.text(0, 0, '', { fontFamily: FONT_FAMILY, fontSize: `${size}px`, color, align: 'center' }).setOrigin(0.5).setDepth(5);
     this.hint = text(30, CSS.cream).setName(`${kind}-order-hint`);
     this.boxLabel = text(28, '#8a6a45');
-    this.readyLabel = text(26, CSS.muted).setText(kind === 'kolache' ? 'cooling rack' : 'onigiri tray');
+    this.readyLabel = text(28, CSS.muted).setText(kind === 'kolache' ? 'cooling rack' : 'onigiri tray');
     this.closeBtn = new Button(scene, 0, 0, 'Close box', () => this.close(), { width: 420, height: 130, name: `btn-close-${kind}` });
-    this.closeBtn.setDepth(6);
+    this.closeBtn.setDepth(6).setWhy(() => `tap a ${kind === 'kolache' ? 'kolache on the rack' : 'onigiri on the tray'} to pack it first`);
   }
 
   layout(l: PackerLayout): void {

@@ -118,6 +118,8 @@ export class BoxScene extends StationScene {
     this.sizeButtons = [...menu.boxes]
       .sort((a, b) => a.size - b.size)
       .map((b) => new BoxPile(this, b.id, b.size, b.name.replace(/^the /, ''), () => this.pickBox(b.id)));
+    // A faded button says why when tapped.
+    this.serveButton.setWhy(() => (!session().activeTicket ? 'pick an order first: tap its ticket up top' : 'put the donuts in the box first'));
     listen(this, session().events, 'changed', () => this.refresh());
   }
 

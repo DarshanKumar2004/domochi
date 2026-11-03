@@ -15,6 +15,7 @@ import { COLORS, CSS, FONT_FAMILY } from '../ui/theme';
 import { listen } from './listen';
 import { SceneKeys } from './sceneKeys';
 import { StationScene } from './StationScene';
+import { popScore } from '../ui/popText';
 
 const GOOD = 0x7fd1ae;
 const LOW = 0xf0a23a;
@@ -123,7 +124,7 @@ export class BakeScene extends StationScene {
     const fillings = m ? m.fillings.filter((f) => today.some((i) => i.filling === f.id)) : [];
     const toppings = m ? m.toppings.filter((t) => today.some((i) => i.toppings.includes(t.id))) : [];
     const label = (text: string) =>
-      this.add.text(0, 0, text, { fontFamily: FONT_FAMILY, fontSize: '22px', color: CSS.cream, align: 'center', wordWrap: { width: 165 } }).setOrigin(0.5, 0).setDepth(3);
+      this.add.text(0, 0, text, { fontFamily: FONT_FAMILY, fontSize: '26px', color: CSS.cream, align: 'center', wordWrap: { width: 165 } }).setOrigin(0.5, 0).setDepth(3);
     for (const f of fillings) {
       const zone = this.add.zone(0, 0, 10, 10).setName(`bake-filling-${f.id}`).setInteractive({ useHandCursor: true });
       zone.on(Phaser.Input.Events.POINTER_UP, () => this.pickFilling(f.id));
@@ -177,7 +178,7 @@ export class BakeScene extends StationScene {
 
     this.meterArt = this.add.graphics().setDepth(3);
     for (const name of ['rise', 'filling', 'shape', 'egg wash']) {
-      this.meterLabels.push(this.add.text(0, 0, name, { fontFamily: FONT_FAMILY, fontSize: '24px', color: CSS.cream }).setOrigin(1, 0.5).setDepth(3));
+      this.meterLabels.push(this.add.text(0, 0, name, { fontFamily: FONT_FAMILY, fontSize: '28px', color: CSS.cream }).setOrigin(1, 0.5).setDepth(3));
     }
 
     this.flashText = roundBg(
@@ -185,6 +186,12 @@ export class BakeScene extends StationScene {
       COLORS.cream,
     );
     this.packer = new SidePacker(this, 'kolache', session, menu, (t) => this.flash(t));
+    // Faded buttons say why when tapped.
+    const needBall = () => (session().bakery.inOven ? 'the pan is in the oven' : 'tap a dough ball on the pan first');
+    this.spoon.setWhy(() => (this.selected < 0 || session().bakery.inOven ? needBall() : 'pick a filling first'));
+    this.shapeBtn.setWhy(needBall);
+    this.toss.setWhy(needBall);
+    this.ovenBtn.setWhy(() => 'put some dough on the pan first');
     listen(this, session().events, 'changed', () => this.refresh());
     listen(this, session().events, 'kolacheBurnt', ({ slots }) => {
       audio().play('burn');
@@ -509,8 +516,14 @@ export class BakeScene extends StationScene {
   private ovenToggle(): void {
     const s = session();
     if (s.bakery.inOven) {
+      const before = s.bakery.rack.length;
       if (!s.ovenOut()) this.flash('the rack is full!\npack some kolaches first');
-      else audio().play('tap');
+      else {
+        audio().play('tap');
+        // How the pan came out: the average of the kolaches just baked.
+        const out = s.bakery.rack.slice(before);
+        if (out.length) popScore(this, this.ovenPos.x, this.ovenPos.y - 60, out.reduce((a, k) => a + s.sideQualityOf('kolache', k), 0) / out.length);
+      }
     } else if (s.ovenIn()) {
       this.selected = -1;
       audio().play('drop');

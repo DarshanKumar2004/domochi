@@ -166,7 +166,7 @@ export class LobbyScene extends Phaser.Scene {
     const chalk = this.add
       .text(0, 0, specialName ? `today's special\n${specialName}\n+${money(balance.special.priceBonus)}` : '', {
         fontFamily: FONT_FAMILY,
-        fontSize: '26px',
+        fontSize: '28px',
         fontStyle: 'bold',
         color: '#f4f1e8',
         align: 'center',

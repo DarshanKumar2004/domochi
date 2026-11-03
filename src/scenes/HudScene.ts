@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import tutorialData from '../data/tutorial.json';
 import { dailyGift } from '../systems/daily';
 import { audio, awardSticker, balance, collectAwayEarnings, isClockPaused, markSeen, menu, save, saveDayInProgress, session, stickers } from '../systems/services';
 import { Button } from '../ui/Button';
@@ -43,7 +44,14 @@ export class HudScene extends Phaser.Scene {
     this.rail = new TicketRail(
       this,
       menu,
-      (no) => session().selectTicket(no),
+      (no) => {
+        session().selectTicket(no);
+        // Once: teach that tapping the picked ticket again shows it big.
+        if (!session().isTutorial && !(save().data.hintsSeen ?? []).includes('ticket-tap')) {
+          this.showToast('tip: tap the picked ticket again\nto see the whole order, big');
+          void save().update((d) => void (d.hintsSeen = [...(d.hintsSeen ?? []), 'ticket-tap']));
+        }
+      },
       (no) => {
         if (!this.scene.isActive(SceneKeys.TicketView)) this.scene.launch(SceneKeys.TicketView, { ticketNo: no });
       },
@@ -203,6 +211,15 @@ export class HudScene extends Phaser.Scene {
    * customer at the window, a donut side done (flip or pull it), a pan of
    * kolaches golden, a pot of rice ready. Checked every frame, no allocations.
    */
+  /** The first time you open a station that came after the tutorial (Bake, Rice): mochi's quick how-to, once. */
+  private stationHint(key: StationKey): void {
+    const hints = (tutorialData as { stationHints?: Record<string, string> }).stationHints;
+    const hint = hints?.[key];
+    if (!hint || session().isTutorial || (save().data.hintsSeen ?? []).includes(key)) return;
+    this.showToast(hint, true);
+    void save().update((d) => void (d.hintsSeen = [...(d.hintsSeen ?? []), key]));
+  }
+
   private updateBadges(): void {
     const s = session();
     this.tabBar.setBadge(SceneKeys.Lobby, s.phase === 'open' && s.someoneToServe);
@@ -266,6 +283,7 @@ export class HudScene extends Phaser.Scene {
     this.scene.bringToTop();
     this.current = key;
     this.tabBar.selectTab(key);
+    this.stationHint(key);
   }
 
   private openSettings(): void {

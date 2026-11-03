@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MIN_HIT_SIZE } from './layout';
 import { COLORS, CSS, FONT_FAMILY } from './theme';
+import { explainDisabled } from './Button';
 
 /**
  * A button you press and hold (e.g. the fryer grate). onChange(true) on press,
@@ -36,13 +37,24 @@ export class HoldButton extends Phaser.GameObjects.Container {
 
     this.setSize(this.bw, this.bh);
     this.setInteractive({ useHandCursor: true });
-    this.on(Phaser.Input.Events.POINTER_DOWN, () => this.set(true));
+    this.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      if (!this.enabled) explainDisabled(this, this.why?.());
+      else this.set(true);
+    });
     this.on(Phaser.Input.Events.POINTER_OUT, () => this.set(false));
     // Lifting the finger anywhere releases it, even off the button.
     scene.input.on(Phaser.Input.Events.POINTER_UP, this.release, this);
     this.once(Phaser.GameObjects.Events.DESTROY, () => scene.input.off(Phaser.Input.Events.POINTER_UP, this.release, this));
     if (name) this.setName(name);
     scene.add.existing(this);
+  }
+
+  private why: (() => string | null) | undefined;
+
+  /** What to say when it's faded and pressed ("tap a dough ball first"). */
+  setWhy(why: () => string | null): this {
+    this.why = why;
+    return this;
   }
 
   get isHeld(): boolean {

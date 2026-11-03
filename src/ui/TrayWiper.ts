@@ -37,7 +37,7 @@ export class TrayWiper {
     this.sponge = scene.add.image(0, 0, TextureKeys.Sponge).setDepth(22).setVisible(false).setName(`sponge-${tray}`);
     this.icon = scene.add.image(0, 0, TextureKeys.Sponge).setDepth(18).setVisible(false).setName(`sponge-pick-${tray}`).setInteractive({ useHandCursor: true });
     this.iconLabel = roundBg(scene.add
-      .text(0, 0, 'tap to clean', { fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold', color: '#fbf6ec', backgroundColor: '#1f1a17cc', padding: { x: 8, y: 3 } })
+      .text(0, 0, 'tap to clean', { fontFamily: FONT_FAMILY, fontSize: '28px', fontStyle: 'bold', color: '#fbf6ec', backgroundColor: '#1f1a17cc', padding: { x: 8, y: 3 } })
       .setOrigin(0.5, 0)
       .setDepth(18)
       .setVisible(false), 0x1f1a17, 0.8, 10);
