@@ -69,6 +69,8 @@ export class TicketRail extends Phaser.GameObjects.Container {
    */
   /** The selected ticket (as of the last refresh): tapping it again opens it big. */
   private activeNo: number | undefined;
+  /** When a ticket was last opened big (performance.now()). */
+  private openedAt = -Infinity;
 
   refreshDay(session: GameSession): void {
     const v = this.viewport;
@@ -173,8 +175,12 @@ export class TicketRail extends Phaser.GameObjects.Container {
       const double = this.lastTap.no === t.no && now - this.lastTap.at < DOUBLE_TAP_MS;
       this.lastTap = double ? { no: -1, at: 0 } : { no: t.no, at: now };
       // Tap to pick an order; tap the picked one again (or double-tap) to see it big.
-      if (double || this.activeNo === t.no) this.onOpen(t.no);
-      else this.onSelect(t.no);
+      // Taps just after opening are the rest of a double-tap (the big view isn't up yet): ignore them.
+      if (now - this.openedAt < DOUBLE_TAP_MS) return;
+      if (double || this.activeNo === t.no) {
+        this.openedAt = now;
+        this.onOpen(t.no);
+      } else this.onSelect(t.no);
     });
     c.add(hit);
     return c;
